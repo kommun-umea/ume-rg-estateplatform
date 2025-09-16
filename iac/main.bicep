@@ -119,7 +119,7 @@ module appSlot_estateservice 'br/ume:microsoft.web.sites.slots:v2.0' = {
   params: {
     environment: environment
 
-    appName: app_estateservicedapter.outputs.name
+    appName: app_estateservice.outputs.name
     appServicePlanId: appServicePlan.outputs.id
   }
 }
