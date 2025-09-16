@@ -21,7 +21,7 @@ if ($environment -ne $parameters.environment.value) {
 $companyPrefix = $parameters.companyPrefix.value
 $purpose = $parameters.purpose.value
 $location = $parameters.location.value
-$templateFile = ".\iac\main.bicep"
+$templateFile = "./iac/main.bicep"
 $resourceGroupAbbreviation = "rg"
 $resourceGroupName = "$companyPrefix-$resourceGroupAbbreviation-$purpose-$environment"
 $deploymentName = "${resourceGroupName}_$(Get-Date -Format 'yyyyMMddTHHmmss')"
