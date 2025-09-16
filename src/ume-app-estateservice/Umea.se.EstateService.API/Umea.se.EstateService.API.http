@@ -1,0 +1,6 @@
+@Umea.se.EstateService.API_HostAddress = http://localhost:5211
+
+GET {{Umea.se.EstateService.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

@@ -1,0 +1,28 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "environment": {
+            "value": "prod"
+        },
+        "companyPrefix": {
+            "value": "ume"
+        },
+        "purpose": {
+            "value": "estateplatform"
+        },
+        "location": {
+            "value": "swedencentral"
+        },
+        "organization": {
+            "value": "umeakommun"
+        },
+        "project": {
+            "value": "Turkos"
+        },
+
+        "serviceConnectionObjectId": {
+            "value": "ee13727f-1fa2-43d3-b369-fbb82e8a67ef"
+        }
+    }
+}

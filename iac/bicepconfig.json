@@ -1,0 +1,25 @@
+{
+    "cloud": {
+        "credentialPrecedence": [
+            "AzureCLI",
+            "ManagedIdentity",
+            "AzurePowerShell",
+            "VisualStudioCode"
+        ],
+        "currentProfile": "AzureCloud",
+        "profiles": {
+            "AzureCloud": {
+                "resourceManagerEndpoint": "https://management.azure.com",
+                "activeDirectoryAuthority": "https://login.microsoftonline.com"
+            }
+        }
+    },
+    "moduleAliases": {
+        "br": {
+            "ume": {
+                "registry": "umecrbicepregistryprod.azurecr.io",
+                "modulePath": "bicep/modules"
+            }
+        }
+    }
+}

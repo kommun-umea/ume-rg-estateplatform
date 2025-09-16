@@ -1,0 +1,115 @@
+# branchName_environment_YYYY-MM-DD_HH.MM.SS
+name: ${{ replace(replace(variables['Build.SourceBranch'], 'refs/heads/', ''), '/', '') }}_${{ parameters.environment }}_$(Date:yyyy-MM-dd_HH.mm.ss)
+
+pr: none
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - iac
+
+pool:
+  vmImage: ubuntu-latest
+
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: Turkos/ume-pipeline-templates
+      ref: release/v250903
+
+parameters:
+  - name: environment
+    displayName: Environment
+    type: string
+    default: dev
+    values:
+      - dev
+      - test
+      - prod
+
+  - name: iacJobPicker
+    displayName: Deploy Infrastructure
+    type: boolean
+    default: false
+
+  - name: updateKeyVaultJobPicker
+    displayName: Update Key Vault
+    type: boolean
+    default: false
+
+variables:
+  - ${{ if eq(parameters.environment, 'prod') }}:
+      - name: serviceConnection
+        value: Ume_ServiceConnection_Prod-Turkos
+  - ${{ if eq(parameters.environment, 'test') }}:
+      - name: serviceConnection
+        value: Ume_ServiceConnection_Test-Turkos
+  - ${{ if eq(parameters.environment, 'dev') }}:
+      - name: serviceConnection
+        value: Ume_ServiceConnection_Dev-Turkos
+
+  - name: resourceGroup
+    value: ume-rg-estateplatform-${{ parameters.environment }}
+
+stages:
+  - stage: CheckForChangesStage
+    displayName: Check for changes
+    jobs:
+      - template: pipelines/general/template-check-for-changes.yml@templates
+        parameters:
+          paths:
+            - iac
+
+  - stage: DeployInfrastructureStage
+    displayName: Deploy Infrastructure
+    dependsOn: CheckForChangesStage
+    variables:
+      changedPaths: $[ dependencies.CheckForChangesStage.outputs['Job.Task.changedPaths'] ]
+    condition: |
+      and(
+        not(or(failed(), canceled())),
+        or(
+          eq(${{ parameters.iacJobPicker }}, true),
+          and(
+            eq(variables['Build.Reason'], 'IndividualCI'),
+            eq(variables['changedPaths'], 'iac')
+          )
+        )
+      )
+    jobs:
+      - template: pipelines/azure/template-deploy-infrastructure.yml@templates
+        parameters:
+          environment: ${{ parameters.environment }}
+          serviceConnection: $(serviceConnection)
+          resourceGroup: ${{ variables.resourceGroup }}
+          entrypointScriptPath: iac/entrypoint.ps1
+          personalAccessToken: $(System.AccessToken)
+
+  - stage: UpdateKeyVaultStage
+    displayName: Update Key Vault
+    dependsOn: DeployInfrastructureStage
+    variables:
+      changedPaths: $[ dependencies.CheckForChangesStage.outputs['Job.Task.changedPaths'] ]
+    condition: |
+      and(
+        not(or(failed(), canceled())),
+        or(
+          eq(${{ parameters.updateKeyVaultJobPicker }}, true),
+          and(
+            eq(variables['Build.Reason'], 'IndividualCI'),
+            eq(variables['changedPaths'], 'iac')
+          )
+        )
+      )
+    jobs:
+      - template: pipelines/azure/template-update-keyvault.yml@templates
+        parameters:
+          templateRepoAlias: templates
+          environment: ${{ parameters.environment }}
+          serviceConnection: $(serviceConnection)
+          variableGroupName: $(resourceGroup)
+          keyVaultName: umekvestateplatform${{ parameters.environment }}
+          personalAccessToken: $(System.AccessToken)

@@ -1,0 +1,95 @@
+# branchName_environment_YYYY-MM-DD_HH.MM.SS
+name: ${{ replace(replace(variables['Build.SourceBranch'], 'refs/heads/', ''), '/', '') }}_${{ parameters.environment }}_$(Date:yyyy-MM-dd_HH.mm.ss)
+
+pr: none
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - src
+
+pool:
+  vmImage: ubuntu-latest
+
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: Turkos/ume-pipeline-templates
+      ref: release/v250903
+
+parameters:
+  - name: environment
+    displayName: Environment
+    type: string
+    default: dev
+    values:
+      - dev
+      - test
+      - prod
+
+  - name: buildAndDeployEstateServiceJobPicker
+    displayName: Deploy ume-app-estateservice
+    type: boolean
+    default: false
+
+variables:
+  - ${{ if eq(parameters.environment, 'prod') }}:
+      - name: serviceConnection
+        value: Ume_ServiceConnection_Prod-Turkos
+  - ${{ if eq(parameters.environment, 'test') }}:
+      - name: serviceConnection
+        value: Ume_ServiceConnection_Test-Turkos
+  - ${{ if eq(parameters.environment, 'dev') }}:
+      - name: serviceConnection
+        value: Ume_ServiceConnection_Dev-Turkos
+
+stages:
+  - stage: CheckForChangesStage
+    displayName: Check for changes
+    jobs:
+      - template: pipelines/general/template-check-for-changes.yml@templates
+        parameters:
+          paths:
+            - src/ume-app-estateservice
+
+  # EstateService
+  - stage: BuildEstateServiceStage
+    displayName: Build EstateService
+    dependsOn: CheckForChangesStage
+    variables:
+      changedPaths: $[ dependencies.CheckForChangesStage.outputs['Job.Task.changedPaths'] ]
+    condition: |
+      and(
+        not(or(failed(), canceled())),
+        or(
+          eq(${{ parameters.buildAndDeployEstateServiceJobPicker }}, true),
+          and(
+            eq(variables['Build.Reason'], 'IndividualCI'),
+            contains(variables['changedPaths'], 'ume-app-estateservice')
+          )
+        )
+      )
+    jobs:
+      - template: pipelines/azure/template-build-backend.yml@templates
+        parameters:
+          projectFolderName: ume-app-estateservice
+          entrypointProjectName: Umea.se.EstateService.API
+
+  - stage: DeployEstateServiceStage
+    displayName: Deploy EstateService
+    dependsOn: BuildEstateServiceStage
+    jobs:
+      - template: pipelines/azure/template-deploy-backend.yml@templates
+        parameters:
+          azureSubscription: $(serviceConnection)
+          environment: ${{ parameters.environment }}
+          resourceGroup: ume-rg-estateservice-${{ parameters.environment }}
+          appName: ume-app-estateservice-${{ parameters.environment }}
+          projectFolderName: ume-app-estateservice
+          pingEndpoints:
+            - /index.html
+            - /api/v1.0/home/ping
+  # ------
