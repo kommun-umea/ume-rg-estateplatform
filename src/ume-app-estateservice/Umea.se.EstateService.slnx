@@ -1,4 +1,5 @@
 <Solution>
+  <Project Path="../../../ume-nuget/src/Umea.se.Toolkit/Umea.se.Toolkit/Umea.se.Toolkit.csproj" />
   <Project Path="Umea.se.EstateService.API/Umea.se.EstateService.API.csproj" />
   <Project Path="Umea.se.EstateService.Logic/Umea.se.EstateService.Logic.csproj" Id="9ac0b9dc-add3-463e-bde5-9a967fc2a356" />
   <Project Path="Umea.se.EstateService.ServiceAccess/Umea.se.EstateService.ServiceAccess.csproj" Id="906be054-766a-4b2b-8516-db2b65826786" />
