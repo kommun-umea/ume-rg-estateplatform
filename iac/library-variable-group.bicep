@@ -31,6 +31,10 @@ var libraryVariables = [
     name: 'pythagoras-api-url'
     value: ''
   }
+  {
+    name: 'estateservice-api-key'
+    value: ''
+  }
 ]
 
 // ------------ Resources ------------

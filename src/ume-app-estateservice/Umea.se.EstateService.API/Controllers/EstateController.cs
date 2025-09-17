@@ -1,11 +1,11 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
+using Umea.se.Toolkit.Auth;
 
 namespace Umea.se.EstateService.API.Controllers;
 
 [Produces("application/json")]
 [Route(ApiRoutes.Estates)]
-[Authorize]
+[AuthorizeApiKey]
 public class EstateController : ControllerBase
 {
     public List<string> GetEstates()
