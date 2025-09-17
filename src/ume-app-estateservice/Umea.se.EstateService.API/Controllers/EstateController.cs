@@ -8,6 +8,7 @@ namespace Umea.se.EstateService.API.Controllers;
 [AuthorizeApiKey]
 public class EstateController : ControllerBase
 {
+    [HttpGet]
     public List<string> GetEstates()
     {
         return ["Estate1", "Estate2"];

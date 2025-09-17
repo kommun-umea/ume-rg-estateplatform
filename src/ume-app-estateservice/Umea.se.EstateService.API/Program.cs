@@ -1,4 +1,3 @@
-using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Umea.se.EstateService.API;
 using Umea.se.EstateService.Logic;
 using Umea.se.EstateService.ServiceAccess;
@@ -39,9 +38,9 @@ builder.Services.AddAuthentication(options =>
 });
 
 // Check with the team if we should use OpenTelemetry
-builder.Services
-    .AddOpenTelemetry()
-    .UseAzureMonitor(options => { options.ConnectionString = config.ApplicationInsightsConnectionString; });
+//builder.Services
+//    .AddOpenTelemetry()
+//    .UseAzureMonitor(options => { options.ConnectionString = config.ApplicationInsightsConnectionString; });
 
 // Swagger
 builder.Services.AddDefaultSwagger(config);
@@ -52,8 +51,6 @@ builder.Services.AddControllers(options =>
 {
     options.Filters.Add<HttpResponseExceptionFilter>();
 });
-
-builder.Services.AddDefaultSwagger(config);
 
 WebApplication app = builder.Build();
 
