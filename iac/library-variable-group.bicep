@@ -27,6 +27,10 @@ var libraryVariables = [
     name: 'pythagoras-api-key'
     value: ''
   }
+  {
+    name: 'pythagoras-api-url'
+    value: ''
+  }
 ]
 
 // ------------ Resources ------------
