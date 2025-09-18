@@ -59,6 +59,23 @@ public class PythagorasClientTests
     }
 
     [Fact]
+    public async Task GetAsync_WithLeadingSlash_NormalizesEndpoint()
+    {
+        const string jsonResponse = "[]";
+        CapturingHandler handler = new(jsonResponse);
+        HttpClient httpClient = new(handler)
+        {
+            BaseAddress = new Uri("https://example.org/")
+        };
+        FakeHttpClientFactory factory = new(httpClient);
+        PythagorasClient client = new(factory);
+
+        await client.GetAsync<Building>("/rest/v1/building");
+
+        Assert.Equal("https://example.org/rest/v1/building", handler.LastRequest!.RequestUri!.ToString());
+    }
+
+    [Fact]
     public async Task GetPaginatedAsync_StreamsUntilLastShortPage()
     {
         Dictionary<int, string> pages = new()

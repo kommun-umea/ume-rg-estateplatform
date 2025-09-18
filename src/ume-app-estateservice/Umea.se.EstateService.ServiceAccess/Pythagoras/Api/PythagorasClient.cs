@@ -64,7 +64,7 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : IPy
         using HttpResponseMessage response = await client.GetAsync(requestUri, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
-        await using Stream contentStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        using Stream contentStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         List<TDto>? payload = await JsonSerializer.DeserializeAsync<List<TDto>>(contentStream, _serializerOptions, cancellationToken).ConfigureAwait(false);
 
         return payload ?? [];
@@ -80,6 +80,17 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : IPy
             throw new ArgumentException("Endpoint must be non-empty.", nameof(endpoint));
         }
 
-        return trimmed.TrimStart('/');
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out Uri? absolute))
+        {
+            return absolute.ToString();
+        }
+
+        string normalized = trimmed.TrimStart('/', '\\');
+        if (normalized.Length == 0)
+        {
+            throw new ArgumentException("Endpoint must contain a path segment.", nameof(endpoint));
+        }
+
+        return normalized;
     }
 }

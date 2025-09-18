@@ -13,7 +13,7 @@ public interface IAutocompleteService
 
 public sealed class AutocompleteService(IPythagorasService pythagorasService, IMemoryCache cache) : IAutocompleteService
 {
-    private static readonly TimeSpan CacheDuration = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan _cacheDuration = TimeSpan.FromSeconds(30);
 
     public async Task<AutocompleteResponse> SearchAsync(AutocompleteRequest request, CancellationToken cancellationToken)
     {
@@ -67,7 +67,7 @@ public sealed class AutocompleteService(IPythagorasService pythagorasService, IM
             Items = merged
         };
 
-        cache.Set(cacheKey, response, CacheDuration);
+        cache.Set(cacheKey, response, _cacheDuration);
         return response;
     }
 
@@ -122,7 +122,7 @@ public sealed class AutocompleteService(IPythagorasService pythagorasService, IM
 
     private static List<AutocompleteItemModel> Merge(IEnumerable<AutocompleteItemModel> results, string query, int limit)
     {
-        Dictionary<(AutocompleteType Type, int Id), AutocompleteItemModel> unique = new();
+        Dictionary<(AutocompleteType Type, int Id), AutocompleteItemModel> unique = [];
 
         foreach (AutocompleteItemModel item in results)
         {

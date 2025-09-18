@@ -47,13 +47,13 @@ public sealed record AutocompleteRequest : IValidatableObject
     [Range(1, int.MaxValue, ErrorMessage = "BuildingId must be positive when provided.")]
     public int? BuildingId { get; init; }
 
-    public IEnumerable<ValidationResult> Validate(ValidationContext _)
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         if (Type is AutocompleteType.Workspace && BuildingId is int id && id <= 0)
         {
             yield return new ValidationResult(
                 "BuildingId must be positive when provided for workspace autocomplete.",
-                new[] { nameof(BuildingId) });
+                [nameof(BuildingId)]);
         }
     }
 }
