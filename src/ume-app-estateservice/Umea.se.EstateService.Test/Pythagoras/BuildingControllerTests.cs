@@ -2,6 +2,7 @@ using Umea.se.EstateService.API.Controllers;
 using Umea.se.EstateService.ServiceAccess.Pythagoras;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
+using Umea.se.EstateService.Shared.Pythagoras;
 
 namespace Umea.se.EstateService.Test.Pythagoras;
 
@@ -22,7 +23,7 @@ public class BuildingControllerTests
         PythagorasService service = new(client);
         BuildingController controller = new(service);
 
-        IReadOnlyList<Building> buildings = await controller.GetBuildingsAsync(CancellationToken.None);
+        IReadOnlyList<BuildingModel> buildings = await controller.GetBuildingsAsync(CancellationToken.None);
 
         Assert.Equal([1, 2], [.. buildings.Select(b => b.Id)]);
         Assert.Equal("maxResults=50", client.LastQueryString);
@@ -43,7 +44,7 @@ public class BuildingControllerTests
         PythagorasService service = new(client);
         BuildingController controller = new(service);
 
-        IReadOnlyList<Building> buildings = await controller.GetBuildingsContainingAsync("alp", CancellationToken.None);
+        IReadOnlyList<BuildingModel> buildings = await controller.GetBuildingsContainingAsync("alp", CancellationToken.None);
 
         Assert.Single(buildings);
         Assert.Equal("Alpha", buildings[0].Name);

@@ -1,6 +1,7 @@
 using Umea.se.EstateService.ServiceAccess.Pythagoras;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
+using Umea.se.EstateService.Shared.Pythagoras;
 
 namespace Umea.se.EstateService.Test.Pythagoras;
 
@@ -17,13 +18,14 @@ public class PythagorasServiceTests
         using CancellationTokenSource cts = new();
 
         Action<PythagorasQuery<Building>> configure = query => query.WithIds(42);
-        IReadOnlyList<Building> result = await service.GetBuildingsAsync(configure, cts.Token);
+        IReadOnlyList<BuildingModel> result = await service.GetBuildingsAsync(configure, cts.Token);
 
         Assert.True(client.GetAsyncCalled);
         Assert.Equal("rest/v1/building", client.LastEndpoint);
         Assert.Same(configure, client.LastConfigure);
         Assert.Equal(cts.Token, client.LastCancellationToken);
-        Assert.Same(client.GetAsyncResult, result);
+        BuildingModel model = Assert.Single(result);
+        Assert.Equal(42, model.Id);
     }
 
     [Fact]
@@ -36,8 +38,8 @@ public class PythagorasServiceTests
         PythagorasService service = new(client);
         using CancellationTokenSource cts = new();
 
-        List<Building> collected = [];
-        await foreach (Building building in service.GetPaginatedBuildingsAsync(null, pageSize: 10, cts.Token))
+        List<BuildingModel> collected = [];
+        await foreach (BuildingModel building in service.GetPaginatedBuildingsAsync(null, pageSize: 10, cts.Token))
         {
             collected.Add(building);
         }
