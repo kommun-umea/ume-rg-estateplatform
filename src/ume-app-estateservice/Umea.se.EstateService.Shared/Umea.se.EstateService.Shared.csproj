@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Umea.se.Toolkit" Version="8.2.9" />
+    <ProjectReference Include="..\..\..\..\ume-nuget\src\Umea.se.Toolkit\Umea.se.Toolkit\Umea.se.Toolkit.csproj" />
   </ItemGroup>
 
 </Project>

@@ -84,9 +84,31 @@ public class BuildingControllerTests
         return result;
     }
 
+    [Fact]
+    public async Task GetBuildingWorkspacesAsync_ReturnsMappedWorkspaces()
+    {
+        FakePythagorasClient client = new()
+        {
+            GetBuildingWorkspacesResult =
+            [
+                new() { Id = 10, BuildingId = 1, BuildingName = "B" }
+            ]
+        };
+
+        PythagorasService service = new(client);
+        BuildingController controller = new(service);
+
+        IReadOnlyList<BuildingWorkspaceModel> result = await controller.GetBuildingWorkspacesAsync(1, CancellationToken.None);
+
+        BuildingWorkspaceModel workspace = Assert.Single(result);
+        Assert.Equal(10, workspace.Id);
+        Assert.Equal("rest/v1/building/1/workspace/info", client.LastEndpoint);
+    }
+
     private sealed class FakePythagorasClient : IPythagorasClient
     {
         public IReadOnlyList<Building> GetAsyncResult { get; set; } = [];
+        public IReadOnlyList<BuildingWorkspace> GetBuildingWorkspacesResult { get; set; } = [];
         public string? LastQueryString { get; private set; }
 
         public string? LastEndpoint { get; private set; }
@@ -95,7 +117,13 @@ public class BuildingControllerTests
         {
             if (typeof(TDto) != typeof(Building))
             {
-                throw new NotSupportedException("Test fake only supports Building DTOs.");
+                if (typeof(TDto) == typeof(BuildingWorkspace))
+                {
+                    LastEndpoint = endpoint;
+                    return Task.FromResult((IReadOnlyList<TDto>)(object)GetBuildingWorkspacesResult);
+                }
+
+                throw new NotSupportedException("Test fake only supports Building and BuildingWorkspace DTOs.");
             }
 
             LastEndpoint = endpoint;

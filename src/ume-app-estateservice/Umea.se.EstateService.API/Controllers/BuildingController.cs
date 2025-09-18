@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
 using Umea.se.EstateService.ServiceAccess.Pythagoras;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Pythagoras;
 using Umea.se.Toolkit.Auth;
 
@@ -14,9 +13,6 @@ public class BuildingController(PythagorasService pythagorasService) : Controlle
     [HttpGet]
     public async Task<IReadOnlyList<BuildingModel>> GetBuildingsAsync(CancellationToken cancellationToken)
     {
-        // Just a test implementation to verify that everything is wired up correctly.
-        // The DTOs return from PythagorasService should be mapped to domain models
-
         IReadOnlyList<BuildingModel> buildings = await pythagorasService.GetBuildingsAsync(query => query.Take(50), cancellationToken);
 
         return buildings;
@@ -33,5 +29,11 @@ public class BuildingController(PythagorasService pythagorasService) : Controlle
         IReadOnlyList<BuildingModel> buildings = await pythagorasService.GetBuildingsAsync(query => query.Contains(b => b.Name, searchTerm), cancellationToken);
 
         return buildings;
+    }
+
+    [HttpGet("{buildingId:int}/workspaces")]
+    public Task<IReadOnlyList<BuildingWorkspaceModel>> GetBuildingWorkspacesAsync(int buildingId, CancellationToken cancellationToken)
+    {
+        return pythagorasService.GetBuildingWorkspacesAsync(buildingId, cancellationToken: cancellationToken);
     }
 }

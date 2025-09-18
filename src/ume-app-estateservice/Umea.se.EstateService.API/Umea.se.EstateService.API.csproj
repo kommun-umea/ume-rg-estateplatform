@@ -15,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\..\ume-nuget\src\Umea.se.Toolkit\Umea.se.Toolkit\Umea.se.Toolkit.csproj" />
     <ProjectReference Include="..\Umea.se.EstateService.Logic\Umea.se.EstateService.Logic.csproj" />
   </ItemGroup>
 
