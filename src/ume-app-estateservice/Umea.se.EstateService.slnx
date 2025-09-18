@@ -1,4 +1,10 @@
 <Solution>
+  <Folder Name="/Solution files/">
+    <File Path="../../.editorconfig" />
+    <File Path="../../.gitignore" />
+    <File Path="../../LICENSE" />
+    <File Path="../../README.md" />
+  </Folder>
   <Project Path="../../../ume-nuget/src/Umea.se.Toolkit/Umea.se.Toolkit/Umea.se.Toolkit.csproj" />
   <Project Path="Umea.se.EstateService.API/Umea.se.EstateService.API.csproj" />
   <Project Path="Umea.se.EstateService.Logic/Umea.se.EstateService.Logic.csproj" Id="9ac0b9dc-add3-463e-bde5-9a967fc2a356" />
