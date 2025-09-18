@@ -22,7 +22,7 @@ public class PythagorasClientTests
         FakeHttpClientFactory factory = new(httpClient);
         PythagorasClient client = new(factory);
 
-        IReadOnlyList<Building> result = await client.GetAsync<Building>(query =>
+        IReadOnlyList<Building> result = await client.GetAsync<Building>("rest/v1/building", query =>
         {
             query.WithIds(1);
             query.Contains(x => x.Name, "SYSTEM", caseSensitive: false);
@@ -51,7 +51,7 @@ public class PythagorasClientTests
         FakeHttpClientFactory factory = new(httpClient);
         PythagorasClient client = new(factory);
 
-        IReadOnlyList<Building> result = await client.GetAsync<Building>();
+        IReadOnlyList<Building> result = await client.GetAsync<Building>("rest/v1/building");
 
         Assert.Empty(result);
         Assert.Equal("https://example.org/rest/v1/building", handler.LastRequest!.RequestUri!.ToString());
@@ -76,7 +76,7 @@ public class PythagorasClientTests
         PythagorasClient client = new(factory);
 
         List<Building> results = [];
-        await foreach (Building building in client.GetPaginatedAsync<Building>(configure: null, pageSize: 2))
+        await foreach (Building building in client.GetPaginatedAsync<Building>("rest/v1/building", pageSize: 2))
         {
             results.Add(building);
         }

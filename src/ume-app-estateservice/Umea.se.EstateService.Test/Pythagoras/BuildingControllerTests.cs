@@ -26,6 +26,7 @@ public class BuildingControllerTests
 
         Assert.Equal([1, 2], [.. buildings.Select(b => b.Id)]);
         Assert.Equal("maxResults=50", client.LastQueryString);
+        Assert.Equal("rest/v1/building", client.LastEndpoint);
     }
 
     [Fact]
@@ -51,6 +52,7 @@ public class BuildingControllerTests
 
         Assert.Equal("ILIKEAW:name", Assert.Single(query["pN[]"]));
         Assert.Equal("alp", Assert.Single(query["pV[]"]));
+        Assert.Equal("rest/v1/building", client.LastEndpoint);
     }
 
     private static Dictionary<string, List<string>> Parse(string? query)
@@ -86,13 +88,16 @@ public class BuildingControllerTests
         public IReadOnlyList<Building> GetAsyncResult { get; set; } = [];
         public string? LastQueryString { get; private set; }
 
-        public Task<IReadOnlyList<TDto>> GetAsync<TDto>(Action<PythagorasQuery<TDto>>? query, CancellationToken cancellationToken) where TDto : class
+        public string? LastEndpoint { get; private set; }
+
+        public Task<IReadOnlyList<TDto>> GetAsync<TDto>(string endpoint, Action<PythagorasQuery<TDto>>? query, CancellationToken cancellationToken) where TDto : class
         {
             if (typeof(TDto) != typeof(Building))
             {
                 throw new NotSupportedException("Test fake only supports Building DTOs.");
             }
 
+            LastEndpoint = endpoint;
             PythagorasQuery<TDto> realQuery = new();
             query?.Invoke(realQuery);
             LastQueryString = realQuery.BuildAsQueryString();
@@ -100,7 +105,7 @@ public class BuildingControllerTests
             return Task.FromResult((IReadOnlyList<TDto>)(object)GetAsyncResult);
         }
 
-        public IAsyncEnumerable<TDto> GetPaginatedAsync<TDto>(Action<PythagorasQuery<TDto>>? configure, int pageSize, CancellationToken cancellationToken) where TDto : class
+        public IAsyncEnumerable<TDto> GetPaginatedAsync<TDto>(string endpoint, Action<PythagorasQuery<TDto>>? configure, int pageSize, CancellationToken cancellationToken) where TDto : class
             => throw new NotSupportedException();
     }
 }

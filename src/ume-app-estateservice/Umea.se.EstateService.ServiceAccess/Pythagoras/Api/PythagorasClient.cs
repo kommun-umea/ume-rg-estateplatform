@@ -5,8 +5,8 @@ namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 
 public interface IPythagorasClient
 {
-    Task<IReadOnlyList<TDto>> GetAsync<TDto>(Action<PythagorasQuery<TDto>>? query = null,CancellationToken cancellationToken = default) where TDto : class;
-    IAsyncEnumerable<TDto> GetPaginatedAsync<TDto>(Action<PythagorasQuery<TDto>>? query, int pageSize, CancellationToken cancellationToken = default) where TDto : class;
+    Task<IReadOnlyList<TDto>> GetAsync<TDto>(string endpoint, Action<PythagorasQuery<TDto>>? query = null, CancellationToken cancellationToken = default) where TDto : class;
+    IAsyncEnumerable<TDto> GetPaginatedAsync<TDto>(string endpoint, Action<PythagorasQuery<TDto>>? query = null, int pageSize = 50, CancellationToken cancellationToken = default) where TDto : class;
 }
 
 public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : IPythagorasClient
@@ -16,14 +16,18 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : IPy
         PropertyNameCaseInsensitive = true
     };
 
-    public Task<IReadOnlyList<TDto>> GetAsync<TDto>(Action<PythagorasQuery<TDto>>? configure = null, CancellationToken cancellationToken = default) where TDto : class
+    public Task<IReadOnlyList<TDto>> GetAsync<TDto>(string endpoint, Action<PythagorasQuery<TDto>>? query = null, CancellationToken cancellationToken = default) where TDto : class
     {
-        return QueryAsync(configure, cancellationToken);
+        ArgumentNullException.ThrowIfNull(endpoint);
+
+        return QueryAsync(endpoint, query, cancellationToken);
     }
 
-    public async IAsyncEnumerable<TDto> GetPaginatedAsync<TDto>(Action<PythagorasQuery<TDto>>? configure, int pageSize, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<TDto> GetPaginatedAsync<TDto>(string endpoint, Action<PythagorasQuery<TDto>>? query = null, int pageSize = 50, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         where TDto : class
     {
+        ArgumentNullException.ThrowIfNull(endpoint);
+
         if (pageSize <= 0)
         {
             throw new ArgumentException("Page size must be > 0.", nameof(pageSize));
@@ -33,7 +37,7 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : IPy
         IReadOnlyList<TDto> page;
         do
         {
-            page = await QueryAsync(configure, cancellationToken, builder => builder.Page(pageNumber, pageSize)).ConfigureAwait(false);
+            page = await QueryAsync(endpoint, query, cancellationToken, builder => builder.Page(pageNumber, pageSize)).ConfigureAwait(false);
 
             foreach (TDto item in page)
             {
@@ -45,14 +49,14 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : IPy
         while (page.Count == pageSize);
     }
 
-    private async Task<IReadOnlyList<TDto>> QueryAsync<TDto>(Action<PythagorasQuery<TDto>>? configure, CancellationToken cancellationToken, Action<PythagorasQuery<TDto>>? afterConfigure = null)
+    private async Task<IReadOnlyList<TDto>> QueryAsync<TDto>(string endpoint, Action<PythagorasQuery<TDto>>? configure, CancellationToken cancellationToken, Action<PythagorasQuery<TDto>>? afterConfigure = null)
         where TDto : class
     {
         PythagorasQuery<TDto> builder = new();
         configure?.Invoke(builder);
         afterConfigure?.Invoke(builder);
 
-        string requestPath = PythagorasEndpointResolver.Resolve(typeof(TDto));
+        string requestPath = NormalizeEndpoint(endpoint);
         string query = builder.BuildAsQueryString();
         string requestUri = BuildRequestUri(requestPath, query);
 
@@ -67,4 +71,15 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : IPy
     }
 
     private static string BuildRequestUri(string path, string query) => string.IsNullOrEmpty(query) ? path : $"{path}?{query}";
+
+    private static string NormalizeEndpoint(string endpoint)
+    {
+        string trimmed = endpoint.Trim();
+        if (trimmed.Length == 0)
+        {
+            throw new ArgumentException("Endpoint must be non-empty.", nameof(endpoint));
+        }
+
+        return trimmed.TrimStart('/');
+    }
 }
