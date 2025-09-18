@@ -1,3 +1,4 @@
+using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Umea.se.EstateService.API;
 using Umea.se.EstateService.Logic;
 using Umea.se.EstateService.ServiceAccess;
@@ -15,7 +16,6 @@ builder.Services.ConnectToKeyVault(config.KeyVaultUrl);
 if (!config.SuppressKeyVaultConfigs)
 {
     config.LoadKeyVaultSecrets();
-    builder.Logging.UseDefaultLoggers(config);
 }
 
 builder.Services
@@ -34,13 +34,12 @@ builder.Services.AddDefaultHttpClient(HttpClientNames.Pythagoras, options =>
 
 builder.Services.AddAuthentication(options =>
 {
-    //API Key authentication?
+
 });
 
-// Check with the team if we should use OpenTelemetry
-//builder.Services
-//    .AddOpenTelemetry()
-//    .UseAzureMonitor(options => { options.ConnectionString = config.ApplicationInsightsConnectionString; });
+builder.Services
+    .AddOpenTelemetry()
+    .UseAzureMonitor(options => { options.ConnectionString = config.ApplicationInsightsConnectionString; });
 
 // Swagger
 builder.Services.AddDefaultSwagger(config);
