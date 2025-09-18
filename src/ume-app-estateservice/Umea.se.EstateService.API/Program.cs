@@ -30,6 +30,8 @@ builder.Services.AddDefaultHttpClient(HttpClientNames.Pythagoras, options =>
 {
     options.BaseAddress = config.PythagorasBaseUrl;
     options.XApiKey = config.PythagorasApiKey;
+    // The below works when improvement/14157 is merged and released
+    //options.DefaultRequestHeaders.Add("api_key", config.PythagorasApiKey);
 });
 
 builder.Services.AddAuthentication(options =>
