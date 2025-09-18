@@ -49,7 +49,7 @@ public class PythagorasBuildingMapperTests
     [Fact]
     public void ToDomain_WithEmptyCollection_ReturnsEmptyArray()
     {
-        IReadOnlyList<BuildingModel> result = PythagorasBuildingMapper.ToDomain(Array.Empty<Building>());
+        IReadOnlyList<BuildingModel> result = PythagorasBuildingMapper.ToDomain([]);
 
         Assert.Same(Array.Empty<BuildingModel>(), result);
     }

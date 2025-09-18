@@ -47,7 +47,7 @@ internal static class PythagorasWorkspaceMapper
 
         if (dtos.Count == 0)
         {
-            return Array.Empty<BuildingWorkspaceModel>();
+            return [];
         }
 
         BuildingWorkspaceModel[] buffer = new BuildingWorkspaceModel[dtos.Count];
@@ -89,7 +89,7 @@ internal static class PythagorasWorkspaceMapper
 
         if (dtos.Count == 0)
         {
-            return Array.Empty<WorkspaceModel>();
+            return [];
         }
 
         WorkspaceModel[] buffer = new WorkspaceModel[dtos.Count];

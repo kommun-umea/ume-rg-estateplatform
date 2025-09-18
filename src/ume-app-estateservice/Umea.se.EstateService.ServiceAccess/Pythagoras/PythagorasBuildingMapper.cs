@@ -32,18 +32,9 @@ internal static class PythagorasBuildingMapper
     {
         ArgumentNullException.ThrowIfNull(dtos);
 
-        if (dtos.Count == 0)
-        {
-            return Array.Empty<BuildingModel>();
-        }
-
-        BuildingModel[] buffer = new BuildingModel[dtos.Count];
-        for (int i = 0; i < dtos.Count; i++)
-        {
-            buffer[i] = ToDomain(dtos[i]);
-        }
-
-        return buffer;
+        return dtos.Count == 0
+            ? []
+            : dtos.Select(ToDomain).ToArray();
     }
 
     private static DomainMarkerType MapMarkerType(TransportMarkerType markerType)

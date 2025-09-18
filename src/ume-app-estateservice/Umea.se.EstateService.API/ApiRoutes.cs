@@ -7,4 +7,5 @@ public class ApiRoutes : ApiRoutesBase
     public const string Estates = $"{RoutePrefixV1}/estates";
     public const string Buildings = $"{RoutePrefixV1}/buildings";
     public const string Workspaces = $"{RoutePrefixV1}/workspaces";
+    public const string Autocomplete = $"{RoutePrefixV1}/autocomplete";
 }

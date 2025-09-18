@@ -5,10 +5,11 @@ using Umea.se.EstateService.Shared.Pythagoras;
 
 namespace Umea.se.EstateService.ServiceAccess.Pythagoras;
 
-public class PythagorasService(IPythagorasClient pythagorasClient)
+public class PythagorasService(IPythagorasClient pythagorasClient) : IPythagorasService
 {
     private const string BuildingsEndpoint = "rest/v1/building";
     private const string WorkspacesEndpoint = "rest/v1/workspace";
+    private const int MaxAutocompleteLimit = 1000;
 
     public async Task<IReadOnlyList<BuildingModel>> GetBuildingsAsync(Action<PythagorasQuery<Building>>? query = null, CancellationToken cancellationToken = default)
     {
@@ -50,5 +51,74 @@ public class PythagorasService(IPythagorasClient pythagorasClient)
         }
     }
 
+    public Task<IReadOnlyList<BuildingSearchResult>> SearchBuildingsAsync(string searchTerm, int limit = 10, CancellationToken cancellationToken = default)
+        => SearchAndMapAsync<Building, BuildingSearchResult>(
+            BuildingsEndpoint,
+            searchTerm,
+            limit,
+            PythagorasAutocompleteMapper.ToBuildingResults,
+            cancellationToken);
+
+    public async Task<IReadOnlyList<WorkspaceSearchResult>> SearchWorkspacesAsync(string searchTerm, int limit = 10, int? buildingId = null, CancellationToken cancellationToken = default)
+    {
+        if (buildingId is int id && id <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive when supplied.");
+        }
+
+        if (buildingId is int scopedId)
+        {
+            return await SearchAndMapAsync<BuildingWorkspace, WorkspaceSearchResult>(
+                    BuildBuildingWorkspacesEndpoint(scopedId),
+                    searchTerm,
+                    limit,
+                    PythagorasAutocompleteMapper.ToWorkspaceResults,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        return await SearchAndMapAsync<Workspace, WorkspaceSearchResult>(
+                WorkspacesEndpoint,
+                searchTerm,
+                limit,
+                PythagorasAutocompleteMapper.ToWorkspaceResults,
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task<IReadOnlyList<TResult>> SearchAndMapAsync<TInput, TResult>(
+        string endpoint,
+        string searchTerm,
+        int limit,
+        Func<IReadOnlyList<TInput>, IReadOnlyList<TResult>> mapper,
+        CancellationToken cancellationToken) where TInput : class
+    {
+        ValidateSearchInputs(searchTerm, limit);
+
+        IReadOnlyList<TInput> payload = await pythagorasClient.GetAsync<TInput>(
+                endpoint,
+                query => ApplySearch(query, searchTerm, limit),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return mapper(payload);
+    }
+
     private static string BuildBuildingWorkspacesEndpoint(int buildingId) => $"rest/v1/building/{buildingId}/workspace/info";
+
+    private static void ValidateSearchInputs(string searchTerm, int limit)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(searchTerm);
+
+        if (limit <= 0 || limit > MaxAutocompleteLimit)
+        {
+            throw new ArgumentOutOfRangeException(nameof(limit), "Limit must be positive.");
+        }
+    }
+
+    private static void ApplySearch<T>(PythagorasQuery<T> query, string searchTerm, int limit) where T : class
+    {
+        query.GeneralSearch(searchTerm);
+        query.Take(limit);
+    }
 }

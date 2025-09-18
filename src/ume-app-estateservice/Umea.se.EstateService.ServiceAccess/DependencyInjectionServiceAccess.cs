@@ -8,8 +8,9 @@ public static class DependencyInjectionServiceAccess
 {
     public static IServiceCollection AddServiceAccessDependencies(this IServiceCollection services)
     {
+        services.AddMemoryCache();
         services.AddSingleton<IPythagorasClient, PythagorasClient>();
-        services.AddSingleton<PythagorasService>();
+        services.AddSingleton<IPythagorasService, PythagorasService>();
 
         return services;
     }

@@ -214,7 +214,7 @@ public class PythagorasQueryTests
         query.WithIds(1);
         query.GeneralSearch("conflict");
 
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => query.BuildAsQueryString());
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(query.BuildAsQueryString);
 
         Assert.Contains("WithIds", ex.Message);
     }
@@ -226,7 +226,7 @@ public class PythagorasQueryTests
         query.Where(x => x.Level, Op.Gt, 1);
         query.Where(x => x.Level, Op.Gt, 2);
 
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => query.BuildAsQueryString());
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(query.BuildAsQueryString);
 
         Assert.Contains("Conflicting filters", ex.Message);
     }

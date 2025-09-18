@@ -149,11 +149,6 @@ public class PythagorasServiceTests
         }
     }
 
-    private static IEnumerable<T> Empty<T>()
-    {
-        yield break;
-    }
-
     private static async IAsyncEnumerable<T> YieldAsync<T>(params T[] items)
     {
         foreach (T item in items)

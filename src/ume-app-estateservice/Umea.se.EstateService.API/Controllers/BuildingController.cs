@@ -8,7 +8,7 @@ namespace Umea.se.EstateService.API.Controllers;
 [Produces("application/json")]
 [Route(ApiRoutes.Buildings)]
 [AuthorizeApiKey]
-public class BuildingController(PythagorasService pythagorasService) : ControllerBase
+public class BuildingController(IPythagorasService pythagorasService) : ControllerBase
 {
     [HttpGet]
     public async Task<IReadOnlyList<BuildingModel>> GetBuildingsAsync(CancellationToken cancellationToken)

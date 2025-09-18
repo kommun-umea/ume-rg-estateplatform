@@ -10,7 +10,7 @@ namespace Umea.se.EstateService.API.Controllers;
 [Produces("application/json")]
 [Route(ApiRoutes.Workspaces)]
 [AuthorizeApiKey]
-public class WorkspaceController(PythagorasService pythagorasService) : ControllerBase
+public class WorkspaceController(IPythagorasService pythagorasService) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<WorkspaceModel>>> GetWorkspacesAsync([FromQuery] int[]? ids, [FromQuery] string? search, [FromQuery] int? maxResults, CancellationToken cancellationToken)
@@ -43,7 +43,7 @@ public class WorkspaceController(PythagorasService pythagorasService) : Controll
             };
         }
 
-        IReadOnlyList<WorkspaceModel> workspaces = await pythagorasService.GetWorkspacesAsync(query, cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<WorkspaceModel> workspaces = await pythagorasService.GetWorkspacesAsync(query, cancellationToken);
         return Ok(workspaces);
     }
 }
