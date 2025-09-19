@@ -14,13 +14,13 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
     private const string WorkspacesEndpoint = "rest/v1/workspace";
     private const int MaxAutocompleteLimit = 1000;
 
-    public async Task<IReadOnlyList<BuildingModel>> GetBuildingsAsync(Action<PythagorasQuery<Building>>? query = null, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<BuildingModel>> GetBuildingsAsync(PythagorasQuery<Building>? query = null, CancellationToken cancellationToken = default)
     {
         IReadOnlyList<Building> payload = await pythagorasClient.GetAsync(BuildingsEndpoint, query, cancellationToken).ConfigureAwait(false);
         return PythagorasBuildingMapper.ToModel(payload);
     }
 
-    public async IAsyncEnumerable<BuildingModel> GetPaginatedBuildingsAsync(Action<PythagorasQuery<Building>>? query = null, int pageSize = 50, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<BuildingModel> GetPaginatedBuildingsAsync(PythagorasQuery<Building>? query = null, int pageSize = 50, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         await foreach (Building dto in pythagorasClient.GetPaginatedAsync(BuildingsEndpoint, query, pageSize, cancellationToken).ConfigureAwait(false))
         {
@@ -28,7 +28,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         }
     }
 
-    public async Task<IReadOnlyList<BuildingWorkspaceModel>> GetBuildingWorkspacesAsync(int buildingId, Action<PythagorasQuery<BuildingWorkspace>>? query = null, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<BuildingWorkspaceModel>> GetBuildingWorkspacesAsync(int buildingId, PythagorasQuery<BuildingWorkspace>? query = null, CancellationToken cancellationToken = default)
     {
         if (buildingId <= 0)
         {
@@ -40,13 +40,13 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         return PythagorasWorkspaceMapper.ToModel(payload);
     }
 
-    public async Task<IReadOnlyList<WorkspaceModel>> GetWorkspacesAsync(Action<PythagorasQuery<Workspace>>? query = null, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<WorkspaceModel>> GetWorkspacesAsync(PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
     {
         IReadOnlyList<Workspace> payload = await pythagorasClient.GetAsync(WorkspacesEndpoint, query, cancellationToken).ConfigureAwait(false);
         return PythagorasWorkspaceMapper.ToModel(payload);
     }
 
-    public async IAsyncEnumerable<WorkspaceModel> GetPaginatedWorkspacesAsync(Action<PythagorasQuery<Workspace>>? query = null, int pageSize = 50, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<WorkspaceModel> GetPaginatedWorkspacesAsync(PythagorasQuery<Workspace>? query = null, int pageSize = 50, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         await foreach (Workspace dto in pythagorasClient.GetPaginatedAsync(WorkspacesEndpoint, query, pageSize, cancellationToken).ConfigureAwait(false))
         {
@@ -98,11 +98,10 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
     {
         ValidateSearchInputs(searchTerm, limit);
 
-        IReadOnlyList<TInput> payload = await pythagorasClient.GetAsync<TInput>(
-                endpoint,
-                query => ApplySearch(query, searchTerm, limit),
-                cancellationToken)
-            .ConfigureAwait(false);
+        PythagorasQuery<TInput> query = new();
+        ApplySearch(query, searchTerm, limit);
+
+        IReadOnlyList<TInput> payload = await pythagorasClient.GetAsync(endpoint, query, cancellationToken).ConfigureAwait(false);
 
         return mapper(payload);
     }

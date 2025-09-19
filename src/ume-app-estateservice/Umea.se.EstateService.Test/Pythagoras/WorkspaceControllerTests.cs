@@ -51,7 +51,7 @@ public class WorkspaceControllerTests
         public IReadOnlyList<Workspace> GetWorkspacesResult { get; set; } = [];
         public string? LastEndpoint { get; private set; }
 
-        public Task<IReadOnlyList<TDto>> GetAsync<TDto>(string endpoint, Action<PythagorasQuery<TDto>>? configure, CancellationToken cancellationToken) where TDto : class
+        public Task<IReadOnlyList<TDto>> GetAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, CancellationToken cancellationToken) where TDto : class
         {
             LastEndpoint = endpoint;
 
@@ -68,7 +68,22 @@ public class WorkspaceControllerTests
             throw new NotSupportedException();
         }
 
-        public IAsyncEnumerable<TDto> GetPaginatedAsync<TDto>(string endpoint, Action<PythagorasQuery<TDto>>? configure, int pageSize, CancellationToken cancellationToken) where TDto : class
+        public IAsyncEnumerable<TDto> GetPaginatedAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, int pageSize, CancellationToken cancellationToken) where TDto : class
+            => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<TDto>> GetOldAsync<TDto>(string endpoint, Action<PythagorasQuery<TDto>>? configure, CancellationToken cancellationToken) where TDto : class
+        {
+            PythagorasQuery<TDto>? builder = null;
+            if (configure is not null)
+            {
+                builder = new PythagorasQuery<TDto>();
+                configure(builder);
+            }
+
+            return GetAsync(endpoint, builder, cancellationToken);
+        }
+
+        public IAsyncEnumerable<TDto> GetOldPaginatedAsync<TDto>(string endpoint, Action<PythagorasQuery<TDto>>? configure, int pageSize, CancellationToken cancellationToken) where TDto : class
             => throw new NotSupportedException();
     }
 }

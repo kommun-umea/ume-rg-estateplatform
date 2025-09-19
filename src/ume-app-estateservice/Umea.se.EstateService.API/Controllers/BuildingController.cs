@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Umea.se.EstateService.Logic.Interfaces;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.Toolkit.Auth;
 
@@ -13,7 +15,10 @@ public class BuildingController(IPythagorasHandler pythagorasService) : Controll
     [HttpGet]
     public async Task<IReadOnlyList<BuildingModel>> GetBuildingsAsync(CancellationToken cancellationToken)
     {
-        IReadOnlyList<BuildingModel> buildings = await pythagorasService.GetBuildingsAsync(query => query.Take(50), cancellationToken);
+        PythagorasQuery<Building> query = new();
+        query.Take(50);
+
+        IReadOnlyList<BuildingModel> buildings = await pythagorasService.GetBuildingsAsync(query, cancellationToken);
 
         return buildings;
     }
@@ -26,7 +31,10 @@ public class BuildingController(IPythagorasHandler pythagorasService) : Controll
             return [];
         }
 
-        IReadOnlyList<BuildingModel> buildings = await pythagorasService.GetBuildingsAsync(query => query.Contains(b => b.Name, searchTerm), cancellationToken);
+        PythagorasQuery<Building> query = new();
+        query.Contains(b => b.Name, searchTerm);
+
+        IReadOnlyList<BuildingModel> buildings = await pythagorasService.GetBuildingsAsync(query, cancellationToken);
 
         return buildings;
     }

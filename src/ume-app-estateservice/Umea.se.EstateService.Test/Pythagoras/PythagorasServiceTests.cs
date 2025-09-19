@@ -17,12 +17,13 @@ public class PythagorasHandlerTests
         PythagorasHandler service = new(client);
         using CancellationTokenSource cts = new();
 
-        Action<PythagorasQuery<Building>> configure = query => query.WithIds(42);
-        IReadOnlyList<BuildingModel> result = await service.GetBuildingsAsync(configure, cts.Token);
+        PythagorasQuery<Building> query = new();
+        query.WithIds(42);
+        IReadOnlyList<BuildingModel> result = await service.GetBuildingsAsync(query, cts.Token);
 
         Assert.True(client.GetAsyncCalled);
         Assert.Equal("rest/v1/building", client.LastEndpoint);
-        Assert.Same(configure, client.LastConfigure);
+        Assert.Same(query, client.LastQuery);
         Assert.Equal(cts.Token, client.LastCancellationToken);
         BuildingModel model = Assert.Single(result);
         Assert.Equal(42, model.Id);
@@ -46,7 +47,7 @@ public class PythagorasHandlerTests
 
         Assert.True(client.GetPaginatedAsyncCalled);
         Assert.Equal("rest/v1/building", client.LastEndpoint);
-        Assert.Null(client.LastConfigure);
+        Assert.Null(client.LastQuery);
         Assert.Equal(10, client.LastPageSize);
         Assert.Equal(cts.Token, client.LastCancellationToken);
         Assert.Equal([1, 2], [.. collected.Select(b => b.Id)]);
@@ -84,13 +85,14 @@ public class PythagorasHandlerTests
 
         Assert.True(client.GetAsyncCalled);
         Assert.Equal("rest/v1/workspace", client.LastEndpoint);
+        Assert.Null(client.LastQuery);
         WorkspaceModel workspace = Assert.Single(result);
         Assert.Equal(7, workspace.Id);
     }
 
     private sealed class FakePythagorasClient : IPythagorasClient
     {
-        public Delegate? LastConfigure { get; private set; }
+        public object? LastQuery { get; private set; }
         public CancellationToken LastCancellationToken { get; private set; }
         public bool GetAsyncCalled { get; private set; }
         public bool GetPaginatedAsyncCalled { get; private set; }
@@ -102,12 +104,12 @@ public class PythagorasHandlerTests
         public IAsyncEnumerable<Workspace> GetPaginatedWorkspacesResult { get; set; } = AsyncEnumerableHelper.Empty<Workspace>();
         public string? LastEndpoint { get; private set; }
 
-        public Task<IReadOnlyList<TDto>> GetAsync<TDto>(string endpoint, Action<PythagorasQuery<TDto>>? configure, CancellationToken cancellationToken) where TDto : class
+        public Task<IReadOnlyList<TDto>> GetAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, CancellationToken cancellationToken) where TDto : class
         {
             GetAsyncCalled = true;
             LastEndpoint = endpoint;
-            LastConfigure = configure;
             LastCancellationToken = cancellationToken;
+            LastQuery = query;
 
             if (typeof(TDto) == typeof(Building))
             {
@@ -127,13 +129,13 @@ public class PythagorasHandlerTests
             throw new NotSupportedException("Test fake does not support the requested DTO type.");
         }
 
-        public IAsyncEnumerable<TDto> GetPaginatedAsync<TDto>(string endpoint, Action<PythagorasQuery<TDto>>? configure, int pageSize, CancellationToken cancellationToken) where TDto : class
+        public IAsyncEnumerable<TDto> GetPaginatedAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, int pageSize, CancellationToken cancellationToken) where TDto : class
         {
             GetPaginatedAsyncCalled = true;
             LastEndpoint = endpoint;
-            LastConfigure = configure;
             LastCancellationToken = cancellationToken;
             LastPageSize = pageSize;
+            LastQuery = query;
 
             if (typeof(TDto) == typeof(Building))
             {
@@ -146,6 +148,30 @@ public class PythagorasHandlerTests
             }
 
             throw new NotSupportedException("Test fake does not support the requested DTO type.");
+        }
+
+        public Task<IReadOnlyList<TDto>> GetOldAsync<TDto>(string endpoint, Action<PythagorasQuery<TDto>>? configure, CancellationToken cancellationToken) where TDto : class
+        {
+            PythagorasQuery<TDto>? query = null;
+            if (configure is not null)
+            {
+                query = new PythagorasQuery<TDto>();
+                configure(query);
+            }
+
+            return GetAsync(endpoint, query, cancellationToken);
+        }
+
+        public IAsyncEnumerable<TDto> GetOldPaginatedAsync<TDto>(string endpoint, Action<PythagorasQuery<TDto>>? configure, int pageSize, CancellationToken cancellationToken) where TDto : class
+        {
+            PythagorasQuery<TDto>? query = null;
+            if (configure is not null)
+            {
+                query = new PythagorasQuery<TDto>();
+                configure(query);
+            }
+
+            return GetPaginatedAsync(endpoint, query, pageSize, cancellationToken);
         }
     }
 

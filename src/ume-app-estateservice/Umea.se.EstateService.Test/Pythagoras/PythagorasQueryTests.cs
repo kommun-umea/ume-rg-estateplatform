@@ -280,6 +280,32 @@ public class PythagorasQueryTests
         Assert.Equal("https://example.test/rest/v1/buildings", request.RequestUri!.ToString());
     }
 
+    [Fact]
+    public void Clone_CopiesUnderlyingRequest()
+    {
+        PythagorasQuery<SampleDto> original = new();
+        original.GeneralSearch("foo");
+
+        PythagorasQuery<SampleDto> clone = original.Clone();
+
+        Assert.Equal(original.BuildAsQueryString(), clone.BuildAsQueryString());
+
+        clone.GeneralSearch("bar");
+        Assert.NotEqual(original.BuildAsQueryString(), clone.BuildAsQueryString());
+    }
+
+    [Fact]
+    public void Clone_PreservesSkipTakeFlags()
+    {
+        PythagorasQuery<SampleDto> original = new();
+        original.Skip(5);
+
+        PythagorasQuery<SampleDto> clone = original.Clone();
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => clone.Page(1, 10));
+        Assert.Contains("Page()", ex.Message);
+    }
+
     private sealed class SampleDto
     {
         public int Level { get; init; }

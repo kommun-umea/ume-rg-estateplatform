@@ -20,27 +20,26 @@ public class WorkspaceController(IPythagorasHandler pythagorasHandler) : Control
             return BadRequest("Specify either ids or generalSearch, not both.");
         }
 
-        Action<PythagorasQuery<Workspace>>? query = null;
+        PythagorasQuery<Workspace>? query = null;
 
         if ((ids?.Length ?? 0) > 0 || !string.IsNullOrWhiteSpace(search) || maxResults is { })
         {
-            query = query =>
+            query = new PythagorasQuery<Workspace>();
+
+            if ((ids?.Length ?? 0) > 0)
             {
-                if ((ids?.Length ?? 0) > 0)
-                {
-                    query.WithIds(ids!);
-                }
+                query.WithIds(ids!);
+            }
 
-                if (!string.IsNullOrWhiteSpace(search))
-                {
-                    query.GeneralSearch(search!);
-                }
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                query.GeneralSearch(search!);
+            }
 
-                if (maxResults is int take && take > 0)
-                {
-                    query.Take(take);
-                }
-            };
+            if (maxResults is int take && take > 0)
+            {
+                query.Take(take);
+            }
         }
 
         IReadOnlyList<WorkspaceModel> workspaces = await pythagorasHandler.GetWorkspacesAsync(query, cancellationToken);

@@ -22,11 +22,11 @@ public class PythagorasClientTests
         FakeHttpClientFactory factory = new(httpClient);
         PythagorasClient client = new(factory);
 
-        IReadOnlyList<Building> result = await client.GetAsync<Building>("rest/v1/building", query =>
-        {
-            query.WithIds(1);
-            query.Contains(x => x.Name, "SYSTEM", caseSensitive: false);
-        });
+        PythagorasQuery<Building> query = new();
+        query.WithIds(1);
+        query.Contains(x => x.Name, "SYSTEM", caseSensitive: false);
+
+        IReadOnlyList<Building> result = await client.GetAsync("rest/v1/building", query);
 
         Assert.Single(result);
         Assert.Equal(1, result[0].Id);
@@ -51,7 +51,7 @@ public class PythagorasClientTests
         FakeHttpClientFactory factory = new(httpClient);
         PythagorasClient client = new(factory);
 
-        IReadOnlyList<Building> result = await client.GetAsync<Building>("rest/v1/building");
+        IReadOnlyList<Building> result = await client.GetAsync<Building>("rest/v1/building", query: null);
 
         Assert.Empty(result);
         Assert.Equal("https://example.org/rest/v1/building", handler.LastRequest!.RequestUri!.ToString());
@@ -70,7 +70,7 @@ public class PythagorasClientTests
         FakeHttpClientFactory factory = new(httpClient);
         PythagorasClient client = new(factory);
 
-        await client.GetAsync<Building>("/rest/v1/building");
+        await client.GetAsync<Building>("/rest/v1/building", query: null);
 
         Assert.Equal("https://example.org/rest/v1/building", handler.LastRequest!.RequestUri!.ToString());
     }
@@ -93,13 +93,69 @@ public class PythagorasClientTests
         PythagorasClient client = new(factory);
 
         List<Building> results = [];
-        await foreach (Building building in client.GetPaginatedAsync<Building>("rest/v1/building", pageSize: 2))
+        await foreach (Building building in client.GetPaginatedAsync<Building>("rest/v1/building", query: null, pageSize: 2))
         {
             results.Add(building);
         }
 
         Assert.Equal([1, 2, 3], [.. results.Select(x => x.Id)]);
         Assert.Equal(2, handler.RequestCount);
+    }
+
+    [Fact]
+    public async Task GetPaginatedAsync_DoesNotMutateCallerQuery()
+    {
+        Dictionary<int, string> pages = new()
+        {
+            [0] = "[]"
+        };
+
+        PagingHandler handler = new(pages);
+        HttpClient httpClient = new(handler)
+        {
+            BaseAddress = new Uri("https://example.org/")
+        };
+        FakeHttpClientFactory factory = new(httpClient);
+        PythagorasClient client = new(factory);
+
+        PythagorasQuery<Building> callerQuery = new();
+        callerQuery.GeneralSearch("abc");
+        string before = callerQuery.BuildAsQueryString();
+
+        await foreach (Building _ in client.GetPaginatedAsync("rest/v1/building", callerQuery, pageSize: 5))
+        {
+            // No results expected.
+        }
+
+        string after = callerQuery.BuildAsQueryString();
+        Assert.Equal(before, after);
+        Assert.Equal(1, handler.RequestCount);
+    }
+
+    [Fact]
+    public async Task GetPaginatedAsync_ThrowsWhenCallerQueryUsesTake()
+    {
+        const string jsonResponse = "[]";
+        CapturingHandler handler = new(jsonResponse);
+        HttpClient httpClient = new(handler)
+        {
+            BaseAddress = new Uri("https://example.org/")
+        };
+        FakeHttpClientFactory factory = new(httpClient);
+        PythagorasClient client = new(factory);
+
+        PythagorasQuery<Building> query = new();
+        query.Take(10);
+
+        static async Task ConsumeAsync(IAsyncEnumerable<Building> sequence)
+        {
+            await foreach (Building _ in sequence)
+            {
+                // Never reached.
+            }
+        }
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => ConsumeAsync(client.GetPaginatedAsync("rest/v1/building", query, pageSize: 5)));
     }
 
     private sealed class FakeHttpClientFactory(HttpClient client) : IHttpClientFactory

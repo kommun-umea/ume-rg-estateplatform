@@ -20,11 +20,24 @@ public enum Op
 
 public class PythagorasQuery<T> where T : class
 {
-    private readonly QueryRequest _req = new();
+    private readonly QueryRequest _req;
     private static readonly ConcurrentDictionary<MemberInfo, string> _nameCache = new();
     private bool _usedSkip;
     private bool _usedTake;
     private bool _usedPage;
+
+    public PythagorasQuery()
+        : this(new QueryRequest(), usedSkip: false, usedTake: false, usedPage: false)
+    {
+    }
+
+    private PythagorasQuery(QueryRequest req, bool usedSkip, bool usedTake, bool usedPage)
+    {
+        _req = req;
+        _usedSkip = usedSkip;
+        _usedTake = usedTake;
+        _usedPage = usedPage;
+    }
 
     // ---- Public API ----
 
@@ -201,6 +214,9 @@ public class PythagorasQuery<T> where T : class
         return new HttpRequestMessage(method, uriBuilder.Uri);
     }
 
+    public PythagorasQuery<T> Clone()
+        => new(_req.Clone(), _usedSkip, _usedTake, _usedPage);
+
     // ---- Helpers ----
 
     private static string GetApiName<TProp>(Expression<Func<T, TProp>> expr)
@@ -252,6 +268,21 @@ internal sealed class QueryRequest
     public List<Filter> Filters { get; } = [];
     public Order? OrderBy { get; set; }
     public Paging? Page { get; set; }
+
+    public QueryRequest Clone()
+    {
+        QueryRequest copy = new()
+        {
+            GeneralSearch = GeneralSearch,
+            OrderBy = OrderBy,
+            Page = Page
+        };
+
+        copy.Ids.AddRange(Ids);
+        copy.Filters.AddRange(Filters);
+
+        return copy;
+    }
 }
 
 public static class OperatorMaps
