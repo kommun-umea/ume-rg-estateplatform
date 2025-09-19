@@ -134,20 +134,5 @@ public class BuildingControllerTests
 
         public IAsyncEnumerable<TDto> GetPaginatedAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, int pageSize, CancellationToken cancellationToken) where TDto : class
             => throw new NotSupportedException();
-
-        public Task<IReadOnlyList<TDto>> GetOldAsync<TDto>(string endpoint, Action<PythagorasQuery<TDto>>? query, CancellationToken cancellationToken) where TDto : class
-        {
-            PythagorasQuery<TDto>? builder = null;
-            if (query is not null)
-            {
-                builder = new PythagorasQuery<TDto>();
-                query(builder);
-            }
-
-            return GetAsync(endpoint, builder, cancellationToken);
-        }
-
-        public IAsyncEnumerable<TDto> GetOldPaginatedAsync<TDto>(string endpoint, Action<PythagorasQuery<TDto>>? configure, int pageSize, CancellationToken cancellationToken) where TDto : class
-            => throw new NotSupportedException();
     }
 }
