@@ -1,24 +1,33 @@
 using System.Globalization;
 using Microsoft.Extensions.Caching.Memory;
-using Umea.se.EstateService.API.Controllers;
+using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.ServiceAccess.Pythagoras;
 using Umea.se.EstateService.Shared.Autocomplete;
 
-namespace Umea.se.EstateService.API.Services;
+namespace Umea.se.EstateService.Logic.Handlers;
 
-public interface IAutocompleteService
+public interface IAutocompleteHandler
 {
-    Task<AutocompleteResponse> SearchAsync(AutocompleteRequest request, CancellationToken cancellationToken);
+    Task<AutocompleteResult> SearchAsync(AutocompleteArgs request, CancellationToken cancellationToken);
 }
 
-public sealed class AutocompleteService(IPythagorasService pythagorasService, IMemoryCache cache) : IAutocompleteService
+public sealed record AutocompleteArgs
+{
+    public AutocompleteType Type { get; init; } = AutocompleteType.Any;
+    public string Query { get; init; } = string.Empty;
+    public int Limit { get; init; } = 10;
+    public int? BuildingId { get; init; }
+}
+
+public sealed class AutocompleteHandler(IPythagorasHandler pythagorasService, IMemoryCache cache) : IAutocompleteHandler
 {
     private static readonly TimeSpan _cacheDuration = TimeSpan.FromSeconds(30);
+    private const int MAX_LIMIT = 1000;
 
-    public async Task<AutocompleteResponse> SearchAsync(AutocompleteRequest request, CancellationToken cancellationToken)
+    public async Task<AutocompleteResult> SearchAsync(AutocompleteArgs request, CancellationToken cancellationToken)
     {
         string cacheKey = BuildCacheKey(request);
-        if (cache.TryGetValue(cacheKey, out AutocompleteResponse? cached) && cached is not null)
+        if (cache.TryGetValue(cacheKey, out AutocompleteResult? cached) && cached is not null)
         {
             return cached;
         }
@@ -27,7 +36,7 @@ public sealed class AutocompleteService(IPythagorasService pythagorasService, IM
         Task<IReadOnlyList<WorkspaceSearchResult>>? workspaceTask = null;
         List<Task> inflight = [];
 
-        const int fetchLimit = AutocompleteRequest.MaxLimit;
+        const int fetchLimit = MAX_LIMIT;
 
         if (request.Type is AutocompleteType.Building or AutocompleteType.Any)
         {
@@ -62,7 +71,7 @@ public sealed class AutocompleteService(IPythagorasService pythagorasService, IM
 
         List<AutocompleteItemModel> merged = Merge(collected, request.Query, request.Limit);
 
-        AutocompleteResponse response = new()
+        AutocompleteResult response = new()
         {
             Items = merged
         };
@@ -192,7 +201,7 @@ public sealed class AutocompleteService(IPythagorasService pythagorasService, IM
     private static int GetLengthPenalty(AutocompleteItemModel item)
         => Math.Min(item.Name?.Length ?? 0, 40);
 
-    private static string BuildCacheKey(AutocompleteRequest request)
+    private static string BuildCacheKey(AutocompleteArgs request)
     {
         string type = request.Type switch
         {
@@ -211,4 +220,9 @@ public sealed class AutocompleteService(IPythagorasService pythagorasService, IM
     }
 
     private static string Normalize(string? value) => value?.Trim().ToLower(CultureInfo.InvariantCulture) ?? string.Empty;
+}
+
+public sealed record AutocompleteResult
+{
+    public IReadOnlyList<AutocompleteItemModel> Items { get; init; } = [];
 }

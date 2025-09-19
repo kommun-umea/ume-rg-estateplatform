@@ -1,8 +1,9 @@
+using Umea.se.EstateService.ServiceAccess.Pythagoras;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 
-namespace Umea.se.EstateService.ServiceAccess.Pythagoras;
+namespace Umea.se.EstateService.Logic.Mappers;
 
-internal static class PythagorasAutocompleteMapper
+public static class PythagorasAutocompleteMapper
 {
     public static IReadOnlyList<BuildingSearchResult> ToBuildingResults(IReadOnlyList<Building> items)
     {

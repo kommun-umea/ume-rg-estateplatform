@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 
-namespace Umea.se.EstateService.Shared.Pythagoras;
+namespace Umea.se.EstateService.Shared.Models;
 
 public sealed class BuildingModel
 {

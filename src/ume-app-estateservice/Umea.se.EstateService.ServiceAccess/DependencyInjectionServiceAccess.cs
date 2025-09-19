@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using Umea.se.EstateService.ServiceAccess.Pythagoras;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 
 namespace Umea.se.EstateService.ServiceAccess;
@@ -10,7 +9,6 @@ public static class DependencyInjectionServiceAccess
     {
         services.AddMemoryCache();
         services.AddSingleton<IPythagorasClient, PythagorasClient>();
-        services.AddSingleton<IPythagorasService, PythagorasService>();
 
         return services;
     }

@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using Umea.se.EstateService.ServiceAccess.Pythagoras;
-using Umea.se.EstateService.Shared.Pythagoras;
+using Umea.se.EstateService.Logic.Interfaces;
+using Umea.se.EstateService.Shared.Models;
 using Umea.se.Toolkit.Auth;
 
 namespace Umea.se.EstateService.API.Controllers;
@@ -8,7 +8,7 @@ namespace Umea.se.EstateService.API.Controllers;
 [Produces("application/json")]
 [Route(ApiRoutes.Buildings)]
 [AuthorizeApiKey]
-public class BuildingController(IPythagorasService pythagorasService) : ControllerBase
+public class BuildingController(IPythagorasHandler pythagorasService) : ControllerBase
 {
     [HttpGet]
     public async Task<IReadOnlyList<BuildingModel>> GetBuildingsAsync(CancellationToken cancellationToken)

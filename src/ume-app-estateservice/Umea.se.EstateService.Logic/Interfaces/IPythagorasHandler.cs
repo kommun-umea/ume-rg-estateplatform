@@ -1,10 +1,11 @@
+using Umea.se.EstateService.ServiceAccess.Pythagoras;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
-using Umea.se.EstateService.Shared.Pythagoras;
+using Umea.se.EstateService.Shared.Models;
 
-namespace Umea.se.EstateService.ServiceAccess.Pythagoras;
+namespace Umea.se.EstateService.Logic.Interfaces;
 
-public interface IPythagorasService
+public interface IPythagorasHandler
 {
     Task<IReadOnlyList<BuildingModel>> GetBuildingsAsync(Action<PythagorasQuery<Building>>? query = null, CancellationToken cancellationToken = default);
 

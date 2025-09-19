@@ -1,7 +1,8 @@
+using Umea.se.EstateService.Logic.Mappers;
 using Umea.se.EstateService.ServiceAccess.Pythagoras;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
-using Umea.se.EstateService.Shared.Pythagoras;
-using DomainMarkerType = Umea.se.EstateService.Shared.Pythagoras.MarkerType;
+using Umea.se.EstateService.Shared.Models;
+using DomainMarkerType = Umea.se.EstateService.Shared.Models.MarkerType;
 using TransportMarkerType = Umea.se.EstateService.ServiceAccess.Pythagoras.Dto.MarkerType;
 
 namespace Umea.se.EstateService.Test.Pythagoras;
@@ -27,7 +28,7 @@ public class PythagorasBuildingMapperTests
             UseWeightsInWorkspaceAreaDistribution = true
         };
 
-        BuildingModel model = PythagorasBuildingMapper.ToDomain(dto);
+        BuildingModel model = PythagorasBuildingMapper.ToModel(dto);
 
         Assert.Equal(dto.Id, model.Id);
         Assert.Equal(dto.Uid, model.Uid);
@@ -49,7 +50,7 @@ public class PythagorasBuildingMapperTests
     [Fact]
     public void ToDomain_WithEmptyCollection_ReturnsEmptyArray()
     {
-        IReadOnlyList<BuildingModel> result = PythagorasBuildingMapper.ToDomain([]);
+        IReadOnlyList<BuildingModel> result = PythagorasBuildingMapper.ToModel([]);
 
         Assert.Same(Array.Empty<BuildingModel>(), result);
     }
@@ -62,7 +63,7 @@ public class PythagorasBuildingMapperTests
             GeoLocation = null!
         };
 
-        BuildingModel model = PythagorasBuildingMapper.ToDomain(dto);
+        BuildingModel model = PythagorasBuildingMapper.ToModel(dto);
 
         Assert.NotNull(model.GeoLocation);
         Assert.Equal(0, model.GeoLocation.X);

@@ -1,6 +1,6 @@
-using Umea.se.EstateService.ServiceAccess.Pythagoras;
+using Umea.se.EstateService.Logic.Mappers;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
-using Umea.se.EstateService.Shared.Pythagoras;
+using Umea.se.EstateService.Shared.Models;
 
 namespace Umea.se.EstateService.Test.Pythagoras;
 
@@ -40,7 +40,7 @@ public class PythagorasWorkspaceMapperTests
             RentalStatusColor = "#000"
         };
 
-        BuildingWorkspaceModel model = PythagorasWorkspaceMapper.ToDomain(dto);
+        BuildingWorkspaceModel model = PythagorasWorkspaceMapper.ToModel(dto);
 
         Assert.Equal(dto.Id, model.Id);
         Assert.Equal(dto.Uid, model.Uid);

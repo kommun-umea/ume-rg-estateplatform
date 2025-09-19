@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
-using Umea.se.EstateService.ServiceAccess.Pythagoras;
+using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
-using Umea.se.EstateService.Shared.Pythagoras;
+using Umea.se.EstateService.Shared.Models;
 using Umea.se.Toolkit.Auth;
 
 namespace Umea.se.EstateService.API.Controllers;
@@ -10,7 +10,7 @@ namespace Umea.se.EstateService.API.Controllers;
 [Produces("application/json")]
 [Route(ApiRoutes.Workspaces)]
 [AuthorizeApiKey]
-public class WorkspaceController(IPythagorasService pythagorasService) : ControllerBase
+public class WorkspaceController(IPythagorasHandler pythagorasHandler) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<WorkspaceModel>>> GetWorkspacesAsync([FromQuery] int[]? ids, [FromQuery] string? search, [FromQuery] int? maxResults, CancellationToken cancellationToken)
@@ -43,7 +43,7 @@ public class WorkspaceController(IPythagorasService pythagorasService) : Control
             };
         }
 
-        IReadOnlyList<WorkspaceModel> workspaces = await pythagorasService.GetWorkspacesAsync(query, cancellationToken);
+        IReadOnlyList<WorkspaceModel> workspaces = await pythagorasHandler.GetWorkspacesAsync(query, cancellationToken);
         return Ok(workspaces);
     }
 }

@@ -1,13 +1,13 @@
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
-using Umea.se.EstateService.Shared.Pythagoras;
-using DomainMarkerType = Umea.se.EstateService.Shared.Pythagoras.MarkerType;
+using Umea.se.EstateService.Shared.Models;
+using DomainMarkerType = Umea.se.EstateService.Shared.Models.MarkerType;
 using TransportMarkerType = Umea.se.EstateService.ServiceAccess.Pythagoras.Dto.MarkerType;
 
-namespace Umea.se.EstateService.ServiceAccess.Pythagoras;
+namespace Umea.se.EstateService.Logic.Mappers;
 
-internal static class PythagorasBuildingMapper
+public static class PythagorasBuildingMapper
 {
-    public static BuildingModel ToDomain(Building dto)
+    public static BuildingModel ToModel(Building dto)
     {
         ArgumentNullException.ThrowIfNull(dto);
 
@@ -20,24 +20,24 @@ internal static class PythagorasBuildingMapper
             Updated = dto.Updated,
             Name = dto.Name ?? string.Empty,
             PopularName = dto.PopularName ?? string.Empty,
-            MarkerType = MapMarkerType(dto.MarkerType),
-            GeoLocation = MapGeoPoint(dto.GeoLocation),
+            MarkerType = ToModel(dto.MarkerType),
+            GeoLocation = ToModel(dto.GeoLocation),
             Origin = dto.Origin ?? string.Empty,
             PropertyTax = dto.PropertyTax,
             UseWeightsInWorkspaceAreaDistribution = dto.UseWeightsInWorkspaceAreaDistribution
         };
     }
 
-    public static IReadOnlyList<BuildingModel> ToDomain(IReadOnlyList<Building> dtos)
+    public static IReadOnlyList<BuildingModel> ToModel(IReadOnlyList<Building> dtos)
     {
         ArgumentNullException.ThrowIfNull(dtos);
 
         return dtos.Count == 0
             ? []
-            : dtos.Select(ToDomain).ToArray();
+            : dtos.Select(ToModel).ToArray();
     }
 
-    private static DomainMarkerType MapMarkerType(TransportMarkerType markerType)
+    private static DomainMarkerType ToModel(TransportMarkerType markerType)
     {
         int numeric = (int)markerType;
         if (Enum.IsDefined(typeof(DomainMarkerType), numeric))
@@ -48,7 +48,7 @@ internal static class PythagorasBuildingMapper
         return DomainMarkerType.Unknown;
     }
 
-    private static GeoPointModel MapGeoPoint(GeoPoint? dto)
+    private static GeoPointModel ToModel(GeoPoint? dto)
     {
         if (dto is null)
         {

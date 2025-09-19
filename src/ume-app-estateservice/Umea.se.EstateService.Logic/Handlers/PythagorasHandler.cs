@@ -1,11 +1,14 @@
 using System.Runtime.CompilerServices;
+using Umea.se.EstateService.Logic.Interfaces;
+using Umea.se.EstateService.Logic.Mappers;
+using Umea.se.EstateService.ServiceAccess.Pythagoras;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
-using Umea.se.EstateService.Shared.Pythagoras;
+using Umea.se.EstateService.Shared.Models;
 
-namespace Umea.se.EstateService.ServiceAccess.Pythagoras;
+namespace Umea.se.EstateService.Logic.Handlers;
 
-public class PythagorasService(IPythagorasClient pythagorasClient) : IPythagorasService
+public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagorasHandler
 {
     private const string BuildingsEndpoint = "rest/v1/building";
     private const string WorkspacesEndpoint = "rest/v1/workspace";
@@ -14,14 +17,14 @@ public class PythagorasService(IPythagorasClient pythagorasClient) : IPythagoras
     public async Task<IReadOnlyList<BuildingModel>> GetBuildingsAsync(Action<PythagorasQuery<Building>>? query = null, CancellationToken cancellationToken = default)
     {
         IReadOnlyList<Building> payload = await pythagorasClient.GetAsync(BuildingsEndpoint, query, cancellationToken).ConfigureAwait(false);
-        return PythagorasBuildingMapper.ToDomain(payload);
+        return PythagorasBuildingMapper.ToModel(payload);
     }
 
     public async IAsyncEnumerable<BuildingModel> GetPaginatedBuildingsAsync(Action<PythagorasQuery<Building>>? query = null, int pageSize = 50, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         await foreach (Building dto in pythagorasClient.GetPaginatedAsync(BuildingsEndpoint, query, pageSize, cancellationToken).ConfigureAwait(false))
         {
-            yield return PythagorasBuildingMapper.ToDomain(dto);
+            yield return PythagorasBuildingMapper.ToModel(dto);
         }
     }
 
@@ -34,13 +37,13 @@ public class PythagorasService(IPythagorasClient pythagorasClient) : IPythagoras
 
         string endpoint = BuildBuildingWorkspacesEndpoint(buildingId);
         IReadOnlyList<BuildingWorkspace> payload = await pythagorasClient.GetAsync(endpoint, query, cancellationToken).ConfigureAwait(false);
-        return PythagorasWorkspaceMapper.ToDomain(payload);
+        return PythagorasWorkspaceMapper.ToModel(payload);
     }
 
     public async Task<IReadOnlyList<WorkspaceModel>> GetWorkspacesAsync(Action<PythagorasQuery<Workspace>>? query = null, CancellationToken cancellationToken = default)
     {
         IReadOnlyList<Workspace> payload = await pythagorasClient.GetAsync(WorkspacesEndpoint, query, cancellationToken).ConfigureAwait(false);
-        return PythagorasWorkspaceMapper.ToDomain(payload);
+        return PythagorasWorkspaceMapper.ToModel(payload);
     }
 
     public async IAsyncEnumerable<WorkspaceModel> GetPaginatedWorkspacesAsync(Action<PythagorasQuery<Workspace>>? query = null, int pageSize = 50, [EnumeratorCancellation] CancellationToken cancellationToken = default)

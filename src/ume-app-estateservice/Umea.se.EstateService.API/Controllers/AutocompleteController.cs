@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
-using Umea.se.EstateService.API.Services;
+using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Shared.Autocomplete;
 using Umea.se.Toolkit.Auth;
 
@@ -11,15 +11,17 @@ namespace Umea.se.EstateService.API.Controllers;
 [Produces("application/json")]
 [Route(ApiRoutes.Autocomplete)]
 [AuthorizeApiKey]
-public class AutocompleteController(IAutocompleteService autocompleteService, ILogger<AutocompleteController> logger) : ControllerBase
+public class AutocompleteController(IAutocompleteHandler autocompleteHandler, ILogger<AutocompleteController> logger) : ControllerBase
 {
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<AutocompleteResponse>> GetAsync([FromQuery] AutocompleteRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<AutocompleteResult>> GetAsync([FromQuery] AutocompleteRequest request, CancellationToken cancellationToken)
     {
         logger.LogDebug("Autocomplete request for {Type} (Limit={Limit})", request.Type, request.Limit);
-        AutocompleteResponse response = await autocompleteService.SearchAsync(request, cancellationToken);
+
+        AutocompleteArgs args = new() { Query = request.Query, Limit = request.Limit, Type = request.Type, BuildingId = request.BuildingId };
+        AutocompleteResult response = await autocompleteHandler.SearchAsync(args, cancellationToken);
         return Ok(response);
     }
 }
@@ -58,7 +60,3 @@ public sealed record AutocompleteRequest : IValidatableObject
     }
 }
 
-public sealed record AutocompleteResponse
-{
-    public IReadOnlyList<AutocompleteItemModel> Items { get; init; } = [];
-}

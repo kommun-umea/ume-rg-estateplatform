@@ -1,11 +1,11 @@
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
-using Umea.se.EstateService.Shared.Pythagoras;
+using Umea.se.EstateService.Shared.Models;
 
-namespace Umea.se.EstateService.ServiceAccess.Pythagoras;
+namespace Umea.se.EstateService.Logic.Mappers;
 
-internal static class PythagorasWorkspaceMapper
+public static class PythagorasWorkspaceMapper
 {
-    public static BuildingWorkspaceModel ToDomain(BuildingWorkspace dto)
+    public static BuildingWorkspaceModel ToModel(BuildingWorkspace dto)
     {
         ArgumentNullException.ThrowIfNull(dto);
 
@@ -41,7 +41,7 @@ internal static class PythagorasWorkspaceMapper
         };
     }
 
-    public static IReadOnlyList<BuildingWorkspaceModel> ToDomain(IReadOnlyList<BuildingWorkspace> dtos)
+    public static IReadOnlyList<BuildingWorkspaceModel> ToModel(IReadOnlyList<BuildingWorkspace> dtos)
     {
         ArgumentNullException.ThrowIfNull(dtos);
 
@@ -53,7 +53,7 @@ internal static class PythagorasWorkspaceMapper
         BuildingWorkspaceModel[] buffer = new BuildingWorkspaceModel[dtos.Count];
         for (int i = 0; i < dtos.Count; i++)
         {
-            buffer[i] = ToDomain(dtos[i]);
+            buffer[i] = ToModel(dtos[i]);
         }
 
         return buffer;
@@ -83,7 +83,7 @@ internal static class PythagorasWorkspaceMapper
         };
     }
 
-    public static IReadOnlyList<WorkspaceModel> ToDomain(IReadOnlyList<Workspace> dtos)
+    public static IReadOnlyList<WorkspaceModel> ToModel(IReadOnlyList<Workspace> dtos)
     {
         ArgumentNullException.ThrowIfNull(dtos);
 

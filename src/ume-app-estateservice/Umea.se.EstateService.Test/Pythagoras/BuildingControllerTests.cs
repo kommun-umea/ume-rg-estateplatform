@@ -1,8 +1,8 @@
 using Umea.se.EstateService.API.Controllers;
-using Umea.se.EstateService.ServiceAccess.Pythagoras;
+using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
-using Umea.se.EstateService.Shared.Pythagoras;
+using Umea.se.EstateService.Shared.Models;
 
 namespace Umea.se.EstateService.Test.Pythagoras;
 
@@ -20,7 +20,7 @@ public class BuildingControllerTests
             ]
         };
 
-        PythagorasService service = new(client);
+        PythagorasHandler service = new(client);
         BuildingController controller = new(service);
 
         IReadOnlyList<BuildingModel> buildings = await controller.GetBuildingsAsync(CancellationToken.None);
@@ -41,7 +41,7 @@ public class BuildingControllerTests
             ]
         };
 
-        PythagorasService service = new(client);
+        PythagorasHandler service = new(client);
         BuildingController controller = new(service);
 
         IReadOnlyList<BuildingModel> buildings = await controller.GetBuildingsContainingAsync("alp", CancellationToken.None);
@@ -95,7 +95,7 @@ public class BuildingControllerTests
             ]
         };
 
-        PythagorasService service = new(client);
+        PythagorasHandler service = new(client);
         BuildingController controller = new(service);
 
         IReadOnlyList<BuildingWorkspaceModel> result = await controller.GetBuildingWorkspacesAsync(1, CancellationToken.None);

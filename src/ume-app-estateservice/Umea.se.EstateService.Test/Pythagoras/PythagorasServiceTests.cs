@@ -1,11 +1,11 @@
-using Umea.se.EstateService.ServiceAccess.Pythagoras;
+using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
-using Umea.se.EstateService.Shared.Pythagoras;
+using Umea.se.EstateService.Shared.Models;
 
 namespace Umea.se.EstateService.Test.Pythagoras;
 
-public class PythagorasServiceTests
+public class PythagorasHandlerTests
 {
     [Fact]
     public async Task GetBuildingsAsync_DelegatesToClient()
@@ -14,7 +14,7 @@ public class PythagorasServiceTests
         {
             GetAsyncResult = [new() { Id = 42 }]
         };
-        PythagorasService service = new(client);
+        PythagorasHandler service = new(client);
         using CancellationTokenSource cts = new();
 
         Action<PythagorasQuery<Building>> configure = query => query.WithIds(42);
@@ -35,7 +35,7 @@ public class PythagorasServiceTests
         {
             GetPaginatedAsyncResult = YieldAsync(new Building { Id = 1 }, new Building { Id = 2 })
         };
-        PythagorasService service = new(client);
+        PythagorasHandler service = new(client);
         using CancellationTokenSource cts = new();
 
         List<BuildingModel> collected = [];
@@ -60,7 +60,7 @@ public class PythagorasServiceTests
             GetBuildingWorkspacesResult = [new() { Id = 5, BuildingId = 99, BuildingName = "B" }]
         };
 
-        PythagorasService service = new(client);
+        PythagorasHandler service = new(client);
 
         IReadOnlyList<BuildingWorkspaceModel> result = await service.GetBuildingWorkspacesAsync(99);
 
@@ -78,7 +78,7 @@ public class PythagorasServiceTests
             GetWorkspacesResult = [new() { Id = 7, Name = "W" }]
         };
 
-        PythagorasService service = new(client);
+        PythagorasHandler service = new(client);
 
         IReadOnlyList<WorkspaceModel> result = await service.GetWorkspacesAsync();
 

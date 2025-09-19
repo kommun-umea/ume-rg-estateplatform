@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Umea.se.EstateService.API.Controllers;
-using Umea.se.EstateService.ServiceAccess.Pythagoras;
+using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
-using Umea.se.EstateService.Shared.Pythagoras;
+using Umea.se.EstateService.Shared.Models;
 
 namespace Umea.se.EstateService.Test.Pythagoras;
 
@@ -20,7 +20,7 @@ public class WorkspaceControllerTests
             ]
         };
 
-        PythagorasService service = new(client);
+        PythagorasHandler service = new(client);
         WorkspaceController controller = new(service);
 
         ActionResult<IReadOnlyList<WorkspaceModel>> response = await controller.GetWorkspacesAsync(null, null, null, CancellationToken.None);
@@ -36,7 +36,7 @@ public class WorkspaceControllerTests
     public async Task GetWorkspacesAsync_WithIdsAndSearch_ReturnsBadRequest()
     {
         FakePythagorasClient client = new();
-        PythagorasService service = new(client);
+        PythagorasHandler service = new(client);
         WorkspaceController controller = new(service);
 
         ActionResult<IReadOnlyList<WorkspaceModel>> response = await controller.GetWorkspacesAsync([1], "foo", null, CancellationToken.None);
