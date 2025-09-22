@@ -86,7 +86,7 @@ stages:
         parameters:
           azureSubscription: $(serviceConnection)
           environment: ${{ parameters.environment }}
-          resourceGroup: ume-rg-estateservice-${{ parameters.environment }}
+          resourceGroup: ume-rg-estateplatform-${{ parameters.environment }}
           appName: ume-app-estateservice-${{ parameters.environment }}
           projectFolderName: ume-app-estateservice
           pingEndpoints:
