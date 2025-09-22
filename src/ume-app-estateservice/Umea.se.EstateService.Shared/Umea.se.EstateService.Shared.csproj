@@ -4,10 +4,11 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Umea.se.Toolkit" Version="8.2.9" />
+    <PackageReference Include="Umea.se.Toolkit" Version="8.3.0" />
   </ItemGroup>
 
 </Project>

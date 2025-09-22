@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1,
+    "uid": "5bd069b9-ffa6-404e-bbd0-913d96051e34",
+    "version": 58,
+    "created": 1638134395000,
+    "updated": 1742904934000,
+    "name": "SYSTEMBYGGNAD",
+    "popularName": "Pythagoras",
+    "markerType": 0,
+    "geoLocation": {
+      "x": 59.31843969999999,
+      "y": 18.0572061,
+      "rotation": 0
+    },
+    "origin": "SpaceManager",
+    "propertyTax": 0,
+    "useWeightsInWorkspaceAreaDistribution": false
+  }
+]

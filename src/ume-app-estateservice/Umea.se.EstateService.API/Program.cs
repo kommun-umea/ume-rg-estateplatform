@@ -29,7 +29,7 @@ builder.Services
 builder.Services.AddDefaultHttpClient(HttpClientNames.Pythagoras, options =>
 {
     options.BaseAddress = config.PythagorasBaseUrl;
-    options.XApiKey = config.PythagorasApiKey;
+    options.DefaultRequestHeaders.Add("api_key", config.PythagorasApiKey);
 });
 
 builder.Services.AddAuthentication(options =>
