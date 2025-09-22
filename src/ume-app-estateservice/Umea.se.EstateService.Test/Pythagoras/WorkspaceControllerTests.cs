@@ -25,11 +25,12 @@ public class WorkspaceControllerTests
 
         ActionResult<IReadOnlyList<WorkspaceModel>> response = await controller.GetWorkspacesAsync(null, null, null, CancellationToken.None);
 
-        OkObjectResult ok = Assert.IsType<OkObjectResult>(response.Result);
-        IReadOnlyList<WorkspaceModel> workspaces = Assert.IsAssignableFrom<IReadOnlyList<WorkspaceModel>>(ok.Value);
-        WorkspaceModel workspace = Assert.Single(workspaces);
-        Assert.Equal(11, workspace.Id);
-        Assert.Equal("rest/v1/workspace", client.LastEndpoint);
+        OkObjectResult ok = response.Result.ShouldBeOfType<OkObjectResult>();
+        object obj = ok.Value.ShouldNotBeNull();
+        IReadOnlyList<WorkspaceModel>? workspaces = obj.ShouldBeAssignableTo<IReadOnlyList<WorkspaceModel>>();
+        WorkspaceModel workspace = workspaces.ShouldHaveSingleItem();
+        workspace.Id.ShouldBe(11);
+        client.LastEndpoint.ShouldBe("rest/v1/workspace");
     }
 
     [Fact]
@@ -41,8 +42,8 @@ public class WorkspaceControllerTests
 
         ActionResult<IReadOnlyList<WorkspaceModel>> response = await controller.GetWorkspacesAsync([1], "foo", null, CancellationToken.None);
 
-        BadRequestObjectResult badRequest = Assert.IsType<BadRequestObjectResult>(response.Result);
-        Assert.Equal("Specify either ids or generalSearch, not both.", badRequest.Value);
+        BadRequestObjectResult badRequest = response.Result.ShouldBeOfType<BadRequestObjectResult>();
+        badRequest.Value.ShouldBe("Specify either ids or generalSearch, not both.");
     }
 
     private sealed class FakePythagorasClient : IPythagorasClient

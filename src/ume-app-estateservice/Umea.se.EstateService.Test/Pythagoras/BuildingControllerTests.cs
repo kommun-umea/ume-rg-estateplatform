@@ -25,9 +25,9 @@ public class BuildingControllerTests
 
         IReadOnlyList<BuildingModel> buildings = await controller.GetBuildingsAsync(CancellationToken.None);
 
-        Assert.Equal([1, 2], [.. buildings.Select(b => b.Id)]);
-        Assert.Equal("maxResults=50", client.LastQueryString);
-        Assert.Equal("rest/v1/building", client.LastEndpoint);
+        buildings.Select(b => b.Id).ShouldBe(new[] { 1, 2 });
+        client.LastQueryString.ShouldBe("maxResults=50");
+        client.LastEndpoint.ShouldBe("rest/v1/building");
     }
 
     [Fact]
@@ -46,14 +46,16 @@ public class BuildingControllerTests
 
         IReadOnlyList<BuildingModel> buildings = await controller.GetBuildingsContainingAsync("alp", CancellationToken.None);
 
-        Assert.Single(buildings);
-        Assert.Equal("Alpha", buildings[0].Name);
+        BuildingModel building = buildings.ShouldHaveSingleItem();
+        building.Name.ShouldBe("Alpha");
 
         Dictionary<string, List<string>> query = Parse(client.LastQueryString);
 
-        Assert.Equal("ILIKEAW:name", Assert.Single(query["pN[]"]));
-        Assert.Equal("alp", Assert.Single(query["pV[]"]));
-        Assert.Equal("rest/v1/building", client.LastEndpoint);
+        string parameterName = query["pN[]"].ShouldHaveSingleItem();
+        parameterName.ShouldBe("ILIKEAW:name");
+        string parameterValue = query["pV[]"].ShouldHaveSingleItem();
+        parameterValue.ShouldBe("alp");
+        client.LastEndpoint.ShouldBe("rest/v1/building");
     }
 
     private static Dictionary<string, List<string>> Parse(string? query)
@@ -100,9 +102,9 @@ public class BuildingControllerTests
 
         IReadOnlyList<BuildingWorkspaceModel> result = await controller.GetBuildingWorkspacesAsync(1, CancellationToken.None);
 
-        BuildingWorkspaceModel workspace = Assert.Single(result);
-        Assert.Equal(10, workspace.Id);
-        Assert.Equal("rest/v1/building/1/workspace/info", client.LastEndpoint);
+        BuildingWorkspaceModel workspace = result.ShouldHaveSingleItem();
+        workspace.Id.ShouldBe(10);
+        client.LastEndpoint.ShouldBe("rest/v1/building/1/workspace/info");
     }
 
     private sealed class FakePythagorasClient : IPythagorasClient
