@@ -1,73 +1,153 @@
-# Umea RG Estate Platform
+# ume-rg-estateplatform
+
+A .NET solution developed by Umeå Kommun for interfacing with the Pythagoras API data.
 
 ## Overview
-Umea RG Estate Platform delivers an ASP.NET Core API that surfaces real-estate data aggregated from the external Pythagoras service. It provides REST endpoints for autocomplete, buildings, estates, and workspaces, wrapping upstream responses in domain models suited for municipal workflows.
 
-## Key Features
-- Autocomplete endpoint that unifies building and workspace search with in-memory caching
-- Building and workspace APIs exposing curated domain models rather than raw Pythagoras DTOs
-- Centralised HTTP client per upstream service with API key authentication and base-address management
-- Comprehensive unit tests around query builders, service access, and controller behaviour
+This project provides a API layer that communicates with the Pythagoras system to access and manage data. It serves as a bridge between Umeå Kommun's internal systems and the Pythagoras API, enabling streamlined data retrieval and processing.
 
-## Architecture
-- **API (`Umea.se.EstateService.API`)**: Hosts controllers, configures dependency injection, Swagger, CORS, and named HTTP clients.
-- **Logic (`Umea.se.EstateService.Logic`)**: Holds orchestration services shared across controllers.
-- **Service Access (`Umea.se.EstateService.ServiceAccess`)**: Wraps external integrations, including the Pythagoras client, mappers, and strongly typed queries.
-- **Shared (`Umea.se.EstateService.Shared`)**: Contains domain models, configuration helpers, and autocomplete scoring utilities.
-- **Tests (`Umea.se.EstateService.Test`)**: xUnit test suite covering the service layer, query builder invariants, and controller flows.
+## Technology Stack
 
-## Prerequisites
-- .NET SDK 8.0+
-- Access to the required configuration secrets (API key and base URL for Pythagoras)
+- **.NET**
+- **ASP.NET**
+- **Pythagoras API** - External data source integration
+- **Bicep** - Infrastructure as Code
+- **Azure DevOps** - CI/CD Pipelines
 
-## Setup
-1. Restore dependencies: `dotnet restore src/ume-app-estateservice/Umea.se.EstateService.slnx`
-2. Build the solution: `dotnet build src/ume-app-estateservice/Umea.se.EstateService.slnx`
-3. Ensure configuration secrets are available (user secrets, environment variables, or Azure Key Vault).
+## Project Structure
 
-## Configuration
-`ApplicationConfig` resolves settings from registered configuration sources. Provide the following keys:
-- `Pythagoras-Api-Key` — injected as the `api_key` header on outbound requests
-- `Pythagoras-Base-Url` — used as the base address for the named `PythagorasHttpClient`
+```
+src/ume-app-estateservice/
+├── Umea.se.EstateService.API/          # Main API project
+├── Umea.se.EstateService.Logic/        # Business logic layer
+├── Umea.se.EstateService.ServiceAccess/# External service integration
+├── Umea.se.EstateService.Shared/       # Shared utilities and models
+└── Umea.se.EstateService.Test/         # Unit tests
+iac/                                    # Infrastructure as Code (Bicep)
+pipelines/                              # Azure DevOps pipeline definitions
+```
 
-The project template already connects to Azure Key Vault when configured; local development can rely on user secrets or environment variables.
+## Getting Started
 
-## Running Locally
+### Prerequisites
+
+- .NET SDK
+- IDE of choice (Visual Studio, JetBrains Rider, or Visual Studio Code)
+- Access to Pythagoras API credentials
+- Access to Umeå Kommun's Azure DevOps NuGet feeds might make things easier. As of writing this is not public (yet)
+
+### Installation
+
+1. Clone the repository:
 ```bash
+git clone https://github.com/[organization]/ume-rg-estateplatform.git
+cd ume-rg-estateplatform
+```
+
+2. Restore dependencies:
+```bash
+dotnet restore
+```
+
+3. Configure NuGet package sources:
+   - The project uses custom NuGet feeds from Umeå Kommun's Azure DevOps
+   - Ensure you have access to the required package sources (see `NuGet.Config`)
+
+4. Configure your application settings:
+   - Update `appsettings.json` with your Pythagoras API configuration
+   - Set up any required connection strings and API keys
+
+5. Build and run the application:
+```bash
+dotnet build
 dotnet run --project src/ume-app-estateservice/Umea.se.EstateService.API
 ```
-Swagger is enabled by default; browse to `/swagger` to inspect the API surface.
 
-## Testing
-```bash
-dotnet test src/ume-app-estateservice/Umea.se.EstateService.slnx
-```
+## Configuration
 
-## Pythagoras Integration
-`PythagorasService` centralises outbound calls to the upstream API. It normalises endpoint paths (such as `rest/v1/building` or `rest/v1/workspace`), maps transport DTOs into domain models, and exposes helper methods for autocomplete scenarios that request the maximum allowed result slice before applying local scoring.
+Before running the application, ensure you have configured:
 
-### PythagorasQuery
-`PythagorasQuery<T>` builds the query strings accepted by Pythagoras endpoints. It offers fluent helpers for general search, filters, ordering, and pagination while guarding against invalid combinations (for example, mixing `Page` with `Skip`).
+- **Pythagoras API Settings**: Endpoint URLs, authentication credentials
+- **Environment Variables**: Any required environment-specific configurations
+- **Logging Configuration**: Appropriate logging levels and targets
+- **NuGet Authentication**: Access to Umeå Kommun's private package feeds
+- **Keyvault
 
-#### Example: Filtered workspace search
-```csharp
-await pythagorasClient.GetAsync(
-    "rest/v1/workspace",
-    query => query
-        .GeneralSearch(searchTerm)
-        .StartsWith(x => x.Name, searchTerm, caseSensitive: false)
-        .Where(x => x.StatusName, Op.Eq, "Active")
-        .Take(50)
-        .OrderBy(x => x.Name),
-    cancellationToken);
-```
+> **Note**: The Infrastructure as Code (IaC) and CI/CD pipelines included in this repository are specifically configured for Umeå Kommun's deployment environment. If you plan to use this solution in a different environment, you will need to configure your own deployment setup and keyvault.
 
-#### Example: Building lookup by identifiers
-```csharp
-await pythagorasClient.GetAsync(
-    "rest/v1/building",
-    query => query
-        .WithIds(101, 205, 309)
-        .OrderBy(x => x.Name),
-    cancellationToken);
-```
+## Development Environment
+
+### Package Sources
+
+The project uses multiple NuGet package sources:
+- **nuget.org**: Public NuGet packages
+- **Umea.se**: Umeå Kommun's internal package feed
+- **turkos.umea.se**: Additional internal packages
+
+Ensure you have proper authentication configured for the private feeds.
+
+## Contributing
+
+We welcome contributions to improve this project. Please follow these guidelines:
+
+### Pull Request Process
+
+- **Target Branch**: All pull requests must be made to the `main` branch
+- **Squash Commits**: All commits will be squashed when merging to maintain a clean commit history
+- **Code Review**: All pull requests require review before merging
+
+### Workflow
+
+1. Create a feature branch from `main`
+2. Make your changes following the established coding standards (see `.editorconfig`)
+3. Ensure all tests pass and code analysis rules are satisfied
+4. Commit with clear, descriptive messages
+5. Open a pull request targeting the `main` branch
+6. Address any feedback from code review
+7. Once approved, your PR will be squashed and merged
+
+## Code Quality
+
+This project follows strict code quality standards enforced through:
+
+- **EditorConfig**: Consistent code formatting and style rules
+- **Code Analysis**: Extensive CA (Code Analysis) rules for best practices
+- **SonarLint**: Additional static code analysis is prefered
+- **File-scoped namespaces**: Modern C# namespace declarations
+- **Warnings = Errors**: We treat warnings as errors
+
+Key coding standards:
+- No `var` usage - explicit type declarations required
+- Mandatory curly braces for all code blocks
+- File-scoped namespace declarations
+- Comprehensive CA rules for performance and maintainability
+
+
+## Deployment
+
+> **Important**: The deployment infrastructure included in this repository is tailored for Umeå Kommun's specific environment. External users must configure their own:
+> - Infrastructure as Code (IaC) templates
+> - CI/CD pipelines
+> - Environment configurations
+> - Security settings
+> - Keyvaults and secrets
+
+## Support
+
+For questions or issues related to this project, please:
+
+1. Check existing issues in the repository
+2. Create a new issue with detailed information about your problem
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+Copyright (c) 2025 Umea Kommun
+
+## Team
+
+Developed and maintained by Team Turkos at Umeå Kommun.
+
+---
+ 
