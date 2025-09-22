@@ -138,9 +138,11 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : IPy
             throw new ArgumentException("Endpoint must be non-empty.", nameof(endpoint));
         }
 
-        if (Uri.TryCreate(trimmed, UriKind.Absolute, out Uri? absolute))
+        if (Uri.TryCreate(trimmed, UriKind.RelativeOrAbsolute, out Uri? candidate)
+            && candidate.IsAbsoluteUri
+            && (candidate.Scheme == Uri.UriSchemeHttp || candidate.Scheme == Uri.UriSchemeHttps))
         {
-            return absolute.ToString();
+            return candidate.AbsoluteUri;
         }
 
         string normalized = trimmed.TrimStart('/', '\\');
