@@ -20,8 +20,7 @@ public class EstateController(IPythagorasHandler pythagorasService) : Controller
         PythagorasQuery<NavigationFolder> query = BuildQuery(request);
 
         IReadOnlyList<EstateModel> estates = await pythagorasService
-            .GetEstatesAsync(query, cancellationToken)
-            .ConfigureAwait(false);
+            .GetEstatesAsync(query, cancellationToken);
 
         return estates;
     }
