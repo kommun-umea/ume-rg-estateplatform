@@ -12,7 +12,9 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
 {
     private const string BuildingsEndpoint = "rest/v1/building";
     private const string WorkspacesEndpoint = "rest/v1/workspace";
+    private const string NavigationFoldersEndpoint = "rest/v1/navigationfolder/info";
     private const int MaxAutocompleteLimit = 1000;
+    private static string BuildingWorkspacesEndpoint(int buildingId) => $"rest/v1/building/{buildingId}/workspace/info";
 
     public async Task<IReadOnlyList<BuildingModel>> GetBuildingsAsync(PythagorasQuery<Building>? query = null, CancellationToken cancellationToken = default)
     {
@@ -35,7 +37,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
             throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
         }
 
-        string endpoint = BuildBuildingWorkspacesEndpoint(buildingId);
+        string endpoint = BuildingWorkspacesEndpoint(buildingId);
         IReadOnlyList<BuildingWorkspace> payload = await pythagorasClient.GetAsync(endpoint, query, cancellationToken).ConfigureAwait(false);
         return PythagorasWorkspaceMapper.ToModel(payload);
     }
@@ -52,6 +54,15 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         {
             yield return PythagorasWorkspaceMapper.ToDomain(dto);
         }
+    }
+
+    public async Task<IReadOnlyList<EstateModel>> GetEstatesAsync(PythagorasQuery<NavigationFolder>? query = null, CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<NavigationFolder> payload = await pythagorasClient
+            .GetAsync(NavigationFoldersEndpoint, query, cancellationToken)
+            .ConfigureAwait(false);
+
+        return PythagorasEstateMapper.ToModel(payload);
     }
 
     public Task<IReadOnlyList<BuildingSearchResult>> SearchBuildingsAsync(string searchTerm, int limit = 10, CancellationToken cancellationToken = default)
@@ -72,7 +83,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         if (buildingId is int scopedId)
         {
             return await SearchAndMapAsync<BuildingWorkspace, WorkspaceSearchResult>(
-                    BuildBuildingWorkspacesEndpoint(scopedId),
+                    BuildingWorkspacesEndpoint(scopedId),
                     searchTerm,
                     limit,
                     PythagorasAutocompleteMapper.ToWorkspaceResults,
@@ -106,7 +117,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         return mapper(payload);
     }
 
-    private static string BuildBuildingWorkspacesEndpoint(int buildingId) => $"rest/v1/building/{buildingId}/workspace/info";
+    
 
     private static void ValidateSearchInputs(string searchTerm, int limit)
     {

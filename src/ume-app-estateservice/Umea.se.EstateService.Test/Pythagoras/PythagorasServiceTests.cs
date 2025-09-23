@@ -2,6 +2,7 @@ using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
+using Umea.se.EstateService.Test.Helpers;
 
 namespace Umea.se.EstateService.Test.Pythagoras;
 

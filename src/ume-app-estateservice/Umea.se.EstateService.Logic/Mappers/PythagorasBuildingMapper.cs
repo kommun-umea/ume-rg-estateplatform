@@ -1,7 +1,7 @@
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
-using DomainMarkerType = Umea.se.EstateService.Shared.Models.MarkerType;
-using TransportMarkerType = Umea.se.EstateService.ServiceAccess.Pythagoras.Dto.MarkerType;
+using Umea.se.EstateService.Shared.ValueObjects;
+using TransportMarkerType = Umea.se.EstateService.ServiceAccess.Pythagoras.Enum.PythMarkerType;
 
 namespace Umea.se.EstateService.Logic.Mappers;
 
@@ -37,29 +37,24 @@ public static class PythagorasBuildingMapper
             : dtos.Select(ToModel).ToArray();
     }
 
-    private static DomainMarkerType ToModel(TransportMarkerType markerType)
+    private static MarkerTypeEnum ToModel(TransportMarkerType markerType)
     {
         int numeric = (int)markerType;
-        if (Enum.IsDefined(typeof(DomainMarkerType), numeric))
+        if (System.Enum.IsDefined(typeof(MarkerTypeEnum), numeric))
         {
-            return (DomainMarkerType)numeric;
+            return (MarkerTypeEnum)numeric;
         }
 
-        return DomainMarkerType.Unknown;
+        return MarkerTypeEnum.Unknown;
     }
 
-    private static GeoPointModel ToModel(GeoPoint? dto)
+    private static GeoPointModel? ToModel(GeoPoint? dto)
     {
         if (dto is null)
         {
-            return new GeoPointModel();
+            return null;
         }
 
-        return new GeoPointModel
-        {
-            X = dto.X,
-            Y = dto.Y,
-            Rotation = dto.Rotation
-        };
+        return new GeoPointModel(dto.X, dto.Y, dto.Rotation);
     }
 }

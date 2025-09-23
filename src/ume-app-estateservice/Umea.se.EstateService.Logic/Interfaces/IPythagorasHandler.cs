@@ -17,6 +17,8 @@ public interface IPythagorasHandler
 
     IAsyncEnumerable<WorkspaceModel> GetPaginatedWorkspacesAsync(PythagorasQuery<Workspace>? query = null, int pageSize = 50, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<EstateModel>> GetEstatesAsync(PythagorasQuery<NavigationFolder>? query = null, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<BuildingSearchResult>> SearchBuildingsAsync(string searchTerm, int limit = 10, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<WorkspaceSearchResult>> SearchWorkspacesAsync(string searchTerm, int limit = 10, int? buildingId = null, CancellationToken cancellationToken = default);

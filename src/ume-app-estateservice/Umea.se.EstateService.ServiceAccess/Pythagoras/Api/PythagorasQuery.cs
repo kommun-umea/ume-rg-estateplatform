@@ -57,6 +57,21 @@ public class PythagorasQuery<T> where T : class
         return this;
     }
 
+    public PythagorasQuery<T> WithQueryParameter<TValue>(string name, TValue value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+        string trimmedName = name.Trim();
+        if (trimmedName.Length == 0)
+        {
+            throw new ArgumentException("Parameter name must contain characters.", nameof(name));
+        }
+
+        string formattedValue = FormatValue(value);
+        _req.AdditionalParameters[trimmedName] = formattedValue;
+        return this;
+    }
+
     public PythagorasQuery<T> Where<TProp>(
         Expression<Func<T, TProp>> selector,
         Op op,
@@ -251,6 +266,7 @@ public class PythagorasQuery<T> where T : class
                 ? DateTime.SpecifyKind(dt, DateTimeKind.Utc).ToString("o", CultureInfo.InvariantCulture)
                 : dt.ToString("o", CultureInfo.InvariantCulture),
             DateTimeOffset dto => dto.ToString("o", CultureInfo.InvariantCulture),
+            bool b => b ? "true" : "false",
             IFormattable f => f.ToString(null, CultureInfo.InvariantCulture) ?? string.Empty,
             _ => value.ToString() ?? string.Empty
         };
@@ -269,6 +285,8 @@ internal sealed class QueryRequest
     public Order? OrderBy { get; set; }
     public Paging? Page { get; set; }
 
+    public Dictionary<string, string> AdditionalParameters { get; } = new(StringComparer.OrdinalIgnoreCase);
+
     public QueryRequest Clone()
     {
         QueryRequest copy = new()
@@ -280,6 +298,10 @@ internal sealed class QueryRequest
 
         copy.Ids.AddRange(Ids);
         copy.Filters.AddRange(Filters);
+        foreach ((string key, string value) in AdditionalParameters)
+        {
+            copy.AdditionalParameters[key] = value;
+        }
 
         return copy;
     }
@@ -405,6 +427,11 @@ internal static class QueryStringWriter
             {
                 parts.Add(new("maxResults", mr.ToString(CultureInfo.InvariantCulture)));
             }
+        }
+
+        foreach ((string key, string value) in req.AdditionalParameters)
+        {
+            parts.Add(new(key, value));
         }
 
         return Encode(parts);

@@ -1,8 +1,8 @@
 using Umea.se.EstateService.Logic.Mappers;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.Shared.Models;
-using DomainMarkerType = Umea.se.EstateService.Shared.Models.MarkerType;
-using TransportMarkerType = Umea.se.EstateService.ServiceAccess.Pythagoras.Dto.MarkerType;
+using Umea.se.EstateService.Shared.ValueObjects;
 
 namespace Umea.se.EstateService.Test.Pythagoras;
 
@@ -20,7 +20,7 @@ public class PythagorasBuildingMapperTests
             Updated = 456,
             Name = "Main",
             PopularName = "HQ",
-            MarkerType = TransportMarkerType.Unknown,
+            MarkerType = PythMarkerType.Unknown,
             GeoLocation = new GeoPoint { X = 1.1, Y = 2.2, Rotation = 3.3 },
             Origin = "manual",
             PropertyTax = 42.5m,
@@ -36,7 +36,7 @@ public class PythagorasBuildingMapperTests
         model.Updated.ShouldBe(dto.Updated);
         model.Name.ShouldBe(dto.Name);
         model.PopularName.ShouldBe(dto.PopularName);
-        model.MarkerType.ShouldBe((DomainMarkerType)dto.MarkerType);
+        model.MarkerType.ShouldBe((MarkerTypeEnum)dto.MarkerType);
 
         GeoPointModel? location = model.GeoLocation;
         location.ShouldNotBeNull();
@@ -59,14 +59,9 @@ public class PythagorasBuildingMapperTests
     [Fact]
     public void ToDomain_AllowsNullGeoPoint()
     {
-        Building dto = new()
-        {
-            GeoLocation = null!
-        };
-
+        Building dto = new();
         BuildingModel model = PythagorasBuildingMapper.ToModel(dto);
 
-        model.GeoLocation.ShouldNotBeNull();
-        model.GeoLocation!.X.ShouldBe(0);
+        model.GeoLocation.ShouldBeNull();
     }
 }
