@@ -1,4 +1,5 @@
 ﻿using Umea.se.EstateService.Logic.Handlers;
+using Umea.se.EstateService.Logic.Interfaces;
 
 namespace Umea.se.EstateService.API;
 

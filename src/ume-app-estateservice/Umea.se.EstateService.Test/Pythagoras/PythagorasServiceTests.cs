@@ -21,12 +21,12 @@ public class PythagorasHandlerTests
         query.WithIds(42);
         IReadOnlyList<BuildingModel> result = await service.GetBuildingsAsync(query, cts.Token);
 
-        Assert.True(client.GetAsyncCalled);
-        Assert.Equal("rest/v1/building", client.LastEndpoint);
-        Assert.Same(query, client.LastQuery);
-        Assert.Equal(cts.Token, client.LastCancellationToken);
-        BuildingModel model = Assert.Single(result);
-        Assert.Equal(42, model.Id);
+        client.GetAsyncCalled.ShouldBeTrue();
+        client.LastEndpoint.ShouldBe("rest/v1/building");
+        client.LastQuery.ShouldBeSameAs(query);
+        client.LastCancellationToken.ShouldBe(cts.Token);
+        BuildingModel model = result.ShouldHaveSingleItem();
+        model.Id.ShouldBe(42);
     }
 
     [Fact]
@@ -45,12 +45,12 @@ public class PythagorasHandlerTests
             collected.Add(building);
         }
 
-        Assert.True(client.GetPaginatedAsyncCalled);
-        Assert.Equal("rest/v1/building", client.LastEndpoint);
-        Assert.Null(client.LastQuery);
-        Assert.Equal(10, client.LastPageSize);
-        Assert.Equal(cts.Token, client.LastCancellationToken);
-        Assert.Equal([1, 2], [.. collected.Select(b => b.Id)]);
+        client.GetPaginatedAsyncCalled.ShouldBeTrue();
+        client.LastEndpoint.ShouldBe("rest/v1/building");
+        client.LastQuery.ShouldBeNull();
+        client.LastPageSize.ShouldBe(10);
+        client.LastCancellationToken.ShouldBe(cts.Token);
+        collected.Select(b => b.Id).ShouldBe(new[] { 1, 2 });
     }
 
     [Fact]
@@ -65,10 +65,10 @@ public class PythagorasHandlerTests
 
         IReadOnlyList<BuildingWorkspaceModel> result = await service.GetBuildingWorkspacesAsync(99);
 
-        Assert.True(client.GetAsyncCalled);
-        Assert.Equal("rest/v1/building/99/workspace/info", client.LastEndpoint);
-        BuildingWorkspaceModel workspace = Assert.Single(result);
-        Assert.Equal(5, workspace.Id);
+        client.GetAsyncCalled.ShouldBeTrue();
+        client.LastEndpoint.ShouldBe("rest/v1/building/99/workspace/info");
+        BuildingWorkspaceModel workspace = result.ShouldHaveSingleItem();
+        workspace.Id.ShouldBe(5);
     }
 
     [Fact]
@@ -83,11 +83,11 @@ public class PythagorasHandlerTests
 
         IReadOnlyList<WorkspaceModel> result = await service.GetWorkspacesAsync();
 
-        Assert.True(client.GetAsyncCalled);
-        Assert.Equal("rest/v1/workspace", client.LastEndpoint);
-        Assert.Null(client.LastQuery);
-        WorkspaceModel workspace = Assert.Single(result);
-        Assert.Equal(7, workspace.Id);
+        client.GetAsyncCalled.ShouldBeTrue();
+        client.LastEndpoint.ShouldBe("rest/v1/workspace");
+        client.LastQuery.ShouldBeNull();
+        WorkspaceModel workspace = result.ShouldHaveSingleItem();
+        workspace.Id.ShouldBe(7);
     }
 
     private sealed class FakePythagorasClient : IPythagorasClient
@@ -182,15 +182,5 @@ public class PythagorasHandlerTests
             yield return item;
             await Task.Yield();
         }
-    }
-}
-
-public static class AsyncEnumerableHelper
-{
-    public static async IAsyncEnumerable<T> Empty<T>()
-    {
-        await Task.CompletedTask;
-
-        yield break;
     }
 }

@@ -28,15 +28,14 @@ public class PythagorasClientTests
 
         IReadOnlyList<Building> result = await client.GetAsync("rest/v1/building", query);
 
-        Assert.Single(result);
-        Assert.Equal(1, result[0].Id);
-        Assert.Equal("SYSTEMBYGGNAD", result[0].Name);
+        Building building = result.ShouldHaveSingleItem();
+        building.Id.ShouldBe(1);
+        building.Name.ShouldBe("SYSTEMBYGGNAD");
 
-        HttpRequestMessage? request = handler.LastRequest;
-        Assert.NotNull(request);
-        Assert.Equal(HttpMethod.Get, request!.Method);
-        Assert.Equal("https://example.org/rest/v1/building?id%5B%5D=1&pN%5B%5D=ILIKEAW%3Aname&pV%5B%5D=SYSTEM", request.RequestUri!.ToString());
-        Assert.Equal(HttpClientNames.Pythagoras, factory.LastRequestedClientName);
+        HttpRequestMessage request = handler.LastRequest.ShouldNotBeNull();
+        request.Method.ShouldBe(HttpMethod.Get);
+        request.RequestUri!.ToString().ShouldBe("https://example.org/rest/v1/building?id%5B%5D=1&pN%5B%5D=ILIKEAW%3Aname&pV%5B%5D=SYSTEM");
+        factory.LastRequestedClientName.ShouldBe(HttpClientNames.Pythagoras);
     }
 
     [Fact]
@@ -53,9 +52,10 @@ public class PythagorasClientTests
 
         IReadOnlyList<Building> result = await client.GetAsync<Building>("rest/v1/building", query: null);
 
-        Assert.Empty(result);
-        Assert.Equal("https://example.org/rest/v1/building", handler.LastRequest!.RequestUri!.ToString());
-        Assert.Equal(HttpClientNames.Pythagoras, factory.LastRequestedClientName);
+        result.ShouldBeEmpty();
+        HttpRequestMessage request = handler.LastRequest.ShouldNotBeNull();
+        request.RequestUri!.ToString().ShouldBe("https://example.org/rest/v1/building");
+        factory.LastRequestedClientName.ShouldBe(HttpClientNames.Pythagoras);
     }
 
     [Fact]
@@ -72,7 +72,7 @@ public class PythagorasClientTests
 
         await client.GetAsync<Building>("/rest/v1/building", query: null);
 
-        Assert.Equal("https://example.org/rest/v1/building", handler.LastRequest!.RequestUri!.ToString());
+        handler.LastRequest.ShouldNotBeNull().RequestUri!.ToString().ShouldBe("https://example.org/rest/v1/building");
     }
 
     [Fact]
@@ -98,8 +98,8 @@ public class PythagorasClientTests
             results.Add(building);
         }
 
-        Assert.Equal([1, 2, 3], [.. results.Select(x => x.Id)]);
-        Assert.Equal(2, handler.RequestCount);
+        results.Select(x => x.Id).ShouldBe(new[] { 1, 2, 3 });
+        handler.RequestCount.ShouldBe(2);
     }
 
     [Fact]
@@ -128,8 +128,8 @@ public class PythagorasClientTests
         }
 
         string after = callerQuery.BuildAsQueryString();
-        Assert.Equal(before, after);
-        Assert.Equal(1, handler.RequestCount);
+        after.ShouldBe(before);
+        handler.RequestCount.ShouldBe(1);
     }
 
     [Fact]
@@ -155,7 +155,7 @@ public class PythagorasClientTests
             }
         }
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => ConsumeAsync(client.GetPaginatedAsync("rest/v1/building", query, pageSize: 5)));
+        await Should.ThrowAsync<InvalidOperationException>(() => ConsumeAsync(client.GetPaginatedAsync("rest/v1/building", query, pageSize: 5)));
     }
 
     private sealed class FakeHttpClientFactory(HttpClient client) : IHttpClientFactory

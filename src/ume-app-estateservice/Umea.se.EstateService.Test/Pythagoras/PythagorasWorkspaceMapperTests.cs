@@ -42,14 +42,14 @@ public class PythagorasWorkspaceMapperTests
 
         BuildingWorkspaceModel model = PythagorasWorkspaceMapper.ToModel(dto);
 
-        Assert.Equal(dto.Id, model.Id);
-        Assert.Equal(dto.Uid, model.Uid);
-        Assert.Equal(dto.Name, model.Name);
-        Assert.Equal(dto.PopularName, model.PopularName);
-        Assert.Equal(dto.GrossArea, model.GrossArea);
-        Assert.Equal(dto.StatusName, model.StatusName);
-        Assert.Equal(dto.RentalStatusColor, model.RentalStatusColor);
-        Assert.Equal(dto.BuildingName, model.BuildingName);
+        model.Id.ShouldBe(dto.Id);
+        model.Uid.ShouldBe(dto.Uid);
+        model.Name.ShouldBe(dto.Name);
+        model.PopularName.ShouldBe(dto.PopularName);
+        model.GrossArea.ShouldBe(dto.GrossArea);
+        model.StatusName.ShouldBe(dto.StatusName);
+        model.RentalStatusColor.ShouldBe(dto.RentalStatusColor);
+        model.BuildingName.ShouldBe(dto.BuildingName);
     }
 
     [Fact]
@@ -76,10 +76,10 @@ public class PythagorasWorkspaceMapperTests
 
         WorkspaceModel model = PythagorasWorkspaceMapper.ToDomain(dto);
 
-        Assert.Equal(dto.Id, model.Id);
-        Assert.Equal(dto.Version, model.Version);
-        Assert.Equal(dto.PopularName, model.PopularName);
-        Assert.Equal(dto.Price, model.Price);
-        Assert.Equal(dto.OptimalCapacity, model.OptimalCapacity);
+        model.Id.ShouldBe(dto.Id);
+        model.Version.ShouldBe(dto.Version);
+        model.PopularName.ShouldBe(dto.PopularName);
+        model.Price.ShouldBe(dto.Price);
+        model.OptimalCapacity.ShouldBe(dto.OptimalCapacity);
     }
 }

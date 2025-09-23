@@ -14,8 +14,8 @@ public class PythagorasQueryTests
 
         Dictionary<string, List<string>> dict = Parse(query.BuildAsQueryString());
 
-        Assert.Equal(["1", "2", "3"], dict["id[]"]);
-        Assert.Single(dict);
+        dict["id[]"].ShouldBe(new[] { "1", "2", "3" });
+        dict.Count.ShouldBe(1);
     }
 
     [Fact]
@@ -27,7 +27,8 @@ public class PythagorasQueryTests
 
         Dictionary<string, List<string>> dict = Parse(query.BuildAsQueryString());
 
-        Assert.Equal("office", Assert.Single(dict["generalSearch"]));
+        string generalSearch = dict["generalSearch"].ShouldHaveSingleItem();
+        generalSearch.ShouldBe("office");
     }
 
     [Fact]
@@ -39,8 +40,10 @@ public class PythagorasQueryTests
 
         Dictionary<string, List<string>> dict = Parse(query.BuildAsQueryString());
 
-        Assert.Equal("EQ:displayName", Assert.Single(dict["pN[]"]));
-        Assert.Equal("Main entrance", Assert.Single(dict["pV[]"]));
+        string parameterName = dict["pN[]"].ShouldHaveSingleItem();
+        parameterName.ShouldBe("EQ:displayName");
+        string parameterValue = dict["pV[]"].ShouldHaveSingleItem();
+        parameterValue.ShouldBe("Main entrance");
     }
 
     [Fact]
@@ -52,8 +55,10 @@ public class PythagorasQueryTests
 
         Dictionary<string, List<string>> dict = Parse(query.BuildAsQueryString());
 
-        Assert.Equal("LIKEAW:custom_label", Assert.Single(dict["aN[]"]));
-        Assert.Equal("north", Assert.Single(dict["aV[]"]));
+        string attributeName = dict["aN[]"].ShouldHaveSingleItem();
+        attributeName.ShouldBe("LIKEAW:custom_label");
+        string attributeValue = dict["aV[]"].ShouldHaveSingleItem();
+        attributeValue.ShouldBe("north");
     }
 
     [Fact]
@@ -65,8 +70,10 @@ public class PythagorasQueryTests
 
         Dictionary<string, List<string>> dict = Parse(query.BuildAsQueryString());
 
-        Assert.Equal("ILIKEAW:displayName", Assert.Single(dict["pN[]"]));
-        Assert.Equal("north", Assert.Single(dict["pV[]"]));
+        string parameterName = dict["pN[]"].ShouldHaveSingleItem();
+        parameterName.ShouldBe("ILIKEAW:displayName");
+        string parameterValue = dict["pV[]"].ShouldHaveSingleItem();
+        parameterValue.ShouldBe("north");
     }
 
     [Fact]
@@ -78,8 +85,10 @@ public class PythagorasQueryTests
 
         Dictionary<string, List<string>> dict = Parse(query.BuildAsQueryString());
 
-        Assert.Equal("createdAt", Assert.Single(dict["orderBy"]));
-        Assert.Equal("true", Assert.Single(dict["orderAsc"]));
+        string orderBy = dict["orderBy"].ShouldHaveSingleItem();
+        orderBy.ShouldBe("createdAt");
+        string orderAsc = dict["orderAsc"].ShouldHaveSingleItem();
+        orderAsc.ShouldBe("true");
     }
 
     [Fact]
@@ -91,8 +100,10 @@ public class PythagorasQueryTests
 
         Dictionary<string, List<string>> dict = Parse(query.BuildAsQueryString());
 
-        Assert.Equal("createdAt", Assert.Single(dict["orderBy"]));
-        Assert.Equal("false", Assert.Single(dict["orderAsc"]));
+        string orderBy = dict["orderBy"].ShouldHaveSingleItem();
+        orderBy.ShouldBe("createdAt");
+        string orderAsc = dict["orderAsc"].ShouldHaveSingleItem();
+        orderAsc.ShouldBe("false");
     }
 
     [Fact]
@@ -104,8 +115,10 @@ public class PythagorasQueryTests
 
         Dictionary<string, List<string>> dict = Parse(query.BuildAsQueryString());
 
-        Assert.Equal("5", Assert.Single(dict["firstResult"]));
-        Assert.Equal("10", Assert.Single(dict["maxResults"]));
+        string firstResult = dict["firstResult"].ShouldHaveSingleItem();
+        firstResult.ShouldBe("5");
+        string maxResults = dict["maxResults"].ShouldHaveSingleItem();
+        maxResults.ShouldBe("10");
     }
 
     [Fact]
@@ -117,8 +130,10 @@ public class PythagorasQueryTests
 
         Dictionary<string, List<string>> dict = Parse(builder.BuildAsQueryString());
 
-        Assert.Equal("25", Assert.Single(dict["firstResult"]));
-        Assert.Equal("25", Assert.Single(dict["maxResults"]));
+        string firstResult = dict["firstResult"].ShouldHaveSingleItem();
+        firstResult.ShouldBe("25");
+        string maxResults = dict["maxResults"].ShouldHaveSingleItem();
+        maxResults.ShouldBe("25");
     }
 
     [Fact]
@@ -126,8 +141,8 @@ public class PythagorasQueryTests
     {
         PythagorasQuery<SampleDto> query = new();
 
-        ArgumentException ex = Assert.Throws<ArgumentException>(() => query.Page(0, 10));
-        Assert.Equal("pageNumber", ex.ParamName);
+        ArgumentException ex = Should.Throw<ArgumentException>(() => query.Page(0, 10));
+        ex.ParamName.ShouldBe("pageNumber");
     }
 
     [Fact]
@@ -135,8 +150,8 @@ public class PythagorasQueryTests
     {
         PythagorasQuery<SampleDto> query = new();
 
-        ArgumentException ex = Assert.Throws<ArgumentException>(() => query.Page(1, 0));
-        Assert.Equal("pageSize", ex.ParamName);
+        ArgumentException ex = Should.Throw<ArgumentException>(() => query.Page(1, 0));
+        ex.ParamName.ShouldBe("pageSize");
     }
 
     [Fact]
@@ -145,8 +160,8 @@ public class PythagorasQueryTests
         PythagorasQuery<SampleDto> query = new();
         query.Skip(5);
 
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => query.Page(1, 10));
-        Assert.Contains("Page()", ex.Message);
+        InvalidOperationException ex = Should.Throw<InvalidOperationException>(() => query.Page(1, 10));
+        ex.Message.ShouldContain("Page()");
     }
 
     [Fact]
@@ -155,8 +170,8 @@ public class PythagorasQueryTests
         PythagorasQuery<SampleDto> query = new();
         query.Page(1, 10);
 
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => query.Skip(5));
-        Assert.Contains("Skip()", ex.Message);
+        InvalidOperationException ex = Should.Throw<InvalidOperationException>(() => query.Skip(5));
+        ex.Message.ShouldContain("Skip()");
     }
 
     [Fact]
@@ -165,8 +180,8 @@ public class PythagorasQueryTests
         PythagorasQuery<SampleDto> query = new();
         query.Page(1, 10);
 
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => query.Take(5));
-        Assert.Contains("Take()", ex.Message);
+        InvalidOperationException ex = Should.Throw<InvalidOperationException>(() => query.Take(5));
+        ex.Message.ShouldContain("Take()");
     }
 
     [Fact]
@@ -175,8 +190,8 @@ public class PythagorasQueryTests
         PythagorasQuery<SampleDto> query = new();
         query.Take(10);
 
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => query.Page(1, 10));
-        Assert.Contains("Page()", ex.Message);
+        InvalidOperationException ex = Should.Throw<InvalidOperationException>(() => query.Page(1, 10));
+        ex.Message.ShouldContain("Page()");
     }
 
     [Fact]
@@ -188,8 +203,8 @@ public class PythagorasQueryTests
 
         Dictionary<string, List<string>> dict = Parse(query.BuildAsQueryString());
 
-        Assert.Equal(["GE:level", "LE:level"], dict["pN[]"]);
-        Assert.Equal(["1", "5"], dict["pV[]"]);
+        dict["pN[]"].ShouldBe(new[] { "GE:level", "LE:level" });
+        dict["pV[]"].ShouldBe(new[] { "1", "5" });
     }
 
     [Fact]
@@ -202,9 +217,9 @@ public class PythagorasQueryTests
 
         Dictionary<string, List<string>> dict = Parse(query.BuildAsQueryString());
 
-        string serialized = Assert.Single(dict["pV[]"]);
-        Assert.EndsWith("Z", serialized);
-        Assert.Equal(DateTime.SpecifyKind(value, DateTimeKind.Utc).ToString("o"), serialized);
+        string serialized = dict["pV[]"].ShouldHaveSingleItem();
+        serialized.ShouldEndWith("Z");
+        serialized.ShouldBe(DateTime.SpecifyKind(value, DateTimeKind.Utc).ToString("o"));
     }
 
     [Fact]
@@ -214,9 +229,9 @@ public class PythagorasQueryTests
         query.WithIds(1);
         query.GeneralSearch("conflict");
 
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(query.BuildAsQueryString);
+        InvalidOperationException ex = Should.Throw<InvalidOperationException>(query.BuildAsQueryString);
 
-        Assert.Contains("WithIds", ex.Message);
+        ex.Message.ShouldContain("WithIds");
     }
 
     [Fact]
@@ -226,9 +241,9 @@ public class PythagorasQueryTests
         query.Where(x => x.Level, Op.Gt, 1);
         query.Where(x => x.Level, Op.Gt, 2);
 
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(query.BuildAsQueryString);
+        InvalidOperationException ex = Should.Throw<InvalidOperationException>(query.BuildAsQueryString);
 
-        Assert.Contains("Conflicting filters", ex.Message);
+        ex.Message.ShouldContain("Conflicting filters");
     }
 
     [Fact]
@@ -241,10 +256,10 @@ public class PythagorasQueryTests
 
         Dictionary<string, List<string>> dict = Parse(query.BuildAsQueryString());
 
-        Assert.Contains("EQ:displayName", dict["pN[]"]);
-        Assert.Contains("EQ:displayName", dict["aN[]"]);
-        Assert.Contains("inside", dict["pV[]"]);
-        Assert.Contains("outside", dict["aV[]"]);
+        dict["pN[]"].ShouldContain("EQ:displayName");
+        dict["aN[]"].ShouldContain("EQ:displayName");
+        dict["pV[]"].ShouldContain("inside");
+        dict["aV[]"].ShouldContain("outside");
     }
 
     [Fact]
@@ -255,8 +270,8 @@ public class PythagorasQueryTests
 
         HttpRequestMessage request = query.Build(HttpMethod.Get, "https://example.test/rest/v1/buildings");
 
-        Assert.Equal(HttpMethod.Get, request.Method);
-        Assert.Equal("https://example.test/rest/v1/buildings?generalSearch=north", request.RequestUri!.ToString());
+        request.Method.ShouldBe(HttpMethod.Get);
+        request.RequestUri!.ToString().ShouldBe("https://example.test/rest/v1/buildings?generalSearch=north");
     }
 
     [Fact]
@@ -267,7 +282,7 @@ public class PythagorasQueryTests
 
         HttpRequestMessage request = query.Build(HttpMethod.Get, "https://example.test/api?existing=1");
 
-        Assert.Equal("https://example.test/api?existing=1&id%5B%5D=42", request.RequestUri!.ToString());
+        request.RequestUri!.ToString().ShouldBe("https://example.test/api?existing=1&id%5B%5D=42");
     }
 
     [Fact]
@@ -277,7 +292,7 @@ public class PythagorasQueryTests
 
         HttpRequestMessage request = query.Build(HttpMethod.Get, "https://example.test/rest/v1/buildings");
 
-        Assert.Equal("https://example.test/rest/v1/buildings", request.RequestUri!.ToString());
+        request.RequestUri!.ToString().ShouldBe("https://example.test/rest/v1/buildings");
     }
 
     [Fact]
@@ -288,10 +303,13 @@ public class PythagorasQueryTests
 
         PythagorasQuery<SampleDto> clone = original.Clone();
 
-        Assert.Equal(original.BuildAsQueryString(), clone.BuildAsQueryString());
+        string originalQuery = original.BuildAsQueryString();
+        string cloneQuery = clone.BuildAsQueryString();
+        cloneQuery.ShouldBe(originalQuery);
 
         clone.GeneralSearch("bar");
-        Assert.NotEqual(original.BuildAsQueryString(), clone.BuildAsQueryString());
+        string mutatedCloneQuery = clone.BuildAsQueryString();
+        mutatedCloneQuery.ShouldNotBe(originalQuery);
     }
 
     [Fact]
@@ -302,8 +320,8 @@ public class PythagorasQueryTests
 
         PythagorasQuery<SampleDto> clone = original.Clone();
 
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => clone.Page(1, 10));
-        Assert.Contains("Page()", ex.Message);
+        InvalidOperationException ex = Should.Throw<InvalidOperationException>(() => clone.Page(1, 10));
+        ex.Message.ShouldContain("Page()");
     }
 
     private sealed class SampleDto

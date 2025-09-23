@@ -1,5 +1,4 @@
 using Umea.se.EstateService.Logic.Mappers;
-using Umea.se.EstateService.ServiceAccess.Pythagoras;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
 using DomainMarkerType = Umea.se.EstateService.Shared.Models.MarkerType;
@@ -30,29 +29,31 @@ public class PythagorasBuildingMapperTests
 
         BuildingModel model = PythagorasBuildingMapper.ToModel(dto);
 
-        Assert.Equal(dto.Id, model.Id);
-        Assert.Equal(dto.Uid, model.Uid);
-        Assert.Equal(dto.Version, model.Version);
-        Assert.Equal(dto.Created, model.Created);
-        Assert.Equal(dto.Updated, model.Updated);
-        Assert.Equal(dto.Name, model.Name);
-        Assert.Equal(dto.PopularName, model.PopularName);
-        Assert.Equal((DomainMarkerType)dto.MarkerType, model.MarkerType);
-        Assert.NotNull(model.GeoLocation);
-        Assert.Equal(dto.GeoLocation.X, model.GeoLocation.X);
-        Assert.Equal(dto.GeoLocation.Y, model.GeoLocation.Y);
-        Assert.Equal(dto.GeoLocation.Rotation, model.GeoLocation.Rotation);
-        Assert.Equal(dto.Origin, model.Origin);
-        Assert.Equal(dto.PropertyTax, model.PropertyTax);
-        Assert.True(model.UseWeightsInWorkspaceAreaDistribution);
+        model.Id.ShouldBe(dto.Id);
+        model.Uid.ShouldBe(dto.Uid);
+        model.Version.ShouldBe(dto.Version);
+        model.Created.ShouldBe(dto.Created);
+        model.Updated.ShouldBe(dto.Updated);
+        model.Name.ShouldBe(dto.Name);
+        model.PopularName.ShouldBe(dto.PopularName);
+        model.MarkerType.ShouldBe((DomainMarkerType)dto.MarkerType);
+
+        GeoPointModel? location = model.GeoLocation;
+        location.ShouldNotBeNull();
+        location!.X.ShouldBe(dto.GeoLocation.X);
+        location.Y.ShouldBe(dto.GeoLocation.Y);
+        location.Rotation.ShouldBe(dto.GeoLocation.Rotation);
+
+        model.Origin.ShouldBe(dto.Origin);
+        model.PropertyTax.ShouldBe(dto.PropertyTax);
+        model.UseWeightsInWorkspaceAreaDistribution.ShouldBeTrue();
     }
 
     [Fact]
     public void ToDomain_WithEmptyCollection_ReturnsEmptyArray()
     {
         IReadOnlyList<BuildingModel> result = PythagorasBuildingMapper.ToModel([]);
-
-        Assert.Same(Array.Empty<BuildingModel>(), result);
+        result.ShouldBeSameAs(Array.Empty<BuildingModel>());
     }
 
     [Fact]
@@ -65,7 +66,7 @@ public class PythagorasBuildingMapperTests
 
         BuildingModel model = PythagorasBuildingMapper.ToModel(dto);
 
-        Assert.NotNull(model.GeoLocation);
-        Assert.Equal(0, model.GeoLocation.X);
+        model.GeoLocation.ShouldNotBeNull();
+        model.GeoLocation!.X.ShouldBe(0);
     }
 }
