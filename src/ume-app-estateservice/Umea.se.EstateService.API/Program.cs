@@ -43,6 +43,7 @@ builder.Services
 
 // Swagger
 builder.Services.AddDefaultSwagger(config);
+builder.Services.ConfigureSwaggerGen(options => options.CustomSchemaIds(x => x.FullName));
 
 builder.Services.AddAllowedOriginsCorsPolicy(config.AllowedOrigins);
 
