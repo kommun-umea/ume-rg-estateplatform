@@ -1,4 +1,6 @@
-﻿namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
+﻿using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
+
+namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 
 public sealed class Building
 {
@@ -9,8 +11,8 @@ public sealed class Building
     public long Updated { get; init; }
     public string Name { get; init; } = "";
     public string PopularName { get; init; } = "";
-    public MarkerType MarkerType { get; init; }
-    public GeoPoint GeoLocation { get; init; } = new();
+    public PythMarkerType MarkerType { get; init; }
+    public GeoPoint? GeoLocation { get; init; }
     public string Origin { get; init; } = "";
     public decimal PropertyTax { get; init; }
     public bool UseWeightsInWorkspaceAreaDistribution { get; init; }
