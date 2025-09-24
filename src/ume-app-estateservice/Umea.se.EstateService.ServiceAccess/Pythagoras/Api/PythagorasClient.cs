@@ -14,7 +14,7 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : IPy
     {
         ArgumentNullException.ThrowIfNull(endpoint);
 
-        PythagorasQuery<TDto> builder = query?.Clone() ?? new PythagorasQuery<TDto>();
+        PythagorasQuery<TDto> builder = query ?? new PythagorasQuery<TDto>();
         return QueryAsync(endpoint, builder, cancellationToken);
     }
 
@@ -38,13 +38,12 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : IPy
             throw new ArgumentException("Page size must be > 0.", nameof(pageSize));
         }
 
-        PythagorasQuery<TDto> baseQuery = query?.Clone() ?? new PythagorasQuery<TDto>();
+        PythagorasQuery<TDto> baseQuery = query ?? new PythagorasQuery<TDto>();
         int pageNumber = 1;
 
         while (true)
         {
-            PythagorasQuery<TDto> pageQuery = baseQuery.Clone();
-            pageQuery.Page(pageNumber, pageSize);
+            PythagorasQuery<TDto> pageQuery = baseQuery.Page(pageNumber, pageSize);
 
             IReadOnlyList<TDto> page = await QueryAsync(endpoint, pageQuery, cancellationToken).ConfigureAwait(false);
             if (page.Count == 0)

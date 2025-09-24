@@ -32,7 +32,7 @@ public class EstateController(IPythagorasHandler pythagorasService) : Controller
 
         if (!string.IsNullOrWhiteSpace(request.SearchTerm))
         {
-            query.GeneralSearch(request.SearchTerm);
+            query = query.GeneralSearch(request.SearchTerm);
         }
 
         return query;

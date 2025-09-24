@@ -28,17 +28,17 @@ public class WorkspaceController(IPythagorasHandler pythagorasHandler) : Control
 
             if ((ids?.Length ?? 0) > 0)
             {
-                query.WithIds(ids!);
+                query = query.WithIds(ids!);
             }
 
             if (!string.IsNullOrWhiteSpace(search))
             {
-                query.GeneralSearch(search!);
+                query = query.GeneralSearch(search!);
             }
 
             if (maxResults is int take && take > 0)
             {
-                query.Take(take);
+                query = query.Take(take);
             }
         }
 

@@ -8,22 +8,20 @@ public class PythagorasQueryTests
     [Fact]
     public void BuildAsQueryString_WithIds_AddsEachIdParameter()
     {
-        PythagorasQuery<SampleDto> query = new();
-
-        query.WithIds(1, 2, 3);
+        PythagorasQuery<SampleDto> query = new PythagorasQuery<SampleDto>()
+            .WithIds(1, 2, 3);
 
         Dictionary<string, List<string>> dict = Parse(query.BuildAsQueryString());
 
-        dict["id[]"].ShouldBe(new[] { "1", "2", "3" });
+        dict["id[]"].ShouldBe(["1", "2", "3"]);
         dict.Count.ShouldBe(1);
     }
 
     [Fact]
     public void BuildAsQueryString_WithGeneralSearch_AddsGeneralSearchParameter()
     {
-        PythagorasQuery<SampleDto> query = new();
-
-        query.GeneralSearch("office");
+        PythagorasQuery<SampleDto> query = new PythagorasQuery<SampleDto>()
+            .GeneralSearch("office");
 
         Dictionary<string, List<string>> dict = Parse(query.BuildAsQueryString());
 
@@ -34,9 +32,8 @@ public class PythagorasQueryTests
     [Fact]
     public void BuildAsQueryString_WithParameterFilter_UsesCamelCasedName()
     {
-        PythagorasQuery<SampleDto> query = new();
-
-        query.Where(x => x.DisplayName, Op.Eq, "Main entrance");
+        PythagorasQuery<SampleDto> query = new PythagorasQuery<SampleDto>()
+            .Where(x => x.DisplayName, Op.Eq, "Main entrance");
 
         Dictionary<string, List<string>> dict = Parse(query.BuildAsQueryString());
 
@@ -49,9 +46,8 @@ public class PythagorasQueryTests
     [Fact]
     public void BuildAsQueryString_WithAttributeTarget_UsesJsonPropertyName()
     {
-        PythagorasQuery<SampleDto> query = new();
-
-        query.WhereAttribute(x => x.CustomLabel, "likeaw", "north");
+        PythagorasQuery<SampleDto> query = new PythagorasQuery<SampleDto>()
+            .WhereAttribute(x => x.CustomLabel, "likeaw", "north");
 
         Dictionary<string, List<string>> dict = Parse(query.BuildAsQueryString());
 
@@ -64,9 +60,8 @@ public class PythagorasQueryTests
     [Fact]
     public void BuildAsQueryString_WithContains_IsCaseInsensitiveLike()
     {
-        PythagorasQuery<SampleDto> query = new();
-
-        query.Contains(x => x.DisplayName, "north");
+        PythagorasQuery<SampleDto> query = new PythagorasQuery<SampleDto>()
+            .Contains(x => x.DisplayName, "north");
 
         Dictionary<string, List<string>> dict = Parse(query.BuildAsQueryString());
 
@@ -79,9 +74,8 @@ public class PythagorasQueryTests
     [Fact]
     public void BuildAsQueryString_OrderByAscending_AddsOrderByParameters()
     {
-        PythagorasQuery<SampleDto> query = new();
-
-        query.OrderBy(x => x.CreatedAt);
+        PythagorasQuery<SampleDto> query = new PythagorasQuery<SampleDto>()
+            .OrderBy(x => x.CreatedAt);
 
         Dictionary<string, List<string>> dict = Parse(query.BuildAsQueryString());
 
@@ -94,9 +88,8 @@ public class PythagorasQueryTests
     [Fact]
     public void BuildAsQueryString_OrderByDescending_SetsOrderAscFalse()
     {
-        PythagorasQuery<SampleDto> query = new();
-
-        query.OrderByDescending(x => x.CreatedAt);
+        PythagorasQuery<SampleDto> query = new PythagorasQuery<SampleDto>()
+            .OrderByDescending(x => x.CreatedAt);
 
         Dictionary<string, List<string>> dict = Parse(query.BuildAsQueryString());
 
@@ -109,9 +102,8 @@ public class PythagorasQueryTests
     [Fact]
     public void BuildAsQueryString_SkipAndTake_ComposePagingParameters()
     {
-        PythagorasQuery<SampleDto> query = new();
-
-        query.Skip(5).Take(10);
+        PythagorasQuery<SampleDto> query = new PythagorasQuery<SampleDto>()
+            .Skip(5).Take(10);
 
         Dictionary<string, List<string>> dict = Parse(query.BuildAsQueryString());
 
@@ -124,9 +116,8 @@ public class PythagorasQueryTests
     [Fact]
     public void BuildAsQueryString_Page_ComputesFirstResultAndSize()
     {
-        PythagorasQuery<SampleDto> builder = new();
-
-        builder.Page(2, 25);
+        PythagorasQuery<SampleDto> builder = new PythagorasQuery<SampleDto>()
+            .Page(2, 25);
 
         Dictionary<string, List<string>> dict = Parse(builder.BuildAsQueryString());
 
@@ -158,7 +149,7 @@ public class PythagorasQueryTests
     public void Page_Throws_WhenUsedAfterSkip()
     {
         PythagorasQuery<SampleDto> query = new();
-        query.Skip(5);
+        query = query.Skip(5);
 
         InvalidOperationException ex = Should.Throw<InvalidOperationException>(() => query.Page(1, 10));
         ex.Message.ShouldContain("Page()");
@@ -168,7 +159,7 @@ public class PythagorasQueryTests
     public void Skip_Throws_WhenUsedAfterPage()
     {
         PythagorasQuery<SampleDto> query = new();
-        query.Page(1, 10);
+        query = query.Page(1, 10);
 
         InvalidOperationException ex = Should.Throw<InvalidOperationException>(() => query.Skip(5));
         ex.Message.ShouldContain("Skip()");
@@ -178,7 +169,7 @@ public class PythagorasQueryTests
     public void Take_Throws_WhenUsedAfterPage()
     {
         PythagorasQuery<SampleDto> query = new();
-        query.Page(1, 10);
+        query = query.Page(1, 10);
 
         InvalidOperationException ex = Should.Throw<InvalidOperationException>(() => query.Take(5));
         ex.Message.ShouldContain("Take()");
@@ -188,7 +179,7 @@ public class PythagorasQueryTests
     public void Page_Throws_WhenUsedAfterTake()
     {
         PythagorasQuery<SampleDto> query = new();
-        query.Take(10);
+        query = query.Take(10);
 
         InvalidOperationException ex = Should.Throw<InvalidOperationException>(() => query.Page(1, 10));
         ex.Message.ShouldContain("Page()");
@@ -197,23 +188,22 @@ public class PythagorasQueryTests
     [Fact]
     public void BuildAsQueryString_Between_AddsRangeFilters()
     {
-        PythagorasQuery<SampleDto> query = new();
-
-        query.Between(x => x.Level, 1, 5);
+        PythagorasQuery<SampleDto> query = new PythagorasQuery<SampleDto>()
+            .Between(x => x.Level, 1, 5);
 
         Dictionary<string, List<string>> dict = Parse(query.BuildAsQueryString());
 
-        dict["pN[]"].ShouldBe(new[] { "GE:level", "LE:level" });
-        dict["pV[]"].ShouldBe(new[] { "1", "5" });
+        dict["pN[]"].ShouldBe(["GE:level", "LE:level"]);
+
+        dict["pV[]"].ShouldBe(["1", "5"]);
     }
 
     [Fact]
     public void BuildAsQueryString_DateTimesAreFormattedInIso8601Utc()
     {
         DateTime value = new(2024, 2, 3, 4, 5, 6, DateTimeKind.Unspecified);
-        PythagorasQuery<SampleDto> query = new();
-
-        query.Where(x => x.CreatedAt, value);
+        PythagorasQuery<SampleDto> query = new PythagorasQuery<SampleDto>()
+            .Where(x => x.CreatedAt, value);
 
         Dictionary<string, List<string>> dict = Parse(query.BuildAsQueryString());
 
@@ -226,8 +216,8 @@ public class PythagorasQueryTests
     public void BuildAsQueryString_Throws_WhenIdsCombinedWithGeneralSearch()
     {
         PythagorasQuery<SampleDto> query = new();
-        query.WithIds(1);
-        query.GeneralSearch("conflict");
+        query = query.WithIds(1);
+        query = query.GeneralSearch("conflict");
 
         InvalidOperationException ex = Should.Throw<InvalidOperationException>(query.BuildAsQueryString);
 
@@ -238,8 +228,8 @@ public class PythagorasQueryTests
     public void BuildAsQueryString_Throws_WhenConflictingFilters()
     {
         PythagorasQuery<SampleDto> query = new();
-        query.Where(x => x.Level, Op.Gt, 1);
-        query.Where(x => x.Level, Op.Gt, 2);
+        query = query.Where(x => x.Level, Op.Gt, 1);
+        query = query.Where(x => x.Level, Op.Gt, 2);
 
         InvalidOperationException ex = Should.Throw<InvalidOperationException>(query.BuildAsQueryString);
 
@@ -251,8 +241,8 @@ public class PythagorasQueryTests
     {
         PythagorasQuery<SampleDto> query = new();
 
-        query.WhereParameter(x => x.DisplayName, "=", "inside");
-        query.WhereAttribute(x => x.DisplayName, "=", "outside");
+        query = query.WhereParameter(x => x.DisplayName, "=", "inside");
+        query = query.WhereAttribute(x => x.DisplayName, "=", "outside");
 
         Dictionary<string, List<string>> dict = Parse(query.BuildAsQueryString());
 
@@ -266,7 +256,7 @@ public class PythagorasQueryTests
     public void Build_AppendsQueryToBaseUrl()
     {
         PythagorasQuery<SampleDto> query = new();
-        query.GeneralSearch("north");
+        query = query.GeneralSearch("north");
 
         HttpRequestMessage request = query.Build(HttpMethod.Get, "https://example.test/rest/v1/buildings");
 
@@ -277,8 +267,8 @@ public class PythagorasQueryTests
     [Fact]
     public void Build_AppendsQueryToExistingQueryString()
     {
-        PythagorasQuery<SampleDto> query = new();
-        query.WithIds(42);
+        PythagorasQuery<SampleDto> query = new PythagorasQuery<SampleDto>()
+            .WithIds(42);
 
         HttpRequestMessage request = query.Build(HttpMethod.Get, "https://example.test/api?existing=1");
 
@@ -296,31 +286,30 @@ public class PythagorasQueryTests
     }
 
     [Fact]
-    public void Clone_CopiesUnderlyingRequest()
+    public void ImmutableBehavior_PreservesOriginalState()
     {
-        PythagorasQuery<SampleDto> original = new();
-        original.GeneralSearch("foo");
-
-        PythagorasQuery<SampleDto> clone = original.Clone();
+        PythagorasQuery<SampleDto> original = new PythagorasQuery<SampleDto>()
+            .GeneralSearch("foo");
 
         string originalQuery = original.BuildAsQueryString();
-        string cloneQuery = clone.BuildAsQueryString();
-        cloneQuery.ShouldBe(originalQuery);
 
-        clone.GeneralSearch("bar");
-        string mutatedCloneQuery = clone.BuildAsQueryString();
-        mutatedCloneQuery.ShouldNotBe(originalQuery);
+        // Creating a new query with different search term returns new instance
+        PythagorasQuery<SampleDto> modified = original.GeneralSearch("bar");
+        string modifiedQuery = modified.BuildAsQueryString();
+
+        // Original should be unchanged
+        original.BuildAsQueryString().ShouldBe(originalQuery);
+        modifiedQuery.ShouldNotBe(originalQuery);
     }
 
     [Fact]
-    public void Clone_PreservesSkipTakeFlags()
+    public void ImmutableBehavior_PreservesSkipTakeFlags()
     {
-        PythagorasQuery<SampleDto> original = new();
-        original.Skip(5);
+        PythagorasQuery<SampleDto> original = new PythagorasQuery<SampleDto>()
+            .Skip(5);
 
-        PythagorasQuery<SampleDto> clone = original.Clone();
-
-        InvalidOperationException ex = Should.Throw<InvalidOperationException>(() => clone.Page(1, 10));
+        // With immutable pattern, state is preserved - attempting Page should still fail
+        InvalidOperationException ex = Should.Throw<InvalidOperationException>(() => original.Page(1, 10));
         ex.Message.ShouldContain("Page()");
     }
 

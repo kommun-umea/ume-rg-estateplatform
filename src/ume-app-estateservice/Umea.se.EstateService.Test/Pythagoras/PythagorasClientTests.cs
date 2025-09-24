@@ -22,9 +22,9 @@ public class PythagorasClientTests
         FakeHttpClientFactory factory = new(httpClient);
         PythagorasClient client = new(factory);
 
-        PythagorasQuery<Building> query = new();
-        query.WithIds(1);
-        query.Contains(x => x.Name, "SYSTEM", caseSensitive: false);
+        PythagorasQuery<Building> query = new PythagorasQuery<Building>()
+            .WithIds(1)
+            .Contains(x => x.Name, "SYSTEM", caseSensitive: false);
 
         IReadOnlyList<Building> result = await client.GetAsync("rest/v1/building", query);
 
@@ -98,7 +98,7 @@ public class PythagorasClientTests
             results.Add(building);
         }
 
-        results.Select(x => x.Id).ShouldBe(new[] { 1, 2, 3 });
+        results.Select(x => x.Id).ShouldBe([1, 2, 3]);
         handler.RequestCount.ShouldBe(2);
     }
 
@@ -144,8 +144,8 @@ public class PythagorasClientTests
         FakeHttpClientFactory factory = new(httpClient);
         PythagorasClient client = new(factory);
 
-        PythagorasQuery<Building> query = new();
-        query.Take(10);
+        PythagorasQuery<Building> query = new PythagorasQuery<Building>()
+            .Take(10);
 
         static async Task ConsumeAsync(IAsyncEnumerable<Building> sequence)
         {
