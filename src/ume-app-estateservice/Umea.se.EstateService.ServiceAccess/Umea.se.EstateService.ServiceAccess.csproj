@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="System.Collections.Immutable" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Umea.se.EstateService.Shared\Umea.se.EstateService.Shared.csproj" />
   </ItemGroup>
 

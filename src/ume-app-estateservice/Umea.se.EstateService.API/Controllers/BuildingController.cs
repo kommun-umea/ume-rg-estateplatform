@@ -15,8 +15,8 @@ public class BuildingController(IPythagorasHandler pythagorasService) : Controll
     [HttpGet]
     public async Task<IReadOnlyList<BuildingModel>> GetBuildingsAsync(CancellationToken cancellationToken)
     {
-        PythagorasQuery<Building> query = new();
-        query.Take(50);
+        PythagorasQuery<Building> query = new PythagorasQuery<Building>()
+            .Take(50);
 
         IReadOnlyList<BuildingModel> buildings = await pythagorasService.GetBuildingsAsync(query, cancellationToken);
 
@@ -31,8 +31,8 @@ public class BuildingController(IPythagorasHandler pythagorasService) : Controll
             return [];
         }
 
-        PythagorasQuery<Building> query = new();
-        query.Contains(b => b.Name, searchTerm);
+        PythagorasQuery<Building> query = new PythagorasQuery<Building>()
+            .Contains(b => b.Name, searchTerm);
 
         IReadOnlyList<BuildingModel> buildings = await pythagorasService.GetBuildingsAsync(query, cancellationToken);
 

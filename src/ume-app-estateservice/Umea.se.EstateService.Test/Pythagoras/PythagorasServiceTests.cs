@@ -18,8 +18,8 @@ public class PythagorasHandlerTests
         PythagorasHandler service = new(client);
         using CancellationTokenSource cts = new();
 
-        PythagorasQuery<Building> query = new();
-        query.WithIds(42);
+        PythagorasQuery<Building> query = new PythagorasQuery<Building>()
+            .WithIds(42);
         IReadOnlyList<BuildingModel> result = await service.GetBuildingsAsync(query, cts.Token);
 
         client.GetAsyncCalled.ShouldBeTrue();

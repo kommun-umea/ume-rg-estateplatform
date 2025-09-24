@@ -2,11 +2,13 @@
 
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Linq.Expressions;
 using System.Net.Http;
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 public enum FieldTarget { Parameter, Attribute }
@@ -22,9 +24,9 @@ public class PythagorasQuery<T> where T : class
 {
     private readonly QueryRequest _req;
     private static readonly ConcurrentDictionary<MemberInfo, string> _nameCache = new();
-    private bool _usedSkip;
-    private bool _usedTake;
-    private bool _usedPage;
+    private readonly bool _usedSkip;
+    private readonly bool _usedTake;
+    private readonly bool _usedPage;
 
     public PythagorasQuery()
         : this(new QueryRequest(), usedSkip: false, usedTake: false, usedPage: false)
@@ -43,18 +45,19 @@ public class PythagorasQuery<T> where T : class
 
     public PythagorasQuery<T> WithIds(params int[] ids)
     {
-        if (ids is { Length: > 0 })
+        if (ids is not { Length: > 0 })
         {
-            _req.Ids.AddRange(ids);
+            return this;
         }
 
-        return this;
+        QueryRequest newReq = _req with { Ids = _req.Ids.AddRange(ids) };
+        return new PythagorasQuery<T>(newReq, _usedSkip, _usedTake, _usedPage);
     }
 
     public PythagorasQuery<T> GeneralSearch(string value)
     {
-        _req.GeneralSearch = value;
-        return this;
+        QueryRequest newReq = _req with { GeneralSearch = value };
+        return new PythagorasQuery<T>(newReq, _usedSkip, _usedTake, _usedPage);
     }
 
     public PythagorasQuery<T> WithQueryParameter<TValue>(string name, TValue value)
@@ -67,27 +70,26 @@ public class PythagorasQuery<T> where T : class
             throw new ArgumentException("Parameter name must contain characters.", nameof(name));
         }
 
+        if (QueryStringWriter.IsReservedKey(trimmedName))
+        {
+            throw new ArgumentException($"The parameter name '{trimmedName}' is reserved and cannot be used.", nameof(name));
+        }
+
         string formattedValue = FormatValue(value);
-        _req.AdditionalParameters[trimmedName] = formattedValue;
-        return this;
+        QueryRequest newReq = _req with { AdditionalParameters = _req.AdditionalParameters.SetItem(trimmedName, formattedValue) };
+        return new PythagorasQuery<T>(newReq, _usedSkip, _usedTake, _usedPage);
     }
 
-    public PythagorasQuery<T> Where<TProp>(
-        Expression<Func<T, TProp>> selector,
-        Op op,
-        TProp value,
-        FieldTarget target = FieldTarget.Parameter)
+    public PythagorasQuery<T> Where<TProp>(Expression<Func<T, TProp>> selector, Op op, TProp value, FieldTarget target = FieldTarget.Parameter)
     {
         string name = GetApiName(selector);
         string str = FormatValue(value);
-        _req.Filters.Add(new Filter(target, name, op, str));
-        return this;
+        Filter filter = new(target, name, op, str);
+        QueryRequest newReq = _req with { Filters = _req.Filters.Add(filter) };
+        return new PythagorasQuery<T>(newReq, _usedSkip, _usedTake, _usedPage);
     }
 
-    public PythagorasQuery<T> Where<TProp>(
-        Expression<Func<T, TProp>> selector,
-        TProp value,
-        FieldTarget target = FieldTarget.Parameter)
+    public PythagorasQuery<T> Where<TProp>(Expression<Func<T, TProp>> selector, TProp value, FieldTarget target = FieldTarget.Parameter)
         => Where(selector, Op.Eq, value, target);
 
     public PythagorasQuery<T> Contains(Expression<Func<T, string>> s, string v, bool caseSensitive = false)
@@ -123,8 +125,15 @@ public class PythagorasQuery<T> where T : class
     public PythagorasQuery<T> NotEqual<TProp>(Expression<Func<T, TProp>> s, TProp v)
         => Where(s, Op.Ne, v);
 
-    public PythagorasQuery<T> Between<TProp>(Expression<Func<T, TProp>> s, TProp min, TProp max)
-        => GreaterThanOrEqual(s, min).LessThanOrEqual(s, max);
+    public PythagorasQuery<T> Between<TProp>(Expression<Func<T, TProp>> s, TProp min, TProp max, FieldTarget target = FieldTarget.Parameter)
+    {
+        string name = GetApiName(s);
+        Filter minFilter = new(target, name, Op.Ge, FormatValue(min));
+        Filter maxFilter = new(target, name, Op.Le, FormatValue(max));
+
+        QueryRequest newReq = _req with { Filters = _req.Filters.AddRange([minFilter, maxFilter]) };
+        return new PythagorasQuery<T>(newReq, _usedSkip, _usedTake, _usedPage);
+    }
 
     public PythagorasQuery<T> WhereAttribute<TProp>(Expression<Func<T, TProp>> s, string op, TProp v)
         => Where(s, OperatorMaps.FromStringOrPrefix(op), v, FieldTarget.Attribute);
@@ -134,14 +143,14 @@ public class PythagorasQuery<T> where T : class
 
     public PythagorasQuery<T> OrderBy<TProp>(Expression<Func<T, TProp>> s)
     {
-        _req.OrderBy = new Order(GetApiName(s), true);
-        return this;
+        QueryRequest newReq = _req with { OrderBy = new Order(GetApiName(s), true) };
+        return new PythagorasQuery<T>(newReq, _usedSkip, _usedTake, _usedPage);
     }
 
     public PythagorasQuery<T> OrderByDescending<TProp>(Expression<Func<T, TProp>> s)
     {
-        _req.OrderBy = new Order(GetApiName(s), false);
-        return this;
+        QueryRequest newReq = _req with { OrderBy = new Order(GetApiName(s), false) };
+        return new PythagorasQuery<T>(newReq, _usedSkip, _usedTake, _usedPage);
     }
 
     public PythagorasQuery<T> Skip(int count)
@@ -156,10 +165,9 @@ public class PythagorasQuery<T> where T : class
             throw new InvalidOperationException("Cannot use Skip() after Page(). Choose either Skip()/Take() or Page().");
         }
 
-        _usedSkip = true;
         int? mr = _req.Page?.MaxResults;
-        _req.Page = new Paging(count, mr);
-        return this;
+        QueryRequest newReq = _req with { Page = new Paging(count, mr) };
+        return new PythagorasQuery<T>(newReq, usedSkip: true, _usedTake, _usedPage);
     }
 
     public PythagorasQuery<T> Page(int pageNumber, int pageSize)
@@ -180,9 +188,8 @@ public class PythagorasQuery<T> where T : class
         }
 
         int firstResult = (pageNumber - 1) * pageSize;
-        _req.Page = new Paging(firstResult, pageSize);
-        _usedPage = true;
-        return this;
+        QueryRequest newReq = _req with { Page = new Paging(firstResult, pageSize) };
+        return new PythagorasQuery<T>(newReq, _usedSkip, _usedTake, usedPage: true);
     }
 
     public PythagorasQuery<T> Take(int count)
@@ -198,9 +205,8 @@ public class PythagorasQuery<T> where T : class
         }
 
         int? fr = _req.Page?.FirstResult;
-        _req.Page = new Paging(fr, count);
-        _usedTake = true;
-        return this;
+        QueryRequest newReq = _req with { Page = new Paging(fr, count) };
+        return new PythagorasQuery<T>(newReq, _usedSkip, usedTake: true, _usedPage);
     }
 
     public string BuildAsQueryString() => QueryStringWriter.Build(_req);
@@ -229,9 +235,6 @@ public class PythagorasQuery<T> where T : class
         return new HttpRequestMessage(method, uriBuilder.Uri);
     }
 
-    public PythagorasQuery<T> Clone()
-        => new(_req.Clone(), _usedSkip, _usedTake, _usedPage);
-
     // ---- Helpers ----
 
     private static string GetApiName<TProp>(Expression<Func<T, TProp>> expr)
@@ -246,12 +249,9 @@ public class PythagorasQuery<T> where T : class
         return _nameCache.GetOrAdd(mi, static m =>
         {
             JsonPropertyNameAttribute? json = m.GetCustomAttribute<JsonPropertyNameAttribute>();
-            return json?.Name ?? ToCamelCase(m.Name);
+            return json?.Name ?? JsonNamingPolicy.CamelCase.ConvertName(m.Name);
         });
     }
-
-    private static string ToCamelCase(string s)
-        => string.IsNullOrEmpty(s) || char.IsLower(s[0]) ? s : char.ToLowerInvariant(s[0]) + s[1..];
 
     private static string FormatValue<TProp>(TProp value)
     {
@@ -273,38 +273,18 @@ public class PythagorasQuery<T> where T : class
     }
 }
 
-internal sealed record Filter(FieldTarget Target, string Field, Op Operator, string Value);
-internal sealed record Order(string Field, bool Asc = true);
-internal sealed record Paging(int? FirstResult, int? MaxResults);
+public sealed record Filter(FieldTarget Target, string Field, Op Operator, string Value);
+public sealed record Order(string Field, bool Asc = true);
+public sealed record Paging(int? FirstResult, int? MaxResults);
 
-internal sealed class QueryRequest
+public sealed record QueryRequest
 {
-    public List<int> Ids { get; } = [];
-    public string? GeneralSearch { get; set; }
-    public List<Filter> Filters { get; } = [];
-    public Order? OrderBy { get; set; }
-    public Paging? Page { get; set; }
-
-    public Dictionary<string, string> AdditionalParameters { get; } = new(StringComparer.OrdinalIgnoreCase);
-
-    public QueryRequest Clone()
-    {
-        QueryRequest copy = new()
-        {
-            GeneralSearch = GeneralSearch,
-            OrderBy = OrderBy,
-            Page = Page
-        };
-
-        copy.Ids.AddRange(Ids);
-        copy.Filters.AddRange(Filters);
-        foreach ((string key, string value) in AdditionalParameters)
-        {
-            copy.AdditionalParameters[key] = value;
-        }
-
-        return copy;
-    }
+    public ImmutableList<int> Ids { get; init; } = [];
+    public string? GeneralSearch { get; init; }
+    public ImmutableList<Filter> Filters { get; init; } = [];
+    public Order? OrderBy { get; init; }
+    public Paging? Page { get; init; }
+    public ImmutableDictionary<string, string> AdditionalParameters { get; init; } = ImmutableDictionary<string, string>.Empty.WithComparers(StringComparer.OrdinalIgnoreCase);
 }
 
 public static class OperatorMaps
@@ -359,6 +339,12 @@ public static class OperatorMaps
 
 internal static class QueryStringWriter
 {
+    private static readonly HashSet<string> _reservedKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "id[]", "generalSearch", "pN[]", "pV[]", "aN[]", "aV[]",
+        "orderBy", "orderAsc", "firstResult", "maxResults"
+    };
+
     private static readonly HashSet<Op> _likeOps =
     [
         Op.LikeExact,
@@ -378,6 +364,8 @@ internal static class QueryStringWriter
         Op.Lt,
         Op.Le
     ];
+
+    internal static bool IsReservedKey(string key) => _reservedKeys.Contains(key);
 
     internal static string Build(QueryRequest req)
     {
