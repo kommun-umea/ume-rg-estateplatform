@@ -1,6 +1,9 @@
+using Umea.se.EstateService.Shared.Interfaces;
+using Umea.se.EstateService.Shared.ValueObjects;
+
 namespace Umea.se.EstateService.Shared.Models;
 
-public sealed class WorkspaceModel
+public sealed class WorkspaceModel : ISearchable
 {
     public int Id { get; init; }
     public Guid Uid { get; init; }
@@ -17,4 +20,8 @@ public sealed class WorkspaceModel
     public Guid? BuildingUid { get; init; }
     public string? BuildingName { get; init; }
     public string? BuildingPopularName { get; set; }
+
+    public AddressModel? Address => null;
+    public GeoPointModel? GeoLocation => null;
+    public DateTimeOffset UpdatedAt => DateTimeOffset.FromUnixTimeMilliseconds(Updated / 1000);
 }

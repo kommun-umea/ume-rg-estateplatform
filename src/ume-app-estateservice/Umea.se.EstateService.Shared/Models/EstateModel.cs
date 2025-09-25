@@ -1,8 +1,9 @@
+using Umea.se.EstateService.Shared.Interfaces;
 using Umea.se.EstateService.Shared.ValueObjects;
 
 namespace Umea.se.EstateService.Shared.Models;
 
-public sealed class EstateModel
+public sealed class EstateModel : ISearchable
 {
     public int Id { get; init; }
     public Guid Uid { get; init; }
@@ -13,4 +14,5 @@ public sealed class EstateModel
     public GeoPointModel? GeoLocation { get; init; }
     public AddressModel? Address { get; init; }
     public BuildingModel[]? Buildings { get; init; }
+    public DateTimeOffset UpdatedAt => DateTime.Now;
 }

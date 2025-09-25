@@ -1,9 +1,10 @@
 using System.Diagnostics.CodeAnalysis;
+using Umea.se.EstateService.Shared.Interfaces;
 using Umea.se.EstateService.Shared.ValueObjects;
 
 namespace Umea.se.EstateService.Shared.Models;
 
-public sealed class BuildingInfoModel
+public sealed class BuildingInfoModel : ISearchable
 {
     public int Id { get; init; }
     public Guid Uid { get; init; }
@@ -21,4 +22,6 @@ public sealed class BuildingInfoModel
 
     [MemberNotNullWhen(true, nameof(GeoLocation))]
     public bool HasGeoLocation => GeoLocation is not null;
+
+    public DateTimeOffset UpdatedAt => DateTime.Now;
 }

@@ -1,3 +1,4 @@
+/*
 using Umea.se.EstateService.ServiceAccess.Pythagoras;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 
@@ -64,3 +65,4 @@ public static class PythagorasAutocompleteMapper
             })];
     }
 }
+*/

@@ -1,3 +1,4 @@
+/*
 using Microsoft.AspNetCore.Mvc;
 using Umea.se.EstateService.API.Controllers.Requests;
 using Umea.se.EstateService.Logic.Handlers;
@@ -24,3 +25,5 @@ public class AutocompleteController(IAutocompleteHandler autocompleteHandler, IL
         return Ok(response);
     }
 }
+
+*/

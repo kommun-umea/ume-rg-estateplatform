@@ -44,6 +44,17 @@ public class EstateController(IPythagorasHandler pythagorasService) : Controller
             query = query.GeneralSearch(request.SearchTerm);
         }
 
+        if (request.IncludeBuildings)
+        {
+            query = query.WithQueryParameter("includeAscendantBuildings", true);
+        }
+
+        if (request.Limit > 0)
+        {
+            query = query.Take(50);
+        }
+            
+
         return query;
     }
 }

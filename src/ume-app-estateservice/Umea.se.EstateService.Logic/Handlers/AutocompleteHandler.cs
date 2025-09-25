@@ -1,3 +1,4 @@
+/*
 using System.Globalization;
 using Microsoft.Extensions.Caching.Memory;
 using Umea.se.EstateService.Logic.Interfaces;
@@ -213,3 +214,5 @@ public sealed record AutocompleteResult
 {
     public IReadOnlyList<AutocompleteItemModel> Items { get; init; } = [];
 }
+
+*/

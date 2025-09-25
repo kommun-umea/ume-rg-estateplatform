@@ -1,85 +1,129 @@
-﻿using System.Text.Json;
+﻿using System.Text.Encodings.Web;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Umea.se.EstateService.Logic.Interfaces;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
+using Umea.se.EstateService.Shared.Interfaces;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.EstateService.Shared.Search;
+using Umea.se.EstateService.Shared.ValueObjects;
 
 namespace Umea.se.EstateService.Logic.Handlers;
 
 public class SearchHandler(IPythagorasHandler pythagorasHandler)
 {
-    private readonly JsonSerializerOptions _jsonOptions = new ()
+    private readonly JsonSerializerOptions _jsonOptions = new()
     {
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) },
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = true
+        PropertyNameCaseInsensitive = true,
     };
 
-    public async Task<List<PythagorasDocument>> GetPythagorasDocuments()
+    public async Task<ICollection<PythagorasDocument>> GetPythagorasDocumentsAsync()
     {
-        IReadOnlyList<EstateModel> estates = await pythagorasHandler.GetEstatesAsync();
-        //IReadOnlyList<BuildingInfoModel> buildings = await pythagorasHandler.GetBuildingInfoAsync();
-        IReadOnlyList<BuildingModel> buildings = [];
-        IReadOnlyList<WorkspaceModel> rooms = await pythagorasHandler.GetWorkspacesAsync();
+        Dictionary<string, PythagorasDocument> docs = [];
 
-        Dictionary<int, BuildingModel> buildingDict = buildings.ToDictionary(b => b.Id, b => b);
+        await AddEstatesAndBuildings(docs);
+        await AddWorkspaces(docs);
 
-        List<PythagorasDocument> docs =
-        [
-            .. estates.Select(CreateDocumentFromEstate),
-            .. buildings.Select(CreateDocumentFromBuilding),
-            .. rooms.Select(room => CreateDocumentFromWorkspace(room, buildingDict)),
-        ];
-
-        return docs;
+        return [.. docs.Values];
     }
 
-    private static PythagorasDocument CreateDocumentFromEstate(EstateModel estate)
+    private async Task AddEstatesAndBuildings(Dictionary<string, PythagorasDocument> docs)
     {
-        return new PythagorasDocument
-        {
-            Id = $"estate-{estate.Id}",
-            Type = NodeType.Estate,
-            Name = estate.Name,
-            Address = estate.Address,
-            Aliases = !string.IsNullOrEmpty(estate.PopularName) ? [estate.PopularName] : null,
-            Geo = estate.GeoLocation != null ? new Shared.Search.GeoPoint { Lat = estate.GeoLocation.Lat, Lng = estate.GeoLocation.Lon } : null,
-            UpdatedAt = DateTimeOffset.UtcNow,
-            Ancestors = []
-        };
-    }
+        PythagorasQuery<NavigationFolder> query = new PythagorasQuery<NavigationFolder>()
+            .WithQueryParameter("includeAscendantBuildings", true);
 
-    private static PythagorasDocument CreateDocumentFromBuilding(BuildingModel building)
-    {
-        return new PythagorasDocument
-        {
-            Id = $"building-{building.Id}",
-            Type = NodeType.Building,
-            Name = building.Name,
-            Aliases = !string.IsNullOrEmpty(building.PopularName) ? [building.PopularName] : null,
-            Geo = building.GeoLocation != null ? new Shared.Search.GeoPoint { Lat = building.GeoLocation.Lat, Lng = building.GeoLocation.Lon } : null,
-            UpdatedAt = DateTimeOffset.FromUnixTimeSeconds(building.Updated),
-            Ancestors = []
-        };
-    }
+        IReadOnlyList<EstateModel> estates = await pythagorasHandler.GetEstatesAsync(query);
 
-    private static PythagorasDocument CreateDocumentFromWorkspace(WorkspaceModel workspace, Dictionary<int, BuildingModel> buildingDict)
-    {
-        if (buildingDict.Count == -1)
+        foreach (EstateModel estate in estates)
         {
-            return new PythagorasDocument();
+            PythagorasDocument estateDoc = CreateDocumentFromSearchable(estate);
+            docs[estateDoc.Id] = estateDoc;
+
+            foreach (BuildingModel building in estate.Buildings ?? [])
+            {
+                string key = $"building-{building.Id}";
+                if (!docs.TryGetValue(key, out PythagorasDocument? doc))
+                {
+                    doc = CreateDocumentFromSearchable(building);
+                    docs[doc.Id] = doc;
+                }
+
+                doc.Ancestors.Add(CreateAncestorFromDocument(estateDoc));
+            }
         }
+    }
+
+    private async Task AddWorkspaces(Dictionary<string, PythagorasDocument> docs)
+    {
+        PythagorasQuery<Workspace> query = new();
+
+        IReadOnlyList<WorkspaceModel> workspaces = await pythagorasHandler.GetWorkspacesAsync(query);
+
+        foreach (WorkspaceModel workspace in workspaces)
+        {
+            PythagorasDocument doc = CreateDocumentFromSearchable(workspace);
+
+            docs[doc.Id] = doc;
+
+            if(workspace.BuildingId is int buildingId)
+{
+                string buildingKey = $"building-{buildingId}";
+                if (docs.TryGetValue(buildingKey, out PythagorasDocument? buildingDoc))
+                {
+                    doc.Ancestors.AddRange(buildingDoc.Ancestors);
+                    doc.Ancestors.Add(CreateAncestorFromDocument(buildingDoc));
+                }
+            }
+        }
+    }
+
+    private static PythagorasDocument CreateDocumentFromSearchable(ISearchable item)
+    {
+        (NodeType nodeType, int rankScore) = item switch
+        {
+            EstateModel => (NodeType.Estate, 1),
+            BuildingModel => (NodeType.Building, 2),
+            WorkspaceModel => (NodeType.Room, 3),
+            _ => throw new ArgumentException($"Unknown searchable type: {item.GetType().Name}", nameof(item))
+        };
+
+        string idPrefix = nodeType.ToString().ToLower();
 
         return new PythagorasDocument
         {
-            Id = $"room-{workspace.Id}",
-            Type = NodeType.Room,
-            Name = workspace.Name,
-            Aliases = !string.IsNullOrEmpty(workspace.PopularName) ? [workspace.PopularName] : null,
-            UpdatedAt = DateTimeOffset.FromUnixTimeSeconds(workspace.Updated),
+            Id = $"{idPrefix}-{item.Id}",
+            Type = nodeType,
+            Name = item.Name,
+            Address = item.Address != null ? $"{item.Address.Street} {item.Address.ZipCode} {item.Address.City}" : null,
+            PopularName = item.PopularName,
+            Geo = MapGeoLocation(item.GeoLocation),
+            RankScore = rankScore,
+            UpdatedAt = item.UpdatedAt,
             Ancestors = []
+        };
+    }
+
+    private static Shared.Search.GeoPoint? MapGeoLocation(GeoPointModel? geoLocationModel)
+    {
+        return geoLocationModel != null
+            ? new Shared.Search.GeoPoint { Lat = geoLocationModel.Lat, Lng = geoLocationModel.Lon }
+            : null;
+    }
+
+    private static Ancestor CreateAncestorFromDocument(PythagorasDocument doc)
+    {
+        return new Ancestor
+        {
+            Id = doc.Id,
+            Type = doc.Type,
+            Name = doc.Name,
+            PopularName = doc.PopularName
         };
     }
 

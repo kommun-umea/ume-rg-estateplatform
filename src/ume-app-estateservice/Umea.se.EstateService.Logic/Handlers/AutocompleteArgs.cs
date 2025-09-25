@@ -1,3 +1,4 @@
+/*
 using Umea.se.EstateService.Shared.Autocomplete;
 
 namespace Umea.se.EstateService.Logic.Handlers;
@@ -9,3 +10,4 @@ public sealed record AutocompleteArgs
     public int Limit { get; init; } = 10;
     public int? BuildingId { get; init; }
 }
+*/
