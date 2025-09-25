@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Api.Query;
 
 namespace Umea.se.EstateService.Test.Pythagoras;
 
