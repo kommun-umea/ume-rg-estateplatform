@@ -36,7 +36,6 @@ public class PythagorasBuildingMapperTests
         model.Updated.ShouldBe(dto.Updated);
         model.Name.ShouldBe(dto.Name);
         model.PopularName.ShouldBe(dto.PopularName);
-        model.MarkerType.ShouldBe((MarkerTypeEnum)dto.MarkerType);
 
         GeoPointModel? location = model.GeoLocation;
         location.ShouldNotBeNull();
@@ -44,9 +43,7 @@ public class PythagorasBuildingMapperTests
         location.Y.ShouldBe(dto.GeoLocation.Y);
         location.Rotation.ShouldBe(dto.GeoLocation.Rotation);
 
-        model.Origin.ShouldBe(dto.Origin);
         model.PropertyTax.ShouldBe(dto.PropertyTax);
-        model.UseWeightsInWorkspaceAreaDistribution.ShouldBeTrue();
     }
 
     [Fact]

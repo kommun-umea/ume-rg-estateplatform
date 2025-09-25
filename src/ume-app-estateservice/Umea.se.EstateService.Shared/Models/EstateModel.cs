@@ -12,4 +12,5 @@ public sealed class EstateModel
     public decimal NetArea { get; init; }
     public GeoPointModel? GeoLocation { get; init; }
     public AddressModel? Address { get; init; }
+    public BuildingModel[]? Buildings { get; init; }
 }

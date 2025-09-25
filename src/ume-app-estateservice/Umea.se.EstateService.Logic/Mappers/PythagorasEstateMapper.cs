@@ -20,6 +20,7 @@ public static class PythagorasEstateMapper
             NetArea = dto.Netarea ?? 0m,
             GeoLocation = new GeoPointModel(dto.GeoX, dto.GeoY, dto.GeoRotation),
             Address = CreateAddress(dto),
+            Buildings = dto.Buildings?.Select(PythagorasBuildingMapper.ToModel).ToArray()
         };
     }
 

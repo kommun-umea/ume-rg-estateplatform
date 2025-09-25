@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using Umea.se.EstateService.Shared.ValueObjects;
 
 namespace Umea.se.EstateService.Shared.Models;
@@ -12,12 +11,6 @@ public sealed class BuildingModel
     public long Updated { get; init; }
     public string Name { get; init; } = string.Empty;
     public string PopularName { get; init; } = string.Empty;
-    public MarkerTypeEnum MarkerType { get; init; }
     public GeoPointModel? GeoLocation { get; init; }
-    public string Origin { get; init; } = string.Empty;
     public decimal PropertyTax { get; init; }
-    public bool UseWeightsInWorkspaceAreaDistribution { get; init; }
-
-    [MemberNotNullWhen(true, nameof(GeoLocation))]
-    public bool HasGeoLocation => GeoLocation is not null;
 }

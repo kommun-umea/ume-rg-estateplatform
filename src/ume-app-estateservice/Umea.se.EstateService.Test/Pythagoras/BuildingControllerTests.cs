@@ -23,11 +23,11 @@ public class BuildingControllerTests
         PythagorasHandler service = new(client);
         BuildingController controller = new(service);
 
-        IReadOnlyList<BuildingModel> buildings = await controller.GetBuildingsAsync(CancellationToken.None);
+        IReadOnlyList<BuildingInfoModel> buildings = await controller.GetBuildingsAsync(CancellationToken.None);
 
         buildings.Select(b => b.Id).ShouldBe(new[] { 1, 2 });
         client.LastQueryString.ShouldBe("maxResults=50");
-        client.LastEndpoint.ShouldBe("rest/v1/building");
+        client.LastEndpoint.ShouldBe("rest/v1/building/info");
     }
 
     [Fact]
@@ -44,9 +44,9 @@ public class BuildingControllerTests
         PythagorasHandler service = new(client);
         BuildingController controller = new(service);
 
-        IReadOnlyList<BuildingModel> buildings = await controller.GetBuildingsContainingAsync("alp", CancellationToken.None);
+        IReadOnlyList<BuildingInfoModel> buildings = await controller.GetBuildingsContainingAsync("alp", CancellationToken.None);
 
-        BuildingModel building = buildings.ShouldHaveSingleItem();
+        BuildingInfoModel building = buildings.ShouldHaveSingleItem();
         building.Name.ShouldBe("Alpha");
 
         Dictionary<string, List<string>> query = Parse(client.LastQueryString);
@@ -55,7 +55,7 @@ public class BuildingControllerTests
         parameterName.ShouldBe("ILIKEAW:name");
         string parameterValue = query["pV[]"].ShouldHaveSingleItem();
         parameterValue.ShouldBe("alp");
-        client.LastEndpoint.ShouldBe("rest/v1/building");
+        client.LastEndpoint.ShouldBe("rest/v1/building/info");
     }
 
     private static Dictionary<string, List<string>> Parse(string? query)
@@ -109,7 +109,7 @@ public class BuildingControllerTests
 
     private sealed class FakePythagorasClient : IPythagorasClient
     {
-        public IReadOnlyList<Building> GetAsyncResult { get; set; } = [];
+        public IReadOnlyList<BuildingInfo> GetAsyncResult { get; set; } = [];
         public IReadOnlyList<BuildingWorkspace> GetBuildingWorkspacesResult { get; set; } = [];
         public string? LastQueryString { get; private set; }
 
@@ -117,7 +117,7 @@ public class BuildingControllerTests
 
         public Task<IReadOnlyList<TDto>> GetAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, CancellationToken cancellationToken) where TDto : class
         {
-            if (typeof(TDto) != typeof(Building))
+            if (typeof(TDto) != typeof(BuildingInfo))
             {
                 if (typeof(TDto) == typeof(BuildingWorkspace))
                 {
