@@ -78,7 +78,7 @@ public static class PythagorasBuildingInfoMapper
         return new GeoPointModel(x, y, rotation);
     }
 
-    private static AddressModel CreateAddress(BuildingInfo dto)
+    private static AddressModel? CreateAddress(BuildingInfo dto)
     {
         bool hasAddress = !string.IsNullOrWhiteSpace(dto.AddressStreet)
             || !string.IsNullOrWhiteSpace(dto.AddressZipCode)
@@ -88,7 +88,7 @@ public static class PythagorasBuildingInfoMapper
 
         if (!hasAddress)
         {
-            return AddressModel.Empty;
+            return null;
         }
 
         return new AddressModel(

@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using Umea.se.EstateService.Shared.ValueObjects;
 
@@ -18,7 +16,7 @@ public sealed class BuildingInfoModel
     public decimal SumGrossFloorArea { get; init; }
     public int NumPlacedPersons { get; init; }
     public string AddressName { get; init; } = string.Empty;
-    public AddressModel Address { get; init; } = AddressModel.Empty;
+    public AddressModel? Address { get; init; }
     public string Origin { get; init; } = string.Empty;
     public int? CurrencyId { get; init; }
     public string? CurrencyName { get; init; }
