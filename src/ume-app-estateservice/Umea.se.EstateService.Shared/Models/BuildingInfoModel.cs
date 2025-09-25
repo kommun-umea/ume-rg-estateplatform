@@ -14,7 +14,6 @@ public sealed class BuildingInfoModel
     public decimal NetArea { get; init; }
     public decimal SumGrossFloorArea { get; init; }
     public int NumPlacedPersons { get; init; }
-    public string AddressName { get; init; } = string.Empty;
     public AddressModel? Address { get; init; }
     public IReadOnlyDictionary<string, string?> ExtraInfo { get; init; } = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
     public IReadOnlyDictionary<string, string?> PropertyValues { get; init; } = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);

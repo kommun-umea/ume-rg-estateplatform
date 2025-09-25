@@ -21,7 +21,6 @@ public static class PythagorasBuildingInfoMapper
             NetArea = dto.Netarea ?? 0m,
             SumGrossFloorArea = dto.SumGrossFloorarea ?? 0m,
             NumPlacedPersons = dto.NumPlacedPersons,
-            AddressName = dto.AddressName ?? string.Empty,
             Address = CreateAddress(dto),
             ExtraInfo = ToDictionary(dto.ExtraInfo),
             PropertyValues = ToDictionary(dto.PropertyValues),
@@ -42,14 +41,13 @@ public static class PythagorasBuildingInfoMapper
     {
         double x = dto.GeoX;
         double y = dto.GeoY;
-        double rotation = dto.GeoRotation;
 
         if (Math.Abs(x) < double.Epsilon && Math.Abs(y) < double.Epsilon)
         {
             return null;
         }
 
-        return new GeoPointModel(x, y, rotation);
+        return new GeoPointModel(x, y);
     }
 
     private static AddressModel? CreateAddress(BuildingInfo dto)

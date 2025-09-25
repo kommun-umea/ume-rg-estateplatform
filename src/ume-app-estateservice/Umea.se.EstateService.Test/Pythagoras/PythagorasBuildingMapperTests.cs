@@ -39,9 +39,8 @@ public class PythagorasBuildingMapperTests
 
         GeoPointModel? location = model.GeoLocation;
         location.ShouldNotBeNull();
-        location!.X.ShouldBe(dto.GeoLocation.X);
-        location.Y.ShouldBe(dto.GeoLocation.Y);
-        location.Rotation.ShouldBe(dto.GeoLocation.Rotation);
+        location!.Lat.ShouldBe(dto.GeoLocation.X);
+        location.Lon.ShouldBe(dto.GeoLocation.Y);
 
         model.PropertyTax.ShouldBe(dto.PropertyTax);
     }

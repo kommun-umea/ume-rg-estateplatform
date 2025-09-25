@@ -55,12 +55,10 @@ public class PythagorasBuildingInfoMapperTests
         model.NetArea.ShouldBe(dto.Netarea ?? 0);
         model.SumGrossFloorArea.ShouldBe(dto.SumGrossFloorarea ?? 0);
         model.NumPlacedPersons.ShouldBe(dto.NumPlacedPersons);
-        model.AddressName.ShouldBe("Primary");
         model.Address.ShouldBe(new AddressModel("Main Street", "12345", "Town", "Country", "Extra"));
         model.GeoLocation.ShouldNotBeNull();
-        model.GeoLocation!.X.ShouldBe(dto.GeoX);
-        model.GeoLocation.Y.ShouldBe(dto.GeoY);
-        model.GeoLocation.Rotation.ShouldBe(dto.GeoRotation);
+        model.GeoLocation!.Lat.ShouldBe(dto.GeoX);
+        model.GeoLocation.Lon.ShouldBe(dto.GeoY);
         model.ExtraInfo.ContainsKey("key").ShouldBeTrue();
         model.ExtraInfo["key"].ShouldBe("value");
         model.PropertyValues.ContainsKey("prop").ShouldBeTrue();

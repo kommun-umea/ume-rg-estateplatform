@@ -45,7 +45,7 @@ public class SearchHandler(IPythagorasHandler pythagorasHandler)
             Name = estate.Name,
             Address = estate.Address,
             Aliases = !string.IsNullOrEmpty(estate.PopularName) ? [estate.PopularName] : null,
-            Geo = estate.GeoLocation != null ? new Shared.Search.GeoPoint { Lat = estate.GeoLocation.X, Lng = estate.GeoLocation.Y } : null,
+            Geo = estate.GeoLocation != null ? new Shared.Search.GeoPoint { Lat = estate.GeoLocation.Lat, Lng = estate.GeoLocation.Lon } : null,
             UpdatedAt = DateTimeOffset.UtcNow,
             Ancestors = []
         };
@@ -59,7 +59,7 @@ public class SearchHandler(IPythagorasHandler pythagorasHandler)
             Type = NodeType.Building,
             Name = building.Name,
             Aliases = !string.IsNullOrEmpty(building.PopularName) ? [building.PopularName] : null,
-            Geo = building.GeoLocation != null ? new Shared.Search.GeoPoint { Lat = building.GeoLocation.X, Lng = building.GeoLocation.Y } : null,
+            Geo = building.GeoLocation != null ? new Shared.Search.GeoPoint { Lat = building.GeoLocation.Lat, Lng = building.GeoLocation.Lon } : null,
             UpdatedAt = DateTimeOffset.FromUnixTimeSeconds(building.Updated),
             Ancestors = []
         };

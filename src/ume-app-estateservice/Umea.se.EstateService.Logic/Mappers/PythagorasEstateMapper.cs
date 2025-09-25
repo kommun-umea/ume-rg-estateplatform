@@ -18,7 +18,7 @@ public static class PythagorasEstateMapper
             PopularName = dto.PopularName ?? string.Empty,
             GrossArea = dto.Grossarea ?? 0m,
             NetArea = dto.Netarea ?? 0m,
-            GeoLocation = new GeoPointModel(dto.GeoX, dto.GeoY, dto.GeoRotation),
+            GeoLocation = new GeoPointModel(dto.GeoX, dto.GeoY),
             Address = CreateAddress(dto),
             Buildings = dto.Buildings?.Select(PythagorasBuildingMapper.ToModel).ToArray()
         };

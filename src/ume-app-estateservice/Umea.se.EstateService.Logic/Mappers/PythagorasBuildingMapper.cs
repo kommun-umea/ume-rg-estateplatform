@@ -40,6 +40,6 @@ public static class PythagorasBuildingMapper
             return null;
         }
 
-        return new GeoPointModel(dto.X, dto.Y, dto.Rotation);
+        return new GeoPointModel(dto.X, dto.Y);
     }
 }
