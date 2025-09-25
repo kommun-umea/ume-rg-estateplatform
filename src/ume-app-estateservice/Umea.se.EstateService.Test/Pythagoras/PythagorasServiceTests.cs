@@ -135,7 +135,7 @@ public class PythagorasHandlerTests
         IReadOnlyList<WorkspaceModel> result = await service.GetWorkspacesAsync();
 
         client.GetAsyncCalled.ShouldBeTrue();
-        client.LastEndpoint.ShouldBe("rest/v1/workspace");
+        client.LastEndpoint.ShouldBe("rest/v1/workspace/info");
         client.LastQuery.ShouldBeNull();
         WorkspaceModel workspace = result.ShouldHaveSingleItem();
         workspace.Id.ShouldBe(7);

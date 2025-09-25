@@ -79,7 +79,5 @@ public class PythagorasWorkspaceMapperTests
         model.Id.ShouldBe(dto.Id);
         model.Version.ShouldBe(dto.Version);
         model.PopularName.ShouldBe(dto.PopularName);
-        model.Price.ShouldBe(dto.Price);
-        model.OptimalCapacity.ShouldBe(dto.OptimalCapacity);
     }
 }

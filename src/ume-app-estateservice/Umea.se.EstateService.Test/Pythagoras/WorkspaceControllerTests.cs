@@ -30,7 +30,7 @@ public class WorkspaceControllerTests
         IReadOnlyList<WorkspaceModel>? workspaces = obj.ShouldBeAssignableTo<IReadOnlyList<WorkspaceModel>>();
         WorkspaceModel workspace = workspaces.ShouldHaveSingleItem();
         workspace.Id.ShouldBe(11);
-        client.LastEndpoint.ShouldBe("rest/v1/workspace");
+        client.LastEndpoint.ShouldBe("rest/v1/workspace/info");
     }
 
     [Fact]

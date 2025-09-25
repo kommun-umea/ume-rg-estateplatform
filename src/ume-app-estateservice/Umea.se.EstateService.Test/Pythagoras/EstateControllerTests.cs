@@ -81,7 +81,6 @@ public class EstateControllerTests
                         NetArea = 0,
                         SumGrossFloorArea = 0,
                         NumPlacedPersons = 0,
-                        AddressName = string.Empty,
                         Address = null,
                         ExtraInfo = new Dictionary<string, string?>(),
                         PropertyValues = new Dictionary<string, string?>(),

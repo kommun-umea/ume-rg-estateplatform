@@ -11,10 +11,10 @@ public sealed class WorkspaceModel
     public string? PopularName { get; init; }
     public double GrossArea { get; init; }
     public double NetArea { get; init; }
-    public double UpliftedArea { get; init; }
     public double CommonArea { get; init; }
-    public double Cost { get; init; }
-    public double Price { get; init; }
-    public int Capacity { get; init; }
-    public int OptimalCapacity { get; init; }
+
+    public int? BuildingId { get; init; }
+    public Guid? BuildingUid { get; init; }
+    public string? BuildingName { get; init; }
+    public string? BuildingPopularName { get; set; }
 }
