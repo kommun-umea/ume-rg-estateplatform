@@ -4,6 +4,7 @@ using Umea.se.EstateService.Logic.Mappers;
 using Umea.se.EstateService.ServiceAccess.Pythagoras;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.Shared.Models;
 
 namespace Umea.se.EstateService.Logic.Handlers;
@@ -12,6 +13,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
 {
     private const string BuildingsEndpoint = "rest/v1/building";
     private const string WorkspacesEndpoint = "rest/v1/workspace";
+    private const string BuildingsInfoEndpoint = "rest/v1/building/info";
     private const string NavigationFoldersEndpoint = "rest/v1/navigationfolder/info";
     private const int MaxAutocompleteLimit = 1000;
     private static string BuildingWorkspacesEndpoint(int buildingId) => $"rest/v1/building/{buildingId}/workspace/info";
@@ -20,6 +22,26 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
     {
         IReadOnlyList<Building> payload = await pythagorasClient.GetAsync(BuildingsEndpoint, query, cancellationToken).ConfigureAwait(false);
         return PythagorasBuildingMapper.ToModel(payload);
+    }
+
+    public async Task<IReadOnlyList<BuildingInfoModel>> GetBuildingInfoAsync(PythagorasQuery<BuildingInfo>? query = null, int? navigationFolderId = null, CancellationToken cancellationToken = default)
+    {
+        query ??= new PythagorasQuery<BuildingInfo>();
+
+        if (navigationFolderId is int folderId)
+        {
+            if (folderId <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(navigationFolderId), "Navigation folder id must be positive when supplied.");
+            }
+
+            query = query
+                .WithQueryParameter("navigationId", NavigationType.UmeaKommun)
+                .WithQueryParameter("navigationFolderId", folderId);
+        }
+
+        IReadOnlyList<BuildingInfo> payload = await pythagorasClient.GetAsync(BuildingsInfoEndpoint, query, cancellationToken).ConfigureAwait(false);
+        return PythagorasBuildingInfoMapper.ToModel(payload);
     }
 
     public async IAsyncEnumerable<BuildingModel> GetPaginatedBuildingsAsync(PythagorasQuery<Building>? query = null, int pageSize = 50, [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -58,6 +80,10 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
 
     public async Task<IReadOnlyList<EstateModel>> GetEstatesAsync(PythagorasQuery<NavigationFolder>? query = null, CancellationToken cancellationToken = default)
     {
+        query ??= new PythagorasQuery<NavigationFolder>();
+        query = query
+            .WithQueryParameter("navigationId", NavigationType.UmeaKommun);
+
         IReadOnlyList<NavigationFolder> payload = await pythagorasClient
             .GetAsync(NavigationFoldersEndpoint, query, cancellationToken)
             .ConfigureAwait(false);
@@ -116,8 +142,6 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
 
         return mapper(payload);
     }
-
-    
 
     private static void ValidateSearchInputs(string searchTerm, int limit)
     {

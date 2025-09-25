@@ -13,13 +13,11 @@ public static class PythagorasEstateMapper
         return new EstateModel
         {
             Id = dto.Id,
-            NavigationId = dto.NavigationId,
             Uid = dto.Uid,
             Name = dto.Name ?? string.Empty,
             PopularName = dto.PopularName ?? string.Empty,
             GrossArea = dto.Grossarea ?? 0m,
             NetArea = dto.Netarea ?? 0m,
-            NavigationName = dto.NavigationName ?? string.Empty,
             GeoLocation = new GeoPointModel(dto.GeoX, dto.GeoY, dto.GeoRotation),
             Address = CreateAddress(dto),
         };
@@ -34,7 +32,7 @@ public static class PythagorasEstateMapper
             : dtos.Select(ToModel).ToArray();
     }
 
-    private static AddressModel CreateAddress(NavigationFolder dto)
+    private static AddressModel? CreateAddress(NavigationFolder dto)
     {
         bool hasValue =
             !string.IsNullOrWhiteSpace(dto.AddressStreet)
@@ -45,7 +43,7 @@ public static class PythagorasEstateMapper
 
         if (!hasValue)
         {
-            return AddressModel.Empty;
+            return null;
         }
 
         return new AddressModel(
