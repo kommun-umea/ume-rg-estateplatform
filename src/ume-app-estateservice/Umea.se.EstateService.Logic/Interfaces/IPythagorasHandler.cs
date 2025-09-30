@@ -9,6 +9,8 @@ public interface IPythagorasHandler
 {
     Task<IReadOnlyList<BuildingModel>> GetBuildingsAsync(PythagorasQuery<Building>? query = null, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<BuildingInfoModel>> GetBuildingInfoAsync(PythagorasQuery<BuildingInfo>? query = null, int? navigationFolderId = null, CancellationToken cancellationToken = default);
+
     IAsyncEnumerable<BuildingModel> GetPaginatedBuildingsAsync(PythagorasQuery<Building>? query = null, int pageSize = 50, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<BuildingWorkspaceModel>> GetBuildingWorkspacesAsync(int buildingId, PythagorasQuery<BuildingWorkspace>? query = null, CancellationToken cancellationToken = default);

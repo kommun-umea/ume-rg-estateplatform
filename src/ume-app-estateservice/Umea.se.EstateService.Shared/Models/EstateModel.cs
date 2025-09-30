@@ -10,8 +10,6 @@ public sealed class EstateModel
     public string PopularName { get; init; } = string.Empty;
     public decimal GrossArea { get; init; }
     public decimal NetArea { get; init; }
-    public int NavigationId { get; init; }
-    public string NavigationName { get; init; } = string.Empty;
     public GeoPointModel? GeoLocation { get; init; }
-    public AddressModel Address { get; init; } = AddressModel.Empty;
+    public AddressModel? Address { get; init; }
 }
