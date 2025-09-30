@@ -25,6 +25,15 @@ public class EstateController(IPythagorasHandler pythagorasService) : Controller
         return estates;
     }
 
+    [HttpGet("{estateId:int}/buildings")]
+    public async Task<IReadOnlyList<BuildingInfoModel>> GetEstateBuildingsAsync(int estateId, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<BuildingInfoModel> buildings = await pythagorasService
+            .GetBuildingInfoAsync(null, estateId, cancellationToken);
+
+        return buildings;
+    }
+
     private static PythagorasQuery<NavigationFolder> BuildQuery(EstateRequest request)
     {
         PythagorasQuery<NavigationFolder> query = new PythagorasQuery<NavigationFolder>()
