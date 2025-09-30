@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 
 namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
