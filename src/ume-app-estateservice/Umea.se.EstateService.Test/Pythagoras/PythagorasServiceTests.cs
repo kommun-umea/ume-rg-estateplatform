@@ -51,7 +51,7 @@ public class PythagorasHandlerTests
         client.LastQuery.ShouldBeNull();
         client.LastPageSize.ShouldBe(10);
         client.LastCancellationToken.ShouldBe(cts.Token);
-        collected.Select(b => b.Id).ShouldBe(new[] { 1, 2 });
+        collected.Select(b => b.Id).ShouldBe([1, 2]);
     }
 
     [Fact]

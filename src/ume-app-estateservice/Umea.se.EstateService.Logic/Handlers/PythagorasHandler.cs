@@ -117,8 +117,6 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         return mapper(payload);
     }
 
-    
-
     private static void ValidateSearchInputs(string searchTerm, int limit)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(searchTerm);

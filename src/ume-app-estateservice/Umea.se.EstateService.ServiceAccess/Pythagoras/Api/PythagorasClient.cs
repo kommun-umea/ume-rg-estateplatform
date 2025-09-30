@@ -18,16 +18,6 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : IPy
         return QueryAsync(endpoint, builder, cancellationToken);
     }
 
-    [Obsolete("Prefer overload accepting PythagorasQuery<T>.")]
-    public Task<IReadOnlyList<TDto>> GetOldAsync<TDto>(string endpoint, Action<PythagorasQuery<TDto>>? query = null, CancellationToken cancellationToken = default) where TDto : class
-    {
-        ArgumentNullException.ThrowIfNull(endpoint);
-
-        PythagorasQuery<TDto> builder = new();
-        query?.Invoke(builder);
-        return QueryAsync(endpoint, builder, cancellationToken);
-    }
-
     public async IAsyncEnumerable<TDto> GetPaginatedAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, int pageSize = 50, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         where TDto : class
     {
@@ -46,45 +36,6 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : IPy
             PythagorasQuery<TDto> pageQuery = baseQuery.Page(pageNumber, pageSize);
 
             IReadOnlyList<TDto> page = await QueryAsync(endpoint, pageQuery, cancellationToken).ConfigureAwait(false);
-            if (page.Count == 0)
-            {
-                yield break;
-            }
-
-            foreach (TDto item in page)
-            {
-                yield return item;
-            }
-
-            if (page.Count < pageSize)
-            {
-                yield break;
-            }
-
-            pageNumber++;
-        }
-    }
-
-    [Obsolete("Prefer overload accepting PythagorasQuery<T>.")]
-    public async IAsyncEnumerable<TDto> GetOldPaginatedAsync<TDto>(string endpoint, Action<PythagorasQuery<TDto>>? query = null, int pageSize = 50, [EnumeratorCancellation] CancellationToken cancellationToken = default)
-        where TDto : class
-    {
-        ArgumentNullException.ThrowIfNull(endpoint);
-
-        if (pageSize <= 0)
-        {
-            throw new ArgumentException("Page size must be > 0.", nameof(pageSize));
-        }
-
-        int pageNumber = 1;
-
-        while (true)
-        {
-            PythagorasQuery<TDto> builder = new();
-            query?.Invoke(builder);
-            builder.Page(pageNumber, pageSize);
-
-            IReadOnlyList<TDto> page = await QueryAsync(endpoint, builder, cancellationToken).ConfigureAwait(false);
             if (page.Count == 0)
             {
                 yield break;
@@ -133,7 +84,8 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : IPy
 
         if (Uri.TryCreate(trimmed, UriKind.RelativeOrAbsolute, out Uri? candidate)
             && candidate.IsAbsoluteUri
-            && (candidate.Scheme == Uri.UriSchemeHttp || candidate.Scheme == Uri.UriSchemeHttps))
+            && (candidate.Scheme == Uri.UriSchemeHttp
+            || candidate.Scheme == Uri.UriSchemeHttps))
         {
             return candidate.AbsoluteUri;
         }
