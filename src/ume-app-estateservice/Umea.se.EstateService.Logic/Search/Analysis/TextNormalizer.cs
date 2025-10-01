@@ -1,6 +1,3 @@
-using System.Globalization;
-using System.Text;
-
 namespace Umea.se.EstateService.Logic.Search.Analysis;
 
 internal static class TextNormalizer

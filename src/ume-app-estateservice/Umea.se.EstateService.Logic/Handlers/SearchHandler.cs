@@ -5,21 +5,16 @@ using Umea.se.EstateService.Shared.Search;
 
 namespace Umea.se.EstateService.Logic.Handlers;
 
-public class SearchHandler(IPythagorasDocumentProvider pythagorasDocumentProvider)
+public class SearchHandler(IPythagorasDocumentProvider documentProvider)
 {
-    private readonly IPythagorasDocumentProvider _pythagorasDocumentProvider = pythagorasDocumentProvider;
+    private readonly IPythagorasDocumentProvider _documentProvider = documentProvider;
     private readonly SemaphoreSlim _indexLock = new(1, 1);
     private InMemorySearchService? _searchService;
 
     public Task<ICollection<PythagorasDocument>> GetPythagorasDocumentsAsync()
-        => _pythagorasDocumentProvider.GetDocumentsAsync();
+        => _documentProvider.GetDocumentsAsync();
 
-    public async Task<IReadOnlyList<SearchResult>> SearchAsync(
-        string query,
-        AutocompleteType type,
-        int limit,
-        int? buildingId,
-        CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<SearchResult>> SearchAsync(string query, AutocompleteType type, int limit, int? buildingId, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(query))
         {
@@ -27,23 +22,22 @@ public class SearchHandler(IPythagorasDocumentProvider pythagorasDocumentProvide
         }
 
         InMemorySearchService service = await EnsureSearchServiceAsync(cancellationToken).ConfigureAwait(false);
-        QueryOptions options = new QueryOptions(MaxResults: Math.Max(limit, 1));
+        QueryOptions options = new(MaxResults: Math.Max(limit, 1));
         IEnumerable<SearchResult> results = service.Search(query, options);
 
-        if (type != AutocompleteType.Any && AutoCompleteTypeToNodeType.TryGetValue(type, out NodeType nodeType))
+        if (type != AutocompleteType.Any && _autoCompleteTypeToNodeType.TryGetValue(type, out NodeType nodeType))
         {
             results = results.Where(r => r.Item.Type == nodeType);
         }
 
         results = ApplyBuildingFilter(results, type, buildingId);
 
-        return results.Take(limit).ToArray();
+        return [.. results.Take(limit)];
     }
 
     private async Task<InMemorySearchService> EnsureSearchServiceAsync(CancellationToken cancellationToken)
     {
-        InMemorySearchService? existing = Volatile.Read(ref _searchService);
-        if (existing != null)
+        if (_searchService is { } existing)
         {
             return existing;
         }
@@ -51,21 +45,33 @@ public class SearchHandler(IPythagorasDocumentProvider pythagorasDocumentProvide
         await _indexLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            existing = _searchService;
-            if (existing != null)
-            {
-                return existing;
-            }
-
-            ICollection<PythagorasDocument> documents = await _pythagorasDocumentProvider.GetDocumentsAsync().ConfigureAwait(false);
-            existing = new InMemorySearchService(documents);
-            Volatile.Write(ref _searchService, existing);
-            return existing;
+            return _searchService ?? await BuildSearchServiceAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
             _indexLock.Release();
         }
+    }
+
+    public async Task RefreshIndexAsync(CancellationToken cancellationToken = default)
+    {
+        await _indexLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await BuildSearchServiceAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _indexLock.Release();
+        }
+    }
+
+    private async Task<InMemorySearchService> BuildSearchServiceAsync(CancellationToken _)
+    {
+        ICollection<PythagorasDocument> documents = await _documentProvider.GetDocumentsAsync().ConfigureAwait(false);
+        InMemorySearchService service = new(documents);
+        _searchService = service;
+        return service;
     }
 
     private static IEnumerable<SearchResult> ApplyBuildingFilter(IEnumerable<SearchResult> results, AutocompleteType type, int? buildingId)
@@ -85,7 +91,7 @@ public class SearchHandler(IPythagorasDocumentProvider pythagorasDocumentProvide
         };
     }
 
-    private static readonly IReadOnlyDictionary<AutocompleteType, NodeType> AutoCompleteTypeToNodeType = new Dictionary<AutocompleteType, NodeType>
+    private static readonly Dictionary<AutocompleteType, NodeType> _autoCompleteTypeToNodeType = new()
     {
         { AutocompleteType.Building, NodeType.Building },
         { AutocompleteType.Workspace, NodeType.Room }

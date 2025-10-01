@@ -23,6 +23,6 @@ public class SearchController(SearchHandler searchHandler) : ControllerBase
             cancellationToken)
             .ConfigureAwait(false);
 
-        return results.Select(r => r.Item).ToArray();
+        return [.. results.Select(r => r.Item)];
     }
 }
