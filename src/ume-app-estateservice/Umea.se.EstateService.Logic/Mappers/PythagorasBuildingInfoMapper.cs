@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.EstateService.Shared.ValueObjects;
 using TransportMarkerType = Umea.se.EstateService.ServiceAccess.Pythagoras.Enum.PythMarkerType;
