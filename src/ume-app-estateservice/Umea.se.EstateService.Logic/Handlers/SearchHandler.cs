@@ -1,6 +1,7 @@
 ﻿using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
@@ -23,14 +24,60 @@ public class SearchHandler(IPythagorasHandler pythagorasHandler)
         PropertyNameCaseInsensitive = true,
     };
 
-    public async Task<ICollection<PythagorasDocument>> GetPythagorasDocumentsAsync()
+    private static readonly object CacheLock = new();
+    private static ICollection<PythagorasDocument>? _cachedDocuments;
+    private static Task<ICollection<PythagorasDocument>>? _cacheRefreshTask;
+
+    public Task<ICollection<PythagorasDocument>> GetPythagorasDocumentsAsync()
+    {
+        ICollection<PythagorasDocument>? cached = Volatile.Read(ref _cachedDocuments);
+        if (cached != null)
+        {
+            return Task.FromResult(cached);
+        }
+
+        return EnsureCacheRefreshTask();
+
+        Task<ICollection<PythagorasDocument>> EnsureCacheRefreshTask()
+        {
+            lock (CacheLock)
+            {
+                if (_cachedDocuments is { } existing)
+                {
+                    return Task.FromResult(existing);
+                }
+
+                _cacheRefreshTask ??= RefreshCacheAsync();
+                return _cacheRefreshTask;
+            }
+        }
+    }
+
+    private async Task<ICollection<PythagorasDocument>> RefreshCacheAsync()
     {
         Dictionary<string, PythagorasDocument> docs = [];
 
-        await AddEstatesAndBuildings(docs);
-        await AddWorkspaces(docs);
+        try
+        {
+            await AddEstatesAndBuildings(docs).ConfigureAwait(false);
+            await AddWorkspaces(docs).ConfigureAwait(false);
 
-        return [.. docs.Values];
+            ICollection<PythagorasDocument> documents = [.. docs.Values];
+
+            lock (CacheLock)
+            {
+                _cachedDocuments = documents;
+            }
+
+            return documents;
+        }
+        finally
+        {
+            lock (CacheLock)
+            {
+                _cacheRefreshTask = null;
+            }
+        }
     }
 
     private async Task AddEstatesAndBuildings(Dictionary<string, PythagorasDocument> docs)
@@ -71,8 +118,8 @@ public class SearchHandler(IPythagorasHandler pythagorasHandler)
 
             docs[doc.Id] = doc;
 
-            if(workspace.BuildingId is int buildingId)
-{
+            if (workspace.BuildingId is int buildingId)
+            {
                 string buildingKey = $"building-{buildingId}";
                 if (docs.TryGetValue(buildingKey, out PythagorasDocument? buildingDoc))
                 {
