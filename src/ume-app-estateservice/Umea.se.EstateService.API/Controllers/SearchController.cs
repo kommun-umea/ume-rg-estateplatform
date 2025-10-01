@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Umea.se.EstateService.API.Controllers.Requests;
 using Umea.se.EstateService.Logic.Handlers;
-using Umea.se.EstateService.Shared.Autocomplete;
+using Umea.se.EstateService.Logic.Search;
 using Umea.se.EstateService.Shared.Search;
 using Umea.se.Toolkit.Auth;
 
@@ -13,32 +13,16 @@ namespace Umea.se.EstateService.API.Controllers;
 public class SearchController(SearchHandler searchHandler) : ControllerBase
 {
     [HttpGet]
-    public async Task<ICollection<PythagorasDocument>> Search(AutocompleteRequest req)
+    public async Task<ICollection<PythagorasDocument>> Search(AutocompleteRequest req, CancellationToken cancellationToken)
     {
-        IEnumerable<PythagorasDocument> docs = await searchHandler.GetPythagorasDocumentsAsync();
+        IReadOnlyList<SearchResult> results = await searchHandler.SearchAsync(
+            req.Query,
+            req.Type,
+            req.Limit,
+            req.BuildingId,
+            cancellationToken)
+            .ConfigureAwait(false);
 
-        if (req.Type != AutocompleteType.Any)
-        {
-            docs = docs.Where(d => d.Type == AutoCompleteTypeToNodeType[req.Type]);
-        }
-
-        if (!string.IsNullOrWhiteSpace(req.Query))
-        {
-            string query = req.Query.Trim();
-            docs = docs.Where(d => d.Name.Contains(query, StringComparison.OrdinalIgnoreCase) || (d.PopularName != null && d.PopularName.Contains(query, StringComparison.OrdinalIgnoreCase)));
-        }
-
-        if (req.Limit > 0)
-        {
-            docs = docs.Take(req.Limit);
-        }
-
-        return [.. docs];
+        return results.Select(r => r.Item).ToArray();
     }
-
-    private readonly Dictionary<AutocompleteType, NodeType> AutoCompleteTypeToNodeType = new()
-    {
-        { AutocompleteType.Building, NodeType.Building },
-        { AutocompleteType.Workspace, NodeType.Room },
-    };
 }

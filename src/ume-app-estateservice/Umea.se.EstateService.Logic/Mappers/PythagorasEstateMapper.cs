@@ -29,7 +29,7 @@ public static class PythagorasEstateMapper
         ArgumentNullException.ThrowIfNull(dtos);
 
         return dtos.Count == 0
-            ? Array.Empty<EstateModel>()
+            ? []
             : dtos.Select(ToModel).ToArray();
     }
 

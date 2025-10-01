@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="SymSpell" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Umea.se.EstateService.ServiceAccess\Umea.se.EstateService.ServiceAccess.csproj" />
     <ProjectReference Include="..\Umea.se.EstateService.Shared\Umea.se.EstateService.Shared.csproj" />
   </ItemGroup>
