@@ -39,4 +39,5 @@ public sealed class NavigationFolder
     public string? InheritedTrusteeEmail { get; init; }
     public string? InheritedTrusteeFullname { get; init; }
     public Dictionary<string, string?> PropertyValues { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+    public Building[]? Buildings { get; init; }
 }

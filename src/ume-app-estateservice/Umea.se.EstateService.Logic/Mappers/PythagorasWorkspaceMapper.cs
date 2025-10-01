@@ -74,12 +74,12 @@ public static class PythagorasWorkspaceMapper
             PopularName = dto.PopularName,
             GrossArea = dto.GrossArea,
             NetArea = dto.NetArea,
-            UpliftedArea = dto.UpliftedArea,
             CommonArea = dto.CommonArea,
-            Cost = dto.Cost,
-            Price = dto.Price,
-            Capacity = dto.Capacity,
-            OptimalCapacity = dto.OptimalCapacity
+
+            BuildingId = dto.BuildingId,
+            BuildingUid = dto.BuildingUid,
+            BuildingName = dto.BuildingName,
+            BuildingPopularName = dto.BuildingPopularName,
         };
     }
 

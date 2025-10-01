@@ -1,6 +1,9 @@
+using Umea.se.EstateService.Shared.Interfaces;
+using Umea.se.EstateService.Shared.ValueObjects;
+
 namespace Umea.se.EstateService.Shared.Models;
 
-public sealed class WorkspaceModel
+public sealed class WorkspaceModel : ISearchable
 {
     public int Id { get; init; }
     public Guid Uid { get; init; }
@@ -11,10 +14,14 @@ public sealed class WorkspaceModel
     public string? PopularName { get; init; }
     public double GrossArea { get; init; }
     public double NetArea { get; init; }
-    public double UpliftedArea { get; init; }
     public double CommonArea { get; init; }
-    public double Cost { get; init; }
-    public double Price { get; init; }
-    public int Capacity { get; init; }
-    public int OptimalCapacity { get; init; }
+
+    public int? BuildingId { get; init; }
+    public Guid? BuildingUid { get; init; }
+    public string? BuildingName { get; init; }
+    public string? BuildingPopularName { get; set; }
+
+    public AddressModel? Address => null;
+    public GeoPointModel? GeoLocation => null;
+    public DateTimeOffset UpdatedAt => DateTimeOffset.FromUnixTimeMilliseconds(Updated / 1000);
 }

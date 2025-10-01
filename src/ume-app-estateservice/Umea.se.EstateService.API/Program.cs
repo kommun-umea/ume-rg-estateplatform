@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Umea.se.EstateService.API;
 using Umea.se.EstateService.Logic;
@@ -50,6 +52,10 @@ builder.Services.AddAllowedOriginsCorsPolicy(config.AllowedOrigins);
 builder.Services.AddControllers(options =>
 {
     options.Filters.Add<HttpResponseExceptionFilter>();
+})
+.AddJsonOptions(options =>
+{
+    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
 });
 
 WebApplication app = builder.Build();

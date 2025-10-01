@@ -13,28 +13,28 @@ namespace Umea.se.EstateService.API.Controllers;
 public class BuildingController(IPythagorasHandler pythagorasService) : ControllerBase
 {
     [HttpGet]
-    public async Task<IReadOnlyList<BuildingModel>> GetBuildingsAsync(CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<BuildingInfoModel>> GetBuildingsAsync(CancellationToken cancellationToken)
     {
-        PythagorasQuery<Building> query = new PythagorasQuery<Building>()
+        PythagorasQuery<BuildingInfo> query = new PythagorasQuery<BuildingInfo>()
             .Take(50);
 
-        IReadOnlyList<BuildingModel> buildings = await pythagorasService.GetBuildingsAsync(query, cancellationToken);
+        IReadOnlyList<BuildingInfoModel> buildings = await pythagorasService.GetBuildingsAsync(query, cancellationToken);
 
         return buildings;
     }
 
     [HttpGet("search")]
-    public async Task<IReadOnlyList<BuildingModel>> GetBuildingsContainingAsync([FromQuery] string searchTerm, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<BuildingInfoModel>> GetBuildingsContainingAsync([FromQuery] string searchTerm, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(searchTerm))
         {
             return [];
         }
 
-        PythagorasQuery<Building> query = new PythagorasQuery<Building>()
+        PythagorasQuery<BuildingInfo> query = new PythagorasQuery<BuildingInfo>()
             .Contains(b => b.Name, searchTerm);
 
-        IReadOnlyList<BuildingModel> buildings = await pythagorasService.GetBuildingsAsync(query, cancellationToken);
+        IReadOnlyList<BuildingInfoModel> buildings = await pythagorasService.GetBuildingsAsync(query, cancellationToken);
 
         return buildings;
     }

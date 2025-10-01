@@ -53,7 +53,7 @@ public class EstateControllerTests
 
     private sealed class FakePythagorasClient : IPythagorasClient
     {
-        public IReadOnlyList<Building> GetAsyncResult { get; set; } = [];
+        public IReadOnlyList<BuildingInfo> GetAsyncResult { get; set; } = [];
         public string? LastQueryString { get; private set; }
         public string? LastEndpoint { get; private set; }
 
@@ -75,24 +75,13 @@ public class EstateControllerTests
                         Uid = b.Uid,
                         Name = b.Name,
                         PopularName = b.PopularName,
-                        MarkerType = (MarkerTypeEnum)(int)b.MarkerType,
                         GeoLocation = null,
-                        Origin = b.Origin,
                         // The rest are not present in Building, so use defaults:
                         GrossArea = 0,
                         NetArea = 0,
                         SumGrossFloorArea = 0,
                         NumPlacedPersons = 0,
-                        AddressName = string.Empty,
                         Address = null,
-                        CurrencyId = null,
-                        CurrencyName = null,
-                        FlagStatusIds = Array.Empty<int>(),
-                        BusinessTypeId = null,
-                        BusinessTypeName = null,
-                        ProspectOfBuildingId = null,
-                        IsProspect = false,
-                        ProspectStartDate = null,
                         ExtraInfo = new Dictionary<string, string?>(),
                         PropertyValues = new Dictionary<string, string?>(),
                         NavigationInfo = new Dictionary<string, string?>()
@@ -114,9 +103,9 @@ public class EstateControllerTests
                         Netarea = null,
                         SumGrossFloorarea = null,
                         NumPlacedPersons = 0,
-                        GeoX = b.GeoLocation?.X ?? 0,
-                        GeoY = b.GeoLocation?.Y ?? 0,
-                        GeoRotation = b.GeoLocation?.Rotation ?? 0,
+                        GeoX = b.GeoX,
+                        GeoY = b.GeoY,
+                        GeoRotation = b.GeoRotation,
                         AddressName = string.Empty,
                         AddressCity = string.Empty,
                         AddressCountry = string.Empty,

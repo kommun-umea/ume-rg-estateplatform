@@ -19,4 +19,15 @@ public sealed class Workspace
     public double Price { get; init; }
     public int Capacity { get; init; }
     public int OptimalCapacity { get; init; }
+
+    public int? FloorId { get; init; }
+    public Guid? FloorUid { get; init; }
+    public string? FloorName { get; init; }
+    public string? FloorPopularName { get; init; }
+
+    public int? BuildingId { get; init; }
+    public Guid? BuildingUid { get; init; }
+    public string? BuildingName { get; init; }
+    public string? BuildingPopularName { get; init; }
+    public string? BuildingOrigin { get; init; }
 }

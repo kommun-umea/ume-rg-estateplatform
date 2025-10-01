@@ -1,7 +1,6 @@
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.EstateService.Shared.ValueObjects;
-using TransportMarkerType = Umea.se.EstateService.ServiceAccess.Pythagoras.Enum.PythMarkerType;
 
 namespace Umea.se.EstateService.Logic.Mappers;
 
@@ -17,23 +16,12 @@ public static class PythagorasBuildingInfoMapper
             Uid = dto.Uid,
             Name = dto.Name ?? string.Empty,
             PopularName = dto.PopularName ?? string.Empty,
-            MarkerType = ToModel(dto.MarkerType),
             GeoLocation = CreateGeoPoint(dto),
             GrossArea = dto.Grossarea ?? 0m,
             NetArea = dto.Netarea ?? 0m,
             SumGrossFloorArea = dto.SumGrossFloorarea ?? 0m,
             NumPlacedPersons = dto.NumPlacedPersons,
-            AddressName = dto.AddressName ?? string.Empty,
             Address = CreateAddress(dto),
-            Origin = dto.Origin ?? string.Empty,
-            CurrencyId = dto.CurrencyId,
-            CurrencyName = dto.CurrencyName,
-            FlagStatusIds = dto.FlagStatusIds?.ToArray() ?? Array.Empty<int>(),
-            BusinessTypeId = dto.BusinessTypeId,
-            BusinessTypeName = dto.BusinessTypeName,
-            ProspectOfBuildingId = dto.ProspectOfBuildingId,
-            IsProspect = dto.IsProspect,
-            ProspectStartDate = dto.ProspectStartDate,
             ExtraInfo = ToDictionary(dto.ExtraInfo),
             PropertyValues = ToDictionary(dto.PropertyValues),
             NavigationInfo = ToDictionary(dto.NavigationInfo)
@@ -49,29 +37,17 @@ public static class PythagorasBuildingInfoMapper
             : dtos.Select(ToModel).ToArray();
     }
 
-    private static MarkerTypeEnum ToModel(TransportMarkerType markerType)
-    {
-        int numeric = (int)markerType;
-        if (Enum.IsDefined(typeof(MarkerTypeEnum), numeric))
-        {
-            return (MarkerTypeEnum)numeric;
-        }
-
-        return MarkerTypeEnum.Unknown;
-    }
-
     private static GeoPointModel? CreateGeoPoint(BuildingInfo dto)
     {
         double x = dto.GeoX;
         double y = dto.GeoY;
-        double rotation = dto.GeoRotation;
 
         if (Math.Abs(x) < double.Epsilon && Math.Abs(y) < double.Epsilon)
         {
             return null;
         }
 
-        return new GeoPointModel(x, y, rotation);
+        return new GeoPointModel(x, y);
     }
 
     private static AddressModel? CreateAddress(BuildingInfo dto)
