@@ -21,4 +21,11 @@ public sealed class AdminController(SearchIndexRefreshService refreshService) : 
             _ => StatusCode(500, new { message = "Unknown refresh status" })
         };
     }
+
+    [HttpGet("index-info")]
+    public IActionResult GetIndexInfo()
+    {
+        SearchIndexInfo info = refreshService.GetIndexInfo();
+        return Ok(info);
+    }
 }

@@ -12,6 +12,8 @@ public sealed class InMemorySearchService
     private readonly Dictionary<int, int> _docLengths = new(); // token count per doc
     private readonly Dictionary<string, int> _termFrequencies = new(StringComparer.Ordinal);
 
+    public int DocumentCount => _docs.Count;
+
     private readonly int _symSpellMaxEdits = 2;
     private SymSpell _symSpell = new SymSpell(1024, 2);
 

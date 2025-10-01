@@ -14,6 +14,8 @@ public sealed class SearchIndexRefreshService(
     private readonly SearchIndexRefreshOptions _options = options.Value;
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
     private Task? _activeRefresh;
+    private DateTime? _lastRefreshTime;
+    private DateTime? _nextRefreshTime;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -29,12 +31,14 @@ public sealed class SearchIndexRefreshService(
         using PeriodicTimer timer = new(interval);
 
         await RefreshOnceAsync(stoppingToken).ConfigureAwait(false);
+        _nextRefreshTime = DateTime.UtcNow.Add(interval);
 
         try
         {
             while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
             {
                 await RefreshOnceAsync(stoppingToken).ConfigureAwait(false);
+                _nextRefreshTime = DateTime.UtcNow.Add(interval);
             }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -71,6 +75,18 @@ public sealed class SearchIndexRefreshService(
         }
     }
 
+    public SearchIndexInfo GetIndexInfo()
+    {
+        return new SearchIndexInfo
+        {
+            DocumentCount = searchHandler.GetDocumentCount(),
+            LastRefreshTime = _lastRefreshTime,
+            NextRefreshTime = _nextRefreshTime,
+            RefreshIntervalHours = _options.RefreshIntervalHours,
+            IsRefreshing = _activeRefresh is { IsCompleted: false }
+        };
+    }
+
     private async Task RefreshOnceAsync(CancellationToken cancellationToken)
     {
         using IDisposable? scope = logger.BeginScope("Search index refresh");
@@ -78,6 +94,7 @@ public sealed class SearchIndexRefreshService(
         {
             logger.LogInformation("Refreshing search index.");
             await searchHandler.RefreshIndexAsync(cancellationToken).ConfigureAwait(false);
+            _lastRefreshTime = DateTime.UtcNow;
             logger.LogInformation("Search index refresh completed successfully.");
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -91,8 +108,3 @@ public sealed class SearchIndexRefreshService(
     }
 }
 
-public enum RefreshStatus
-{
-    Started,
-    AlreadyRunning
-}

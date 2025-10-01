@@ -14,6 +14,8 @@ public class SearchHandler(IPythagorasDocumentProvider documentProvider)
     public Task<ICollection<PythagorasDocument>> GetPythagorasDocumentsAsync()
         => _documentProvider.GetDocumentsAsync();
 
+    public int GetDocumentCount() => _searchService?.DocumentCount ?? 0;
+
     public async Task<IReadOnlyList<SearchResult>> SearchAsync(string query, AutocompleteType type, int limit, int? buildingId, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(query))
