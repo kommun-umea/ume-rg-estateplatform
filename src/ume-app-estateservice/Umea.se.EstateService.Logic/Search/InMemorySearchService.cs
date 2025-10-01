@@ -7,28 +7,28 @@ namespace Umea.se.EstateService.Logic.Search;
 
 public sealed class InMemorySearchService
 {
-    private readonly List<PythagorasDocument> _docs = new();
+    private readonly List<PythagorasDocument> _docs = [];
     private readonly TermIndex _idx = new();
-    private readonly Dictionary<int, int> _docLengths = new(); // token count per doc
+    private readonly Dictionary<int, int> _docLengths = []; // token count per doc
     private readonly Dictionary<string, int> _termFrequencies = new(StringComparer.Ordinal);
 
     public int DocumentCount => _docs.Count;
 
     private readonly int _symSpellMaxEdits = 2;
-    private SymSpell _symSpell = new SymSpell(1024, 2);
+    private SymSpell _symSpell = new(1024, 2);
 
     // Field weights (tweak to taste)
     private readonly Dictionary<Field, double> _w = new()
     {
-        { Field.Name, 8.0 },
-        { Field.PopularName, 6.0 },
+        { Field.Name, 20.0 },
+        { Field.PopularName, 15.0 },
         { Field.Path, 2.0 },
         { Field.AncestorName, 1.5 },
         { Field.AncestorPopularName, 1.0 },
     };
 
     // strong bump when the term hits the start of key fields
-    private readonly double _startsWithBonus = 25.0;
+    private readonly double _startsWithBonus = 50.0;
 
     public InMemorySearchService(IEnumerable<PythagorasDocument> items)
     {
@@ -42,7 +42,7 @@ public sealed class InMemorySearchService
         List<PythagorasDocument> items = JsonSerializer.Deserialize<List<PythagorasDocument>>(json, new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true
-        }) ?? new();
+        }) ?? [];
         return new InMemorySearchService(items);
     }
 
@@ -102,17 +102,19 @@ public sealed class InMemorySearchService
     public IEnumerable<SearchResult> Search(string query, QueryOptions? options = null)
     {
         options ??= new QueryOptions();
-        string[] qTokens = TextNormalizer.Tokenize(query).ToArray();
+        string[] qTokens = [.. TextNormalizer.Tokenize(query)];
+
         if (qTokens.Length == 0)
         {
             return [];
         }
 
         // Expand each token to a set of candidate index terms (exact, prefix, fuzzy)
-        List<HashSet<string>> termCandidates = new List<HashSet<string>>();
+        List<HashSet<string>> termCandidates = [];
         foreach (string? qt in qTokens)
         {
-            HashSet<string> bucket = new HashSet<string>(StringComparer.Ordinal);
+            HashSet<string> bucket = new(StringComparer.Ordinal);
+
             // exact
             if (_idx.Inverted.ContainsKey(qt))
             {
@@ -164,7 +166,7 @@ public sealed class InMemorySearchService
 
         foreach (HashSet<string> bucket in termCandidates)
         {
-            HashSet<int> docIdsForTerm = new HashSet<int>();
+            HashSet<int> docIdsForTerm = [];
             foreach (string term in bucket)
             {
                 if (_idx.Inverted.TryGetValue(term, out List<Posting>? postings))
@@ -208,13 +210,13 @@ public sealed class InMemorySearchService
         // =================================================================================
         // 2. Score documents that matched ALL terms
         // =================================================================================
-        Dictionary<int, double> docScores = new Dictionary<int, double>();
-        Dictionary<int, Dictionary<string, string>> matchedPerDoc = new Dictionary<int, Dictionary<string, string>>(); // queryToken -> matchedIndexTerm
+        Dictionary<int, double> docScores = [];
+        Dictionary<int, Dictionary<string, string>> matchedPerDoc = []; // queryToken -> matchedIndexTerm
 
         for (int qi = 0; qi < termCandidates.Count; qi++)
         {
             HashSet<string> candidates = termCandidates[qi];
-            HashSet<int> seenDocs = new HashSet<int>();
+            HashSet<int> seenDocs = [];
             foreach (string term in candidates)
             {
                 if (!_idx.Inverted.TryGetValue(term, out List<Posting>? postings))
@@ -245,7 +247,7 @@ public sealed class InMemorySearchService
                     // field-weighted term frequency
                     double tfWeighted = 0.0;
                     double startsWithBonus = 0.0;
-                    Dictionary<Field, List<int>> fieldPositions = new Dictionary<Field, List<int>>();
+                    Dictionary<Field, List<int>> fieldPositions = [];
                     foreach (Posting? p in group)
                     {
                         if (startsWithBonus == 0.0 &&
@@ -279,7 +281,7 @@ public sealed class InMemorySearchService
                     // record match representative
                     if (!matchedPerDoc.TryGetValue(docId, out Dictionary<string, string>? map))
                     {
-                        matchedPerDoc[docId] = map = new();
+                        matchedPerDoc[docId] = map = [];
                     }
 
                     map[qTokens[qi]] = term;
@@ -302,18 +304,18 @@ public sealed class InMemorySearchService
         foreach (KeyValuePair<int, Dictionary<string, string>> kv in matchedPerDoc)
         {
             int docId = kv.Key;
-            string[] indexTerms = kv.Value.Values.Distinct().ToArray();
+            string[] indexTerms = [.. kv.Value.Values.Distinct()];
             if (indexTerms.Length < 2)
             {
                 continue;
             }
 
             // collect all positions across fields (we just need any positions for the same doc)
-            List<List<int>> posLists = new List<List<int>>();
+            List<List<int>> posLists = [];
             foreach (string? t in indexTerms)
             {
                 List<Posting> postings = _idx.Inverted[t];
-                List<int> pos = postings.Where(p => p.DocId == docId).SelectMany(p => p.Positions).OrderBy(x => x).ToList();
+                List<int> pos = [.. postings.Where(p => p.DocId == docId).SelectMany(p => p.Positions).OrderBy(x => x)];
                 if (pos.Count > 0)
                 {
                     posLists.Add(pos);
@@ -362,13 +364,20 @@ public sealed class InMemorySearchService
         }
 
         // Compose results
-        SearchResult[] results = docScores
+        IEnumerable<KeyValuePair<int, double>> sortedDocs = docScores
             .OrderByDescending(kv2 => kv2.Value)
             .ThenBy(kv2 => options.PreferEstatesOnTie ? (_docs[kv2.Key].Type == NodeType.Estate ? 0 : 1) : 0)
-            .ThenBy(kv2 => _docs[kv2.Key].PopularName ?? _docs[kv2.Key].Name)
+            .ThenBy(kv2 => _docs[kv2.Key].PopularName ?? _docs[kv2.Key].Name);
+
+        // Apply type filter before taking MaxResults
+        if (options.FilterByType.HasValue)
+        {
+            sortedDocs = sortedDocs.Where(kv2 => _docs[kv2.Key].Type == options.FilterByType.Value);
+        }
+
+        SearchResult[] results = [.. sortedDocs
             .Take(options.MaxResults)
-            .Select(kv2 => new SearchResult(_docs[kv2.Key], kv2.Value, matchedPerDoc.TryGetValue(kv2.Key, out Dictionary<string, string>? m) ? m : []))
-            .ToArray();
+            .Select(kv2 => new SearchResult(_docs[kv2.Key], kv2.Value, matchedPerDoc.TryGetValue(kv2.Key, out Dictionary<string, string>? m) ? m : []))];
 
         return results;
     }

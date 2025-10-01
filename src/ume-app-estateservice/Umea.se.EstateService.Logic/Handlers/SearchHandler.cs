@@ -24,13 +24,16 @@ public class SearchHandler(IPythagorasDocumentProvider documentProvider)
         }
 
         InMemorySearchService service = await EnsureSearchServiceAsync(cancellationToken).ConfigureAwait(false);
-        QueryOptions options = new(MaxResults: Math.Max(limit, 1));
-        IEnumerable<SearchResult> results = service.Search(query, options);
 
+        // Pass type filter to search so it can return the right number of results
+        NodeType? filterByType = null;
         if (type != AutocompleteType.Any && _autoCompleteTypeToNodeType.TryGetValue(type, out NodeType nodeType))
         {
-            results = results.Where(r => r.Item.Type == nodeType);
+            filterByType = nodeType;
         }
+
+        QueryOptions options = new(MaxResults: Math.Max(limit, 1), FilterByType: filterByType);
+        IEnumerable<SearchResult> results = service.Search(query, options);
 
         results = ApplyBuildingFilter(results, type, buildingId);
 
