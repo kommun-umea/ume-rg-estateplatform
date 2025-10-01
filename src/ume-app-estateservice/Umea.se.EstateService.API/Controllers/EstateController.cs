@@ -36,8 +36,7 @@ public class EstateController(IPythagorasHandler pythagorasService) : Controller
 
     private static PythagorasQuery<NavigationFolder> BuildQuery(EstateRequest request)
     {
-        PythagorasQuery<NavigationFolder> query = new PythagorasQuery<NavigationFolder>()
-            .Where(f => f.TypeId, NavigationFolderType.Estate);
+        PythagorasQuery<NavigationFolder> query = new PythagorasQuery<NavigationFolder>();
 
         if (!string.IsNullOrWhiteSpace(request.SearchTerm))
         {
