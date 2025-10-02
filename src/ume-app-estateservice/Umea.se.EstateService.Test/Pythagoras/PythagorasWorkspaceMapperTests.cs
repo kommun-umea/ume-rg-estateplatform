@@ -40,7 +40,7 @@ public class PythagorasWorkspaceMapperTests
             RentalStatusColor = "#000"
         };
 
-        BuildingWorkspaceModel model = PythagorasWorkspaceMapper.ToModel(dto);
+        BuildingRoomModel model = PythagorasWorkspaceMapper.ToModel(dto);
 
         model.Id.ShouldBe(dto.Id);
         model.Uid.ShouldBe(dto.Uid);
@@ -74,7 +74,7 @@ public class PythagorasWorkspaceMapperTests
             OptimalCapacity = 2
         };
 
-        WorkspaceModel model = PythagorasWorkspaceMapper.ToDomain(dto);
+        RoomModel model = PythagorasWorkspaceMapper.ToDomain(dto);
 
         model.Id.ShouldBe(dto.Id);
         model.Version.ShouldBe(dto.Version);
