@@ -154,7 +154,7 @@ public class PythagorasHandlerTests
         public IReadOnlyList<Workspace> GetWorkspacesResult { get; set; } = [];
         public string? LastEndpoint { get; private set; }
 
-        public Task<IReadOnlyList<TDto>> GetAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, CancellationToken cancellationToken) where TDto : class
+        public Task<IReadOnlyList<TDto>> GetAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, CancellationToken cancellationToken) where TDto : class, IPythagorasDto
         {
             GetAsyncCalled = true;
             LastEndpoint = endpoint;
@@ -182,18 +182,6 @@ public class PythagorasHandlerTests
             }
 
             throw new NotSupportedException("Test fake does not support the requested DTO type.");
-        }
-
-        public Task<IReadOnlyList<TDto>> GetOldAsync<TDto>(string endpoint, Action<PythagorasQuery<TDto>>? configure, CancellationToken cancellationToken) where TDto : class
-        {
-            PythagorasQuery<TDto>? query = null;
-            if (configure is not null)
-            {
-                query = new PythagorasQuery<TDto>();
-                configure(query);
-            }
-
-            return GetAsync(endpoint, query, cancellationToken);
         }
     }
 }

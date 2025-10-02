@@ -1,6 +1,6 @@
 namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 
-public sealed class Workspace
+public sealed class Workspace : IPythagorasDto
 {
     public int Id { get; init; }
     public Guid Uid { get; init; }

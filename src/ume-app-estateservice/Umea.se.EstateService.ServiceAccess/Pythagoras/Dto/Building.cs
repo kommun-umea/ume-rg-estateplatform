@@ -2,7 +2,7 @@
 
 namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 
-public sealed class Building
+public sealed class Building : IPythagorasDto
 {
     public int Id { get; init; }
     public Guid Uid { get; init; }
