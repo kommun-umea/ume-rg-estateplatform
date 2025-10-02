@@ -99,17 +99,8 @@ public sealed class InMemorySearchService
         }
     }
 
-    public IEnumerable<SearchResult> Search(string query, QueryOptions? options = null)
+    private List<HashSet<string>> ExpandQueryTokens(string[] qTokens, QueryOptions options)
     {
-        options ??= new QueryOptions();
-        string[] qTokens = [.. TextNormalizer.Tokenize(query)];
-
-        if (qTokens.Length == 0)
-        {
-            return [];
-        }
-
-        // Expand each token to a set of candidate index terms (exact, prefix, fuzzy)
         List<HashSet<string>> termCandidates = [];
         foreach (string? qt in qTokens)
         {
@@ -158,10 +149,11 @@ public sealed class InMemorySearchService
             }
             termCandidates.Add(bucket);
         }
+        return termCandidates;
+    }
 
-        // =================================================================================
-        // 1. Find candidate documents (AND logic)
-        // =================================================================================
+    private HashSet<int> FindCandidateDocuments(List<HashSet<string>> termCandidates)
+    {
         HashSet<int>? finalDocIds = null;
 
         foreach (HashSet<string> bucket in termCandidates)
@@ -194,22 +186,17 @@ public sealed class InMemorySearchService
             }
         }
 
-        if (finalDocIds == null || finalDocIds.Count == 0)
-        {
-            return [];
-        }
+        return finalDocIds ?? [];
+    }
 
+    private (Dictionary<int, double>, Dictionary<int, Dictionary<string, string>>) ScoreDocuments(
+        List<HashSet<string>> termCandidates,
+        HashSet<int> candidateDocIds,
+        string[] qTokens)
+    {
         int N = _docs.Count;
-        if (_docs.Count == 0)
-        {
-            return [];
-        }
-
         double avgdl = _docLengths.Count > 0 ? _docLengths.Values.Average() : 1.0;
 
-        // =================================================================================
-        // 2. Score documents that matched ALL terms
-        // =================================================================================
         Dictionary<int, double> docScores = [];
         Dictionary<int, Dictionary<string, string>> matchedPerDoc = []; // queryToken -> matchedIndexTerm
 
@@ -234,13 +221,11 @@ public sealed class InMemorySearchService
                 {
                     int docId = group.Key;
 
-                    // --- THIS IS THE CORE CHANGE ---
                     // Only score docs that are in our final candidate set
-                    if (!finalDocIds.Contains(docId))
+                    if (!candidateDocIds.Contains(docId))
                     {
                         continue;
                     }
-                    // -----------------------------
 
                     seenDocs.Add(docId);
 
@@ -291,16 +276,20 @@ public sealed class InMemorySearchService
             // coverage bonus: docs that matched this query term get a small boost
             foreach (int docId in seenDocs)
             {
-                if (docScores.TryGetValue(docId, out double value)) // check existence as it might have been filtered
+                if (docScores.TryGetValue(docId, out double value))
                 {
                     docScores[docId] = value + 0.2;
                 }
             }
         }
 
-        // =================================================================================
-        // 3. Proximity bonus (only for docs that already passed the AND filter)
-        // =================================================================================
+        return (docScores, matchedPerDoc);
+    }
+
+    private void ApplyProximityBonus(
+        Dictionary<int, double> docScores,
+        Dictionary<int, Dictionary<string, string>> matchedPerDoc)
+    {
         foreach (KeyValuePair<int, Dictionary<string, string>> kv in matchedPerDoc)
         {
             int docId = kv.Key;
@@ -326,44 +315,55 @@ public sealed class InMemorySearchService
                 continue;
             }
 
-            // compute minimal window covering one position from each list (classic k-way merge)
-            int[] pointers = new int[posLists.Count];
-            int bestSpan = int.MaxValue;
-            while (true)
-            {
-                int minVal = int.MaxValue, maxVal = int.MinValue, minIdx = -1;
-                for (int i = 0; i < posLists.Count; i++)
-                {
-                    List<int> list = posLists[i];
-                    int ptr = pointers[i];
-                    if (ptr >= list.Count) { minIdx = -1; break; }
-                    int v = list[ptr];
-                    if (v < minVal) { minVal = v; minIdx = i; }
-                    if (v > maxVal)
-                    {
-                        maxVal = v;
-                    }
-                }
-                if (minIdx == -1)
-                {
-                    break;
-                }
-
-                int span = Math.Max(0, maxVal - minVal);
-                if (span < bestSpan)
-                {
-                    bestSpan = span;
-                }
-
-                pointers[minIdx]++;
-            }
+            int bestSpan = CalculateMinimalSpan(posLists);
             if (bestSpan != int.MaxValue)
             {
                 docScores[docId] += 1.0 / (1.0 + bestSpan); // closer = bigger boost
             }
         }
+    }
 
-        // Compose results
+    private static int CalculateMinimalSpan(List<List<int>> posLists)
+    {
+        // compute minimal window covering one position from each list (classic k-way merge)
+        int[] pointers = new int[posLists.Count];
+        int bestSpan = int.MaxValue;
+        while (true)
+        {
+            int minVal = int.MaxValue, maxVal = int.MinValue, minIdx = -1;
+            for (int i = 0; i < posLists.Count; i++)
+            {
+                List<int> list = posLists[i];
+                int ptr = pointers[i];
+                if (ptr >= list.Count) { minIdx = -1; break; }
+                int v = list[ptr];
+                if (v < minVal) { minVal = v; minIdx = i; }
+                if (v > maxVal)
+                {
+                    maxVal = v;
+                }
+            }
+            if (minIdx == -1)
+            {
+                break;
+            }
+
+            int span = Math.Max(0, maxVal - minVal);
+            if (span < bestSpan)
+            {
+                bestSpan = span;
+            }
+
+            pointers[minIdx]++;
+        }
+        return bestSpan;
+    }
+
+    private IEnumerable<SearchResult> ComposeResults(
+        Dictionary<int, double> docScores,
+        Dictionary<int, Dictionary<string, string>> matchedPerDoc,
+        QueryOptions options)
+    {
         IEnumerable<KeyValuePair<int, double>> sortedDocs = docScores
             .OrderByDescending(kv2 => kv2.Value)
             .ThenBy(kv2 => options.PreferEstatesOnTie ? (_docs[kv2.Key].Type == NodeType.Estate ? 0 : 1) : 0)
@@ -380,5 +380,31 @@ public sealed class InMemorySearchService
             .Select(kv2 => new SearchResult(_docs[kv2.Key], kv2.Value, matchedPerDoc.TryGetValue(kv2.Key, out Dictionary<string, string>? m) ? m : []))];
 
         return results;
+    }
+
+    public IEnumerable<SearchResult> Search(string query, QueryOptions? options = null)
+    {
+        options ??= new QueryOptions();
+        string[] qTokens = [.. TextNormalizer.Tokenize(query)];
+
+        if (qTokens.Length == 0)
+        {
+            return [];
+        }
+
+        List<HashSet<string>> termCandidates = ExpandQueryTokens(qTokens, options);
+
+        HashSet<int> candidateDocIds = FindCandidateDocuments(termCandidates);
+        if (candidateDocIds.Count == 0)
+        {
+            return [];
+        }
+
+        (Dictionary<int, double> docScores, Dictionary<int, Dictionary<string, string>> matchedPerDoc) =
+            ScoreDocuments(termCandidates, candidateDocIds, qTokens);
+
+        ApplyProximityBonus(docScores, matchedPerDoc);
+
+        return ComposeResults(docScores, matchedPerDoc, options);
     }
 }
