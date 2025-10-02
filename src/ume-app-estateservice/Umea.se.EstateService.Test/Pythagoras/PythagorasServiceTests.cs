@@ -114,12 +114,12 @@ public class PythagorasHandlerTests
 
         PythagorasHandler service = new(client);
 
-        IReadOnlyList<BuildingWorkspaceModel> result = await service.GetBuildingWorkspacesAsync(99);
+        IReadOnlyList<BuildingRoomModel> result = await service.GetBuildingWorkspacesAsync(99);
 
         client.GetAsyncCalled.ShouldBeTrue();
         client.LastEndpoint.ShouldBe("rest/v1/building/99/workspace/info");
-        BuildingWorkspaceModel workspace = result.ShouldHaveSingleItem();
-        workspace.Id.ShouldBe(5);
+        BuildingRoomModel room = result.ShouldHaveSingleItem();
+        room.Id.ShouldBe(5);
     }
 
     [Fact]
@@ -132,13 +132,13 @@ public class PythagorasHandlerTests
 
         PythagorasHandler service = new(client);
 
-        IReadOnlyList<WorkspaceModel> result = await service.GetWorkspacesAsync();
+        IReadOnlyList<RoomModel> result = await service.GetRoomsAsync();
 
         client.GetAsyncCalled.ShouldBeTrue();
         client.LastEndpoint.ShouldBe("rest/v1/workspace/info");
         client.LastQuery.ShouldBeNull();
-        WorkspaceModel workspace = result.ShouldHaveSingleItem();
-        workspace.Id.ShouldBe(7);
+        RoomModel room = result.ShouldHaveSingleItem();
+        room.Id.ShouldBe(7);
     }
 
     private sealed class FakePythagorasClient : IPythagorasClient
