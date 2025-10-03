@@ -33,7 +33,7 @@ public static class PythagorasBuildingInfoMapper
         ArgumentNullException.ThrowIfNull(dtos);
 
         return dtos.Count == 0
-            ? Array.Empty<BuildingInfoModel>()
+            ? []
             : dtos.Select(ToModel).ToArray();
     }
 

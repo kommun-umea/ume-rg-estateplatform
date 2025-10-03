@@ -1,179 +1,104 @@
-﻿using System.Text.Encodings.Web;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using Umea.se.EstateService.Logic.Interfaces;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
-using Umea.se.EstateService.Shared.Interfaces;
-using Umea.se.EstateService.Shared.Models;
+﻿using Umea.se.EstateService.Logic.Interfaces;
+using Umea.se.EstateService.Logic.Search;
+using Umea.se.EstateService.Shared.Autocomplete;
 using Umea.se.EstateService.Shared.Search;
-using Umea.se.EstateService.Shared.ValueObjects;
 
 namespace Umea.se.EstateService.Logic.Handlers;
 
-public class SearchHandler(IPythagorasHandler pythagorasHandler)
+public class SearchHandler(IPythagorasDocumentProvider documentProvider)
 {
-    private readonly JsonSerializerOptions _jsonOptions = new()
-    {
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) },
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = true,
-    };
-
-    private static readonly object CacheLock = new();
-    private static ICollection<PythagorasDocument>? _cachedDocuments;
-    private static Task<ICollection<PythagorasDocument>>? _cacheRefreshTask;
+    private readonly IPythagorasDocumentProvider _documentProvider = documentProvider;
+    private readonly SemaphoreSlim _indexLock = new(1, 1);
+    private InMemorySearchService? _searchService;
 
     public Task<ICollection<PythagorasDocument>> GetPythagorasDocumentsAsync()
+        => _documentProvider.GetDocumentsAsync();
+
+    public int GetDocumentCount() => _searchService?.DocumentCount ?? 0;
+
+    public async Task<IReadOnlyList<SearchResult>> SearchAsync(string query, AutocompleteType type, int limit, int? buildingId, CancellationToken cancellationToken = default)
     {
-        ICollection<PythagorasDocument>? cached = Volatile.Read(ref _cachedDocuments);
-        if (cached != null)
+        if (string.IsNullOrWhiteSpace(query))
         {
-            return Task.FromResult(cached);
+            return [];
         }
 
-        return EnsureCacheRefreshTask();
+        InMemorySearchService service = await EnsureSearchServiceAsync(cancellationToken).ConfigureAwait(false);
 
-        Task<ICollection<PythagorasDocument>> EnsureCacheRefreshTask()
+        // Pass type filter to search so it can return the right number of results
+        NodeType? filterByType = null;
+        if (type != AutocompleteType.Any && _autoCompleteTypeToNodeType.TryGetValue(type, out NodeType nodeType))
         {
-            lock (CacheLock)
-            {
-                if (_cachedDocuments is { } existing)
-                {
-                    return Task.FromResult(existing);
-                }
-
-                _cacheRefreshTask ??= RefreshCacheAsync();
-                return _cacheRefreshTask;
-            }
+            filterByType = nodeType;
         }
+
+        QueryOptions options = new(MaxResults: Math.Max(limit, 1), FilterByType: filterByType);
+        IEnumerable<SearchResult> results = service.Search(query, options);
+
+        results = ApplyBuildingFilter(results, type, buildingId);
+
+        return [.. results.Take(limit)];
     }
 
-    private async Task<ICollection<PythagorasDocument>> RefreshCacheAsync()
+    private async Task<InMemorySearchService> EnsureSearchServiceAsync(CancellationToken cancellationToken)
     {
-        Dictionary<string, PythagorasDocument> docs = [];
+        if (_searchService is { } existing)
+        {
+            return existing;
+        }
 
+        await _indexLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await AddEstatesAndBuildings(docs).ConfigureAwait(false);
-            await AddWorkspaces(docs).ConfigureAwait(false);
-
-            ICollection<PythagorasDocument> documents = [.. docs.Values];
-
-            lock (CacheLock)
-            {
-                _cachedDocuments = documents;
-            }
-
-            return documents;
+            return _searchService ?? await BuildSearchServiceAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
-            lock (CacheLock)
-            {
-                _cacheRefreshTask = null;
-            }
+            _indexLock.Release();
         }
     }
 
-    private async Task AddEstatesAndBuildings(Dictionary<string, PythagorasDocument> docs)
+    public async Task RefreshIndexAsync(CancellationToken cancellationToken = default)
     {
-        PythagorasQuery<NavigationFolder> query = new PythagorasQuery<NavigationFolder>()
-            .WithQueryParameter("includeAscendantBuildings", true);
-
-        IReadOnlyList<EstateModel> estates = await pythagorasHandler.GetEstatesAsync(query);
-
-        foreach (EstateModel estate in estates)
+        await _indexLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            PythagorasDocument estateDoc = CreateDocumentFromSearchable(estate);
-            docs[estateDoc.Id] = estateDoc;
-
-            foreach (BuildingModel building in estate.Buildings ?? [])
-            {
-                string key = $"building-{building.Id}";
-                if (!docs.TryGetValue(key, out PythagorasDocument? doc))
-                {
-                    doc = CreateDocumentFromSearchable(building);
-                    docs[doc.Id] = doc;
-                }
-
-                doc.Ancestors.Add(CreateAncestorFromDocument(estateDoc));
-            }
+            await BuildSearchServiceAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _indexLock.Release();
         }
     }
 
-    private async Task AddWorkspaces(Dictionary<string, PythagorasDocument> docs)
+    private async Task<InMemorySearchService> BuildSearchServiceAsync(CancellationToken _)
     {
-        PythagorasQuery<Workspace> query = new();
+        ICollection<PythagorasDocument> documents = await _documentProvider.GetDocumentsAsync().ConfigureAwait(false);
+        InMemorySearchService service = new(documents);
+        _searchService = service;
+        return service;
+    }
 
-        IReadOnlyList<WorkspaceModel> workspaces = await pythagorasHandler.GetWorkspacesAsync(query);
-
-        foreach (WorkspaceModel workspace in workspaces)
+    private static IEnumerable<SearchResult> ApplyBuildingFilter(IEnumerable<SearchResult> results, AutocompleteType type, int? buildingId)
+    {
+        if (buildingId is null)
         {
-            PythagorasDocument doc = CreateDocumentFromSearchable(workspace);
-
-            docs[doc.Id] = doc;
-
-            if (workspace.BuildingId is int buildingId)
-            {
-                string buildingKey = $"building-{buildingId}";
-                if (docs.TryGetValue(buildingKey, out PythagorasDocument? buildingDoc))
-                {
-                    doc.Ancestors.AddRange(buildingDoc.Ancestors);
-                    doc.Ancestors.Add(CreateAncestorFromDocument(buildingDoc));
-                }
-            }
+            return results;
         }
-    }
 
-    private static PythagorasDocument CreateDocumentFromSearchable(ISearchable item)
-    {
-        (NodeType nodeType, int rankScore) = item switch
+        string buildingKey = $"building-{buildingId.Value}";
+
+        return type switch
         {
-            EstateModel => (NodeType.Estate, 1),
-            BuildingModel => (NodeType.Building, 2),
-            WorkspaceModel => (NodeType.Room, 3),
-            _ => throw new ArgumentException($"Unknown searchable type: {item.GetType().Name}", nameof(item))
-        };
-
-        string idPrefix = nodeType.ToString().ToLower();
-
-        return new PythagorasDocument
-        {
-            Id = $"{idPrefix}-{item.Id}",
-            Type = nodeType,
-            Name = item.Name,
-            Address = item.Address != null ? $"{item.Address.Street} {item.Address.ZipCode} {item.Address.City}" : null,
-            PopularName = item.PopularName,
-            Geo = MapGeoLocation(item.GeoLocation),
-            RankScore = rankScore,
-            UpdatedAt = item.UpdatedAt,
-            Ancestors = []
+            AutocompleteType.Building => results.Where(r => string.Equals(r.Item.Id, buildingKey, StringComparison.OrdinalIgnoreCase)),
+            _ => results.Where(r => string.Equals(r.Item.Id, buildingKey, StringComparison.OrdinalIgnoreCase) ||
+                                     r.Item.Ancestors.Any(a => string.Equals(a.Id, buildingKey, StringComparison.OrdinalIgnoreCase)))
         };
     }
 
-    private static Shared.Search.GeoPoint? MapGeoLocation(GeoPointModel? geoLocationModel)
+    private static readonly Dictionary<AutocompleteType, NodeType> _autoCompleteTypeToNodeType = new()
     {
-        return geoLocationModel != null
-            ? new Shared.Search.GeoPoint { Lat = geoLocationModel.Lat, Lng = geoLocationModel.Lon }
-            : null;
-    }
-
-    private static Ancestor CreateAncestorFromDocument(PythagorasDocument doc)
-    {
-        return new Ancestor
-        {
-            Id = doc.Id,
-            Type = doc.Type,
-            Name = doc.Name,
-            PopularName = doc.PopularName
-        };
-    }
-
-#pragma warning disable IDE0051 // Remove unused private members
-    private string SerializeObject<T>(T obj) => JsonSerializer.Serialize(obj, _jsonOptions);
-#pragma warning restore IDE0051 // Remove unused private members
+        { AutocompleteType.Building, NodeType.Building },
+        { AutocompleteType.Workspace, NodeType.Room }
+    };
 }

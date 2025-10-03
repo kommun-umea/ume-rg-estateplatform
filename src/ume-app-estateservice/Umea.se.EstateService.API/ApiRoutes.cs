@@ -9,5 +9,6 @@ public class ApiRoutes : ApiRoutesBase
     public const string Workspaces = $"{RoutePrefixV1}/workspaces";
     public const string Autocomplete = $"{RoutePrefixV1}/autocomplete";
     public const string Search = $"{RoutePrefixV1}/search";
+    public const string Admin = $"{RoutePrefixV1}/admin";
     public const string EstateBuildings = $"{Estates}/{{estateId:int}}/buildings";
 }

@@ -115,7 +115,7 @@ public class EstateControllerTests
                         Origin = b.Origin,
                         CurrencyId = null,
                         CurrencyName = null,
-                        FlagStatusIds = Array.Empty<int>(),
+                        FlagStatusIds = [],
                         BusinessTypeId = null,
                         BusinessTypeName = null,
                         ProspectOfBuildingId = null,

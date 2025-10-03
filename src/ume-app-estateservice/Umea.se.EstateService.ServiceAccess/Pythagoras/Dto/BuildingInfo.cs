@@ -25,7 +25,7 @@ public sealed class BuildingInfo
     public string Origin { get; init; } = string.Empty;
     public int? CurrencyId { get; init; }
     public string? CurrencyName { get; init; }
-    public IReadOnlyList<int> FlagStatusIds { get; init; } = Array.Empty<int>();
+    public IReadOnlyList<int> FlagStatusIds { get; init; } = [];
     public int? BusinessTypeId { get; init; }
     public string? BusinessTypeName { get; init; }
     public int? ProspectOfBuildingId { get; init; }
