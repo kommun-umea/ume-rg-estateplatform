@@ -57,7 +57,7 @@ public class EstateControllerTests
         public string? LastQueryString { get; private set; }
         public string? LastEndpoint { get; private set; }
 
-        public Task<IReadOnlyList<TDto>> GetAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, CancellationToken cancellationToken) where TDto : class
+        public Task<IReadOnlyList<TDto>> GetAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, CancellationToken cancellationToken) where TDto : class, IPythagorasDto
         {
             LastEndpoint = endpoint;
             LastQueryString = query?.BuildAsQueryString();
@@ -132,7 +132,7 @@ public class EstateControllerTests
             throw new NotSupportedException("Test fake only supports Building, BuildingInfo, and BuildingInfoModel DTOs.");
         }
 
-        public IAsyncEnumerable<TDto> GetPaginatedAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, int pageSize, CancellationToken cancellationToken) where TDto : class
+        public IAsyncEnumerable<TDto> GetPaginatedAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, int pageSize, CancellationToken cancellationToken) where TDto : class, IPythagorasDto
             => throw new NotSupportedException();
     }
 }

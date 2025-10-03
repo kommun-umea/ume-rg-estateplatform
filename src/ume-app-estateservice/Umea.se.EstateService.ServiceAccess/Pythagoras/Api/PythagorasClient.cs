@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 
 namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 
@@ -10,7 +11,7 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : IPy
         PropertyNameCaseInsensitive = true
     };
 
-    public Task<IReadOnlyList<TDto>> GetAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, CancellationToken cancellationToken = default) where TDto : class
+    public Task<IReadOnlyList<TDto>> GetAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, CancellationToken cancellationToken = default) where TDto : class, IPythagorasDto
     {
         ArgumentNullException.ThrowIfNull(endpoint);
         query ??= new PythagorasQuery<TDto>();
@@ -18,7 +19,7 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : IPy
     }
 
     public async IAsyncEnumerable<TDto> GetPaginatedAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, int pageSize = 50, [EnumeratorCancellation] CancellationToken cancellationToken = default)
-        where TDto : class
+        where TDto : class, IPythagorasDto
     {
         ArgumentNullException.ThrowIfNull(endpoint);
 
@@ -55,7 +56,7 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : IPy
     }
 
     private async Task<IReadOnlyList<TDto>> QueryAsync<TDto>(string endpoint, PythagorasQuery<TDto> query, CancellationToken cancellationToken)
-        where TDto : class
+        where TDto : class, IPythagorasDto
     {
         string requestPath = NormalizeEndpoint(endpoint);
         string queryString = query.BuildAsQueryString();

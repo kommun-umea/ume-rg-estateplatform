@@ -52,7 +52,7 @@ public class RoomControllerTests
 
         public IReadOnlyList<Workspace> GetWorkspacesResult { get; set; } = [];
 
-        public Task<IReadOnlyList<T>> GetAsync<T>(string endpoint, PythagorasQuery<T>? query, CancellationToken cancellationToken) where T : class
+        public Task<IReadOnlyList<T>> GetAsync<T>(string endpoint, PythagorasQuery<T>? query, CancellationToken cancellationToken) where T : class, IPythagorasDto
         {
             LastEndpoint = endpoint;
 

@@ -2,7 +2,7 @@ using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 
 namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 
-public sealed class BuildingInfo
+public sealed class BuildingInfo : IPythagorasDto
 {
     public int Id { get; init; }
     public Guid Uid { get; init; }
