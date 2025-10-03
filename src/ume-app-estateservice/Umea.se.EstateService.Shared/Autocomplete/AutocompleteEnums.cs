@@ -4,7 +4,7 @@ public enum AutocompleteType
 {
     Any,
     Building,
-    Workspace
+    Room
 }
 
 public enum MatchedField

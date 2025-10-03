@@ -41,7 +41,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         return PythagorasBuildingInfoMapper.ToModel(payload);
     }
 
-    public async Task<IReadOnlyList<BuildingWorkspaceModel>> GetBuildingWorkspacesAsync(int buildingId, PythagorasQuery<BuildingWorkspace>? query = null, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<BuildingRoomModel>> GetBuildingWorkspacesAsync(int buildingId, PythagorasQuery<BuildingWorkspace>? query = null, CancellationToken cancellationToken = default)
     {
         if (buildingId <= 0)
         {
@@ -53,7 +53,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         return PythagorasWorkspaceMapper.ToModel(payload);
     }
 
-    public async Task<IReadOnlyList<WorkspaceModel>> GetWorkspacesAsync(PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<RoomModel>> GetRoomsAsync(PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
     {
         IReadOnlyList<Workspace> payload = await pythagorasClient.GetAsync(WorkspacesEndpoint, query, cancellationToken).ConfigureAwait(false);
         return PythagorasWorkspaceMapper.ToModel(payload);

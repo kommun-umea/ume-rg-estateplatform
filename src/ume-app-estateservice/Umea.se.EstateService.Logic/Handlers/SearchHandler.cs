@@ -99,6 +99,6 @@ public class SearchHandler(IPythagorasDocumentProvider documentProvider)
     private static readonly Dictionary<AutocompleteType, NodeType> _autoCompleteTypeToNodeType = new()
     {
         { AutocompleteType.Building, NodeType.Building },
-        { AutocompleteType.Workspace, NodeType.Room }
+        { AutocompleteType.Room, NodeType.Room }
     };
 }

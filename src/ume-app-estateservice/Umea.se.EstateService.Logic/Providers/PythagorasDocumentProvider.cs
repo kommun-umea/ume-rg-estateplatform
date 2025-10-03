@@ -48,9 +48,9 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
     {
         PythagorasQuery<Workspace> query = new();
 
-        IReadOnlyList<WorkspaceModel> workspaces = await pythagorasHandler.GetWorkspacesAsync(query);
+        IReadOnlyList<RoomModel> workspaces = await pythagorasHandler.GetRoomsAsync(query);
 
-        foreach (WorkspaceModel workspace in workspaces)
+        foreach (RoomModel workspace in workspaces)
         {
             PythagorasDocument doc = CreateDocumentFromSearchable(workspace);
 
@@ -74,7 +74,7 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
         {
             EstateModel => (NodeType.Estate, 1),
             BuildingModel => (NodeType.Building, 2),
-            WorkspaceModel => (NodeType.Room, 3),
+            RoomModel => (NodeType.Room, 3),
             _ => throw new ArgumentException($"Unknown searchable type: {item.GetType().Name}", nameof(item))
         };
 

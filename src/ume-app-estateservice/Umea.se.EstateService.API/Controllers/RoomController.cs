@@ -8,12 +8,12 @@ using Umea.se.Toolkit.Auth;
 namespace Umea.se.EstateService.API.Controllers;
 
 [Produces("application/json")]
-[Route(ApiRoutes.Workspaces)]
+[Route(ApiRoutes.Rooms)]
 [AuthorizeApiKey]
-public class WorkspaceController(IPythagorasHandler pythagorasHandler) : ControllerBase
+public class RoomController(IPythagorasHandler pythagorasHandler) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<WorkspaceModel>>> GetWorkspacesAsync([FromQuery] int[]? ids, [FromQuery] string? search, [FromQuery] int? maxResults, CancellationToken cancellationToken)
+    public async Task<ActionResult<IReadOnlyList<RoomModel>>> GetRoomsAsync([FromQuery] int[]? ids, [FromQuery] string? search, [FromQuery] int? maxResults, CancellationToken cancellationToken)
     {
         if ((ids?.Length ?? 0) > 0 && !string.IsNullOrWhiteSpace(search))
         {
@@ -42,7 +42,7 @@ public class WorkspaceController(IPythagorasHandler pythagorasHandler) : Control
             }
         }
 
-        IReadOnlyList<WorkspaceModel> workspaces = await pythagorasHandler.GetWorkspacesAsync(query, cancellationToken);
-        return Ok(workspaces);
+        IReadOnlyList<RoomModel> rooms = await pythagorasHandler.GetRoomsAsync(query, cancellationToken);
+        return Ok(rooms);
     }
 }

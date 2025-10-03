@@ -3,7 +3,7 @@ using Umea.se.EstateService.Shared.ValueObjects;
 
 namespace Umea.se.EstateService.Shared.Models;
 
-public sealed class WorkspaceModel : ISearchable
+public sealed class RoomModel : ISearchable
 {
     public int Id { get; init; }
     public Guid Uid { get; init; }
