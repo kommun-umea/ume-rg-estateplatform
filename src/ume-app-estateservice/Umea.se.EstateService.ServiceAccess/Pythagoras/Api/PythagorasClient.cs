@@ -1,15 +1,19 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
+using Umea.se.Toolkit.ExternalService;
 
 namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 
-public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : IPythagorasClient
+public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
+    : ExternalServiceBase(HttpClientNames.Pythagoras, httpClientFactory), IPythagorasClient
 {
     private static readonly JsonSerializerOptions _serializerOptions = new(JsonSerializerDefaults.Web)
     {
         PropertyNameCaseInsensitive = true
     };
+
+    protected override string PingUrl => "ping";
 
     public Task<IReadOnlyList<TDto>> GetAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, CancellationToken cancellationToken = default) where TDto : class, IPythagorasDto
     {
@@ -62,8 +66,7 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : IPy
         string queryString = query.BuildAsQueryString();
         string requestUri = BuildRequestUri(requestPath, queryString);
 
-        HttpClient client = httpClientFactory.CreateClient(HttpClientNames.Pythagoras);
-        using HttpResponseMessage response = await client.GetAsync(requestUri, cancellationToken).ConfigureAwait(false);
+        using HttpResponseMessage response = await HttpClient.GetAsync(requestUri, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         using Stream contentStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
