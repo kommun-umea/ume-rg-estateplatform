@@ -13,7 +13,7 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
         PropertyNameCaseInsensitive = true
     };
 
-    protected override string PingUrl => "ping";
+    protected override string PingUrl => "rest/v1/address/1";
 
     public Task<IReadOnlyList<TDto>> GetAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, CancellationToken cancellationToken = default) where TDto : class, IPythagorasDto
     {
