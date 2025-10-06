@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Linq;
 using Umea.se.EstateService.Logic.Search.Analysis;
 using Umea.se.EstateService.Logic.Search.Indexing;
 using Umea.se.EstateService.Shared.Search;
@@ -11,6 +12,7 @@ public sealed class InMemorySearchService
     private readonly TermIndex _idx = new();
     private readonly Dictionary<int, int> _docLengths = []; // token count per doc
     private readonly Dictionary<string, int> _termFrequencies = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, double> _idf = new(StringComparer.Ordinal);
 
     public int DocumentCount => _docs.Count;
 
@@ -67,6 +69,7 @@ public sealed class InMemorySearchService
         _idx.Prefixes.Clear();
         _docLengths.Clear();
         _termFrequencies.Clear();
+        _idf.Clear();
 
         int docId = 0;
         foreach (PythagorasDocument it in items)
@@ -110,6 +113,16 @@ public sealed class InMemorySearchService
         foreach (KeyValuePair<string, int> kv in _termFrequencies)
         {
             _symSpell.CreateDictionaryEntry(kv.Key, kv.Value);
+        }
+
+        int docCount = _docs.Count;
+        if (docCount > 0)
+        {
+            foreach (KeyValuePair<string, List<Posting>> entry in _idx.Inverted)
+            {
+                int df = entry.Value.Select(static p => p.DocId).Distinct().Count();
+                _idf[entry.Key] = ComputeIdf(docCount, df);
+            }
         }
     }
 
@@ -209,7 +222,6 @@ public sealed class InMemorySearchService
         string[] qTokens,
         string normalizedQuery)
     {
-        int N = _docs.Count;
         double avgdl = _docLengths.Count > 0 ? _docLengths.Values.Average() : 1.0;
 
         Dictionary<int, double> docScores = [];
@@ -218,26 +230,21 @@ public sealed class InMemorySearchService
 
         for (int qi = 0; qi < termCandidates.Count; qi++)
         {
+            string queryToken = qTokens[qi];
             HashSet<string> candidates = termCandidates[qi];
             HashSet<int> seenDocs = [];
+
             foreach (string term in candidates)
             {
-                if (!_idx.Inverted.TryGetValue(term, out List<Posting>? postings))
+                if (!_idx.Inverted.TryGetValue(term, out List<Posting>? postings) ||
+                    !_idf.TryGetValue(term, out double idf))
                 {
                     continue;
                 }
 
-                // document frequency for IDF
-                int df = postings.Select(p => p.DocId).Distinct().Count();
-                double idf = Math.Log(1 + (N - df + 0.5) / (df + 0.5)); // BM25-ish idf
-
-                // aggregate per doc across fields
-                IEnumerable<IGrouping<int, Posting>> byDoc = postings.GroupBy(p => p.DocId);
-                foreach (IGrouping<int, Posting> group in byDoc)
+                foreach (IGrouping<int, Posting> group in postings.GroupBy(static p => p.DocId))
                 {
                     int docId = group.Key;
-
-                    // Only score docs that are in our final candidate set
                     if (!candidateDocIds.Contains(docId))
                     {
                         continue;
@@ -245,24 +252,24 @@ public sealed class InMemorySearchService
 
                     seenDocs.Add(docId);
 
-                    // field-weighted term frequency
                     double tfWeighted = 0.0;
                     double startsWithBonus = 0.0;
                     bool popularStartsWith = false;
-                    foreach (Posting? p in group)
+
+                    foreach (Posting p in group)
                     {
                         bool isPrefixHit = p.Positions.Contains(0);
-                        bool isPrefixTermMatch = term.StartsWith(qTokens[qi], StringComparison.Ordinal);
+                        bool isRealPrefix = term.StartsWith(queryToken, StringComparison.Ordinal);
 
                         if (startsWithBonus == 0.0 &&
                             (p.Field == Field.Name || p.Field == Field.PopularName) &&
                             isPrefixHit &&
-                            isPrefixTermMatch)
+                            isRealPrefix)
                         {
                             startsWithBonus = _startsWithBonus;
                         }
 
-                        if (p.Field == Field.PopularName && isPrefixHit && isPrefixTermMatch)
+                        if (p.Field == Field.PopularName && isPrefixHit && isRealPrefix)
                         {
                             popularStartsWith = true;
                         }
@@ -270,20 +277,12 @@ public sealed class InMemorySearchService
                         tfWeighted += _w[p.Field] * p.Positions.Count;
                     }
 
-                    // BM25-lite with field weights folded into tf
-                    int dl = _docLengths[docId];
-                    const double k1 = 1.2, b = 0.75;
-                    double bm25 = idf * (tfWeighted * (k1 + 1)) / (tfWeighted + k1 * (1 - b + b * (dl / avgdl)));
-
-                    // proximity bonus: if multiple query tokens later map into same doc, we'll compute a minimal span
-                    // here we add a small self-bonus that gets amplified when spans overlap in the final pass
+                    double bm25 = ComputeBm25(tfWeighted, idf, _docLengths[docId], avgdl);
                     double proximityBonus = 0.05 * group.Count();
 
-                    double baseBoost = _typeBaseBoost.TryGetValue(_docs[docId].Type, out double boost) ? boost : 0.0;
-                    if (!docScores.TryGetValue(docId, out double s))
-                    {
-                        s = baseBoost;
-                    }
+                    double score = docScores.TryGetValue(docId, out double current)
+                        ? current
+                        : _typeBaseBoost.TryGetValue(_docs[docId].Type, out double boost) ? boost : 0.0;
 
                     if (normalizedQuery.Length > 0 && !exactMatchAwarded.Contains(docId))
                     {
@@ -292,40 +291,38 @@ public sealed class InMemorySearchService
                         if (string.Equals(normalizedName, normalizedQuery, StringComparison.Ordinal) ||
                             string.Equals(normalizedPopular, normalizedQuery, StringComparison.Ordinal))
                         {
-                            s += _exactMatchBonus;
+                            score += _exactMatchBonus;
                             exactMatchAwarded.Add(docId);
                         }
                     }
 
                     if (startsWithBonus > 0)
                     {
-                        s += startsWithBonus;
+                        score += startsWithBonus;
                     }
 
                     if (popularStartsWith)
                     {
-                        s += _popularStartsWithBonus;
+                        score += _popularStartsWithBonus;
                     }
 
-                    s += bm25 + proximityBonus;
-                    docScores[docId] = s;
+                    score += bm25 + proximityBonus;
+                    docScores[docId] = score;
 
-                    // record match representative
                     if (!matchedPerDoc.TryGetValue(docId, out Dictionary<string, string>? map))
                     {
                         matchedPerDoc[docId] = map = [];
                     }
 
-                    map[qTokens[qi]] = term;
+                    map[queryToken] = term;
                 }
             }
 
-            // coverage bonus: docs that matched this query term get a small boost
             foreach (int docId in seenDocs)
             {
-                if (docScores.TryGetValue(docId, out double value))
+                if (docScores.TryGetValue(docId, out double current))
                 {
-                    docScores[docId] = value + 0.2;
+                    docScores[docId] = current + 0.2;
                 }
             }
         }
@@ -405,6 +402,24 @@ public sealed class InMemorySearchService
             pointers[minIdx]++;
         }
         return bestSpan;
+    }
+
+    private static double ComputeIdf(int totalDocs, int documentFrequency)
+    {
+        return Math.Log(1 + (totalDocs - documentFrequency + 0.5) / (documentFrequency + 0.5));
+    }
+
+    private static double ComputeBm25(double tfWeighted, double idf, int docLength, double avgdl)
+    {
+        if (tfWeighted <= 0 || idf <= 0)
+        {
+            return 0;
+        }
+
+        const double k1 = 1.2;
+        const double b = 0.75;
+        double denominator = tfWeighted + k1 * (1 - b + b * (docLength / avgdl));
+        return denominator <= 0 ? 0 : idf * (tfWeighted * (k1 + 1)) / denominator;
     }
 
     private IEnumerable<SearchResult> ComposeResults(
