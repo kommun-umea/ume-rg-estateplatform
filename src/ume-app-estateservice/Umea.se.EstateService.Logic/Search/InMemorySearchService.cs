@@ -21,7 +21,7 @@ public sealed class InMemorySearchService
     private readonly Dictionary<Field, double> _w = new()
     {
         { Field.Name, 20.0 },
-        { Field.PopularName, 15.0 },
+        { Field.PopularName, 25.0 },
         { Field.Path, 2.0 },
         { Field.AncestorName, 1.5 },
         { Field.AncestorPopularName, 1.0 },
@@ -29,6 +29,20 @@ public sealed class InMemorySearchService
 
     // strong bump when the term hits the start of key fields
     private readonly double _startsWithBonus = 50.0;
+
+    // bonus for full-field matches to keep exact hits ahead of longer prefixes
+    private readonly double _exactMatchBonus = 60.0;
+
+    // extra reward when the popular name starts with the query
+    private readonly double _popularStartsWithBonus = 12.0;
+
+    // prefer broader results by default unless overridden by field matches
+    private readonly Dictionary<NodeType, double> _typeBaseBoost = new()
+    {
+        { NodeType.Estate, 15.0 },
+        { NodeType.Building, 0.0 },
+        { NodeType.Room, 0.0 }
+    };
 
     public InMemorySearchService(IEnumerable<PythagorasDocument> items)
     {
@@ -192,13 +206,15 @@ public sealed class InMemorySearchService
     private (Dictionary<int, double>, Dictionary<int, Dictionary<string, string>>) ScoreDocuments(
         List<HashSet<string>> termCandidates,
         HashSet<int> candidateDocIds,
-        string[] qTokens)
+        string[] qTokens,
+        string normalizedQuery)
     {
         int N = _docs.Count;
         double avgdl = _docLengths.Count > 0 ? _docLengths.Values.Average() : 1.0;
 
         Dictionary<int, double> docScores = [];
         Dictionary<int, Dictionary<string, string>> matchedPerDoc = []; // queryToken -> matchedIndexTerm
+        HashSet<int> exactMatchAwarded = [];
 
         for (int qi = 0; qi < termCandidates.Count; qi++)
         {
@@ -232,18 +248,26 @@ public sealed class InMemorySearchService
                     // field-weighted term frequency
                     double tfWeighted = 0.0;
                     double startsWithBonus = 0.0;
-                    Dictionary<Field, List<int>> fieldPositions = [];
+                    bool popularStartsWith = false;
                     foreach (Posting? p in group)
                     {
+                        bool isPrefixHit = p.Positions.Contains(0);
+                        bool isPrefixTermMatch = term.StartsWith(qTokens[qi], StringComparison.Ordinal);
+
                         if (startsWithBonus == 0.0 &&
                             (p.Field == Field.Name || p.Field == Field.PopularName) &&
-                            p.Positions.Contains(0))
+                            isPrefixHit &&
+                            isPrefixTermMatch)
                         {
                             startsWithBonus = _startsWithBonus;
                         }
 
+                        if (p.Field == Field.PopularName && isPrefixHit && isPrefixTermMatch)
+                        {
+                            popularStartsWith = true;
+                        }
+
                         tfWeighted += _w[p.Field] * p.Positions.Count;
-                        fieldPositions[p.Field] = p.Positions;
                     }
 
                     // BM25-lite with field weights folded into tf
@@ -255,12 +279,35 @@ public sealed class InMemorySearchService
                     // here we add a small self-bonus that gets amplified when spans overlap in the final pass
                     double proximityBonus = 0.05 * group.Count();
 
+                    double baseBoost = _typeBaseBoost.TryGetValue(_docs[docId].Type, out double boost) ? boost : 0.0;
                     if (!docScores.TryGetValue(docId, out double s))
                     {
-                        s = 0;
+                        s = baseBoost;
                     }
 
-                    s += bm25 + proximityBonus + startsWithBonus;
+                    if (normalizedQuery.Length > 0 && !exactMatchAwarded.Contains(docId))
+                    {
+                        string normalizedName = TextNormalizer.Normalize(_docs[docId].Name).Trim();
+                        string normalizedPopular = TextNormalizer.Normalize(_docs[docId].PopularName ?? string.Empty).Trim();
+                        if (string.Equals(normalizedName, normalizedQuery, StringComparison.Ordinal) ||
+                            string.Equals(normalizedPopular, normalizedQuery, StringComparison.Ordinal))
+                        {
+                            s += _exactMatchBonus;
+                            exactMatchAwarded.Add(docId);
+                        }
+                    }
+
+                    if (startsWithBonus > 0)
+                    {
+                        s += startsWithBonus;
+                    }
+
+                    if (popularStartsWith)
+                    {
+                        s += _popularStartsWithBonus;
+                    }
+
+                    s += bm25 + proximityBonus;
                     docScores[docId] = s;
 
                     // record match representative
@@ -318,7 +365,8 @@ public sealed class InMemorySearchService
             int bestSpan = CalculateMinimalSpan(posLists);
             if (bestSpan != int.MaxValue)
             {
-                docScores[docId] += 1.0 / (1.0 + bestSpan); // closer = bigger boost
+                double increment = 1.0 / (1.0 + bestSpan);
+                docScores[docId] += increment; // closer = bigger boost
             }
         }
     }
@@ -377,7 +425,10 @@ public sealed class InMemorySearchService
 
         SearchResult[] results = [.. sortedDocs
             .Take(options.MaxResults)
-            .Select(kv2 => new SearchResult(_docs[kv2.Key], kv2.Value, matchedPerDoc.TryGetValue(kv2.Key, out Dictionary<string, string>? m) ? m : []))];
+            .Select(kv2 => new SearchResult(
+                _docs[kv2.Key],
+                kv2.Value,
+                matchedPerDoc.TryGetValue(kv2.Key, out Dictionary<string, string>? m) ? m : []))];
 
         return results;
     }
@@ -385,6 +436,7 @@ public sealed class InMemorySearchService
     public IEnumerable<SearchResult> Search(string query, QueryOptions? options = null)
     {
         options ??= new QueryOptions();
+        string normalizedQuery = TextNormalizer.Normalize(query ?? string.Empty).Trim();
         string[] qTokens = [.. TextNormalizer.Tokenize(query)];
 
         if (qTokens.Length == 0)
@@ -401,7 +453,7 @@ public sealed class InMemorySearchService
         }
 
         (Dictionary<int, double> docScores, Dictionary<int, Dictionary<string, string>> matchedPerDoc) =
-            ScoreDocuments(termCandidates, candidateDocIds, qTokens);
+            ScoreDocuments(termCandidates, candidateDocIds, qTokens, normalizedQuery);
 
         ApplyProximityBonus(docScores, matchedPerDoc);
 
