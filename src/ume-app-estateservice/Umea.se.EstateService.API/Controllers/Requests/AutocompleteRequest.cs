@@ -30,7 +30,7 @@ public sealed record AutocompleteRequest : IValidatableObject
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        if (Type is AutocompleteType.Workspace && BuildingId is int id && id <= 0)
+        if (Type is AutocompleteType.Room && BuildingId is int id && id <= 0)
         {
             yield return new ValidationResult(
                 "BuildingId must be positive when provided for workspace autocomplete.",

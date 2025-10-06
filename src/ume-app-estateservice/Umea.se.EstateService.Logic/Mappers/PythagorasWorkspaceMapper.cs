@@ -5,11 +5,11 @@ namespace Umea.se.EstateService.Logic.Mappers;
 
 public static class PythagorasWorkspaceMapper
 {
-    public static BuildingWorkspaceModel ToModel(BuildingWorkspace dto)
+    public static BuildingRoomModel ToModel(BuildingWorkspace dto)
     {
         ArgumentNullException.ThrowIfNull(dto);
 
-        return new BuildingWorkspaceModel
+        return new BuildingRoomModel
         {
             Id = dto.Id,
             Uid = dto.Uid,
@@ -41,7 +41,7 @@ public static class PythagorasWorkspaceMapper
         };
     }
 
-    public static IReadOnlyList<BuildingWorkspaceModel> ToModel(IReadOnlyList<BuildingWorkspace> dtos)
+    public static IReadOnlyList<BuildingRoomModel> ToModel(IReadOnlyList<BuildingWorkspace> dtos)
     {
         ArgumentNullException.ThrowIfNull(dtos);
 
@@ -50,7 +50,7 @@ public static class PythagorasWorkspaceMapper
             return [];
         }
 
-        BuildingWorkspaceModel[] buffer = new BuildingWorkspaceModel[dtos.Count];
+        BuildingRoomModel[] buffer = new BuildingRoomModel[dtos.Count];
         for (int i = 0; i < dtos.Count; i++)
         {
             buffer[i] = ToModel(dtos[i]);
@@ -59,11 +59,11 @@ public static class PythagorasWorkspaceMapper
         return buffer;
     }
 
-    public static WorkspaceModel ToDomain(Workspace dto)
+    public static RoomModel ToDomain(Workspace dto)
     {
         ArgumentNullException.ThrowIfNull(dto);
 
-        return new WorkspaceModel
+        return new RoomModel
         {
             Id = dto.Id,
             Uid = dto.Uid,
@@ -83,7 +83,7 @@ public static class PythagorasWorkspaceMapper
         };
     }
 
-    public static IReadOnlyList<WorkspaceModel> ToModel(IReadOnlyList<Workspace> dtos)
+    public static IReadOnlyList<RoomModel> ToModel(IReadOnlyList<Workspace> dtos)
     {
         ArgumentNullException.ThrowIfNull(dtos);
 
@@ -92,7 +92,7 @@ public static class PythagorasWorkspaceMapper
             return [];
         }
 
-        WorkspaceModel[] buffer = new WorkspaceModel[dtos.Count];
+        RoomModel[] buffer = new RoomModel[dtos.Count];
         for (int i = 0; i < dtos.Count; i++)
         {
             buffer[i] = ToDomain(dtos[i]);

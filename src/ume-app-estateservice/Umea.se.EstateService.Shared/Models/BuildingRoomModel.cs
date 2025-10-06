@@ -1,6 +1,6 @@
-namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
+namespace Umea.se.EstateService.Shared.Models;
 
-public sealed class BuildingWorkspace : IPythagorasDto
+public sealed class BuildingRoomModel
 {
     public int Id { get; init; }
     public Guid Uid { get; init; }
@@ -10,8 +10,6 @@ public sealed class BuildingWorkspace : IPythagorasDto
     public string? PopularName { get; init; }
     public double GrossArea { get; init; }
     public double NetArea { get; init; }
-    public bool NotCleanable { get; init; }
-    public bool ChangedByErrand { get; init; }
     public double UpliftedArea { get; init; }
     public double CommonArea { get; init; }
     public double Cost { get; init; }
@@ -27,10 +25,8 @@ public sealed class BuildingWorkspace : IPythagorasDto
     public string BuildingName { get; init; } = string.Empty;
     public string? BuildingPopularName { get; init; }
     public string? BuildingOrigin { get; init; }
-    public int? StatusId { get; init; }
     public string? StatusName { get; init; }
     public string? StatusColor { get; init; }
-    public int? RentalStatusId { get; init; }
     public string? RentalStatusName { get; init; }
     public string? RentalStatusColor { get; init; }
 }

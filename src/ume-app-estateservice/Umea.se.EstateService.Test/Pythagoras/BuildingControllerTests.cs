@@ -87,7 +87,7 @@ public class BuildingControllerTests
     }
 
     [Fact]
-    public async Task GetBuildingWorkspacesAsync_ReturnsMappedWorkspaces()
+    public async Task GetBuildingRoomsAsync_ReturnsMappedRooms()
     {
         FakePythagorasClient client = new()
         {
@@ -100,10 +100,10 @@ public class BuildingControllerTests
         PythagorasHandler service = new(client);
         BuildingController controller = new(service);
 
-        IReadOnlyList<BuildingWorkspaceModel> result = await controller.GetBuildingWorkspacesAsync(1, CancellationToken.None);
+        IReadOnlyList<BuildingRoomModel> result = await controller.GetBuildingRoomsAsync(1, CancellationToken.None);
 
-        BuildingWorkspaceModel workspace = result.ShouldHaveSingleItem();
-        workspace.Id.ShouldBe(10);
+        BuildingRoomModel room = result.ShouldHaveSingleItem();
+        room.Id.ShouldBe(10);
         client.LastEndpoint.ShouldBe("rest/v1/building/1/workspace/info");
     }
 
@@ -115,7 +115,7 @@ public class BuildingControllerTests
 
         public string? LastEndpoint { get; private set; }
 
-        public Task<IReadOnlyList<TDto>> GetAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, CancellationToken cancellationToken) where TDto : class
+        public Task<IReadOnlyList<TDto>> GetAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, CancellationToken cancellationToken) where TDto : class, IPythagorasDto
         {
             if (typeof(TDto) != typeof(BuildingInfo))
             {
@@ -134,7 +134,7 @@ public class BuildingControllerTests
             return Task.FromResult((IReadOnlyList<TDto>)(object)GetAsyncResult);
         }
 
-        public IAsyncEnumerable<TDto> GetPaginatedAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, int pageSize, CancellationToken cancellationToken) where TDto : class
+        public IAsyncEnumerable<TDto> GetPaginatedAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, int pageSize, CancellationToken cancellationToken) where TDto : class, IPythagorasDto
             => throw new NotSupportedException();
     }
 }

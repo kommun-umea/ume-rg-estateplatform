@@ -39,8 +39,8 @@ public class BuildingController(IPythagorasHandler pythagorasService) : Controll
         return buildings;
     }
 
-    [HttpGet("{buildingId:int}/workspaces")]
-    public Task<IReadOnlyList<BuildingWorkspaceModel>> GetBuildingWorkspacesAsync(int buildingId, CancellationToken cancellationToken)
+    [HttpGet("{buildingId:int}/rooms")]
+    public Task<IReadOnlyList<BuildingRoomModel>> GetBuildingRoomsAsync(int buildingId, CancellationToken cancellationToken)
     {
         return pythagorasService.GetBuildingWorkspacesAsync(buildingId, cancellationToken: cancellationToken);
     }

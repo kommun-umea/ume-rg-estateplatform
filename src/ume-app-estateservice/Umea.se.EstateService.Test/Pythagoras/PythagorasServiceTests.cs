@@ -114,12 +114,12 @@ public class PythagorasHandlerTests
 
         PythagorasHandler service = new(client);
 
-        IReadOnlyList<BuildingWorkspaceModel> result = await service.GetBuildingWorkspacesAsync(99);
+        IReadOnlyList<BuildingRoomModel> result = await service.GetBuildingWorkspacesAsync(99);
 
         client.GetAsyncCalled.ShouldBeTrue();
         client.LastEndpoint.ShouldBe("rest/v1/building/99/workspace/info");
-        BuildingWorkspaceModel workspace = result.ShouldHaveSingleItem();
-        workspace.Id.ShouldBe(5);
+        BuildingRoomModel room = result.ShouldHaveSingleItem();
+        room.Id.ShouldBe(5);
     }
 
     [Fact]
@@ -132,13 +132,13 @@ public class PythagorasHandlerTests
 
         PythagorasHandler service = new(client);
 
-        IReadOnlyList<WorkspaceModel> result = await service.GetWorkspacesAsync();
+        IReadOnlyList<RoomModel> result = await service.GetRoomsAsync();
 
         client.GetAsyncCalled.ShouldBeTrue();
         client.LastEndpoint.ShouldBe("rest/v1/workspace/info");
         client.LastQuery.ShouldBeNull();
-        WorkspaceModel workspace = result.ShouldHaveSingleItem();
-        workspace.Id.ShouldBe(7);
+        RoomModel room = result.ShouldHaveSingleItem();
+        room.Id.ShouldBe(7);
     }
 
     private sealed class FakePythagorasClient : IPythagorasClient
@@ -154,7 +154,7 @@ public class PythagorasHandlerTests
         public IReadOnlyList<Workspace> GetWorkspacesResult { get; set; } = [];
         public string? LastEndpoint { get; private set; }
 
-        public Task<IReadOnlyList<TDto>> GetAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, CancellationToken cancellationToken) where TDto : class
+        public Task<IReadOnlyList<TDto>> GetAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, CancellationToken cancellationToken) where TDto : class, IPythagorasDto
         {
             GetAsyncCalled = true;
             LastEndpoint = endpoint;
@@ -182,18 +182,6 @@ public class PythagorasHandlerTests
             }
 
             throw new NotSupportedException("Test fake does not support the requested DTO type.");
-        }
-
-        public Task<IReadOnlyList<TDto>> GetOldAsync<TDto>(string endpoint, Action<PythagorasQuery<TDto>>? configure, CancellationToken cancellationToken) where TDto : class
-        {
-            PythagorasQuery<TDto>? query = null;
-            if (configure is not null)
-            {
-                query = new PythagorasQuery<TDto>();
-                configure(query);
-            }
-
-            return GetAsync(endpoint, query, cancellationToken);
         }
     }
 }

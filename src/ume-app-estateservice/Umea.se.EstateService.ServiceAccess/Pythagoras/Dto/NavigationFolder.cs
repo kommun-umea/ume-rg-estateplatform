@@ -1,6 +1,6 @@
 namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 
-public sealed class NavigationFolder
+public sealed class NavigationFolder : IPythagorasDto
 {
     public int Id { get; init; }
     public string RowId { get; init; } = string.Empty;
