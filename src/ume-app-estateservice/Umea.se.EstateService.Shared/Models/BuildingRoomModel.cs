@@ -12,8 +12,6 @@ public sealed class BuildingRoomModel
     public double NetArea { get; init; }
     public double UpliftedArea { get; init; }
     public double CommonArea { get; init; }
-    public double Cost { get; init; }
-    public double Price { get; init; }
     public int Capacity { get; init; }
     public int OptimalCapacity { get; init; }
     public int? FloorId { get; init; }
@@ -24,9 +22,5 @@ public sealed class BuildingRoomModel
     public Guid BuildingUid { get; init; }
     public string BuildingName { get; init; } = string.Empty;
     public string? BuildingPopularName { get; init; }
-    public string? BuildingOrigin { get; init; }
-    public string? StatusName { get; init; }
-    public string? StatusColor { get; init; }
-    public string? RentalStatusName { get; init; }
-    public string? RentalStatusColor { get; init; }
+    
 }

@@ -47,8 +47,6 @@ public class PythagorasWorkspaceMapperTests
         model.Name.ShouldBe(dto.Name);
         model.PopularName.ShouldBe(dto.PopularName);
         model.GrossArea.ShouldBe(dto.GrossArea);
-        model.StatusName.ShouldBe(dto.StatusName);
-        model.RentalStatusColor.ShouldBe(dto.RentalStatusColor);
         model.BuildingName.ShouldBe(dto.BuildingName);
     }
 

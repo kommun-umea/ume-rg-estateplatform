@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.Logic.Mappers;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
@@ -12,6 +14,8 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
     private const string WorkspacesEndpoint = "rest/v1/workspace/info";
     private const string BuildingsInfoEndpoint = "rest/v1/building/info";
     private const string NavigationFoldersEndpoint = "rest/v1/navigationfolder/info";
+    private static string BuildingFloorsEndpoint(int buildingId) => $"rest/v1/building/{buildingId}/floor";
+    private static string FloorWorkspacesEndpoint(int floorId) => $"rest/v1/floor/{floorId}/workspace/info";
 
     private static string BuildingWorkspacesEndpoint(int buildingId) => $"rest/v1/building/{buildingId}/workspace/info";
 
@@ -51,6 +55,47 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         string endpoint = BuildingWorkspacesEndpoint(buildingId);
         IReadOnlyList<BuildingWorkspace> payload = await pythagorasClient.GetAsync(endpoint, query, cancellationToken).ConfigureAwait(false);
         return PythagorasWorkspaceMapper.ToModel(payload);
+    }
+
+    public async Task<IReadOnlyList<FloorWithRoomsModel>> GetBuildingFloorsWithRoomsAsync(
+        int buildingId,
+        PythagorasQuery<Floor>? floorQuery = null,
+        PythagorasQuery<BuildingWorkspace>? workspaceQuery = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (buildingId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
+        }
+
+        IReadOnlyList<Floor> floors = await pythagorasClient
+            .GetAsync(BuildingFloorsEndpoint(buildingId), floorQuery, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (floors.Count == 0)
+        {
+            return Array.Empty<FloorWithRoomsModel>();
+        }
+
+        List<FloorWithRoomsModel> result = new(floors.Count);
+        foreach (Floor floor in floors)
+        {
+            if (floor.Id <= 0)
+            {
+                result.Add(PythagorasFloorMapper.ToModel(floor));
+                continue;
+            }
+
+            IReadOnlyList<BuildingWorkspace> workspaceDtos = await pythagorasClient
+                .GetAsync(FloorWorkspacesEndpoint(floor.Id), workspaceQuery, cancellationToken)
+                .ConfigureAwait(false);
+
+            IReadOnlyList<BuildingRoomModel> rooms = PythagorasWorkspaceMapper.ToModel(workspaceDtos);
+            FloorWithRoomsModel model = PythagorasFloorMapper.ToModel(floor, rooms);
+            result.Add(model);
+        }
+
+        return result;
     }
 
     public async Task<IReadOnlyList<RoomModel>> GetRoomsAsync(PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
