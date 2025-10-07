@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
 using Umea.se.EstateService.Logic.HostedServices;
 using Umea.se.Toolkit.Auth;
 
@@ -9,7 +10,24 @@ namespace Umea.se.EstateService.API.Controllers;
 [AuthorizeApiKey]
 public sealed class AdminController(SearchIndexRefreshService refreshService) : ControllerBase
 {
+    /// <summary>
+    /// Triggers a manual refresh of the search index.
+    /// </summary>
+    /// <remarks>
+    /// Starts a background refresh of the search index. If a refresh is already running, the request is accepted but no new refresh is started.
+    /// </remarks>
+    /// <returns>
+    /// 202 Accepted with a message indicating whether the refresh was started or already running.
+    /// </returns>
+    /// <response code="202">Refresh started or already running</response>
+    /// <response code="500">Unknown refresh status</response>
     [HttpPost("refresh-index")]
+    [SwaggerOperation(
+        Summary = "Trigger manual search index refresh",
+        Description = "Starts a background refresh of the search index. If a refresh is already running, the request is accepted but no new refresh is started."
+    )]
+    [ProducesResponseType(typeof(object), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(typeof(object), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> RefreshIndex()
     {
         RefreshStatus status = await refreshService.TriggerManualRefreshAsync().ConfigureAwait(false);
@@ -22,7 +40,22 @@ public sealed class AdminController(SearchIndexRefreshService refreshService) : 
         };
     }
 
+    /// <summary>
+    /// Gets information about the current search index status.
+    /// </summary>
+    /// <remarks>
+    /// Returns details such as document count, last and next refresh times, refresh interval, and whether a refresh is in progress.
+    /// </remarks>
+    /// <returns>
+    /// 200 OK with search index information.
+    /// </returns>
+    /// <response code="200">Returns search index status information</response>
     [HttpGet("index-info")]
+    [SwaggerOperation(
+        Summary = "Get search index status information",
+        Description = "Returns details about the search index, including document count, last and next refresh times, refresh interval, and refresh status."
+    )]
+    [ProducesResponseType(typeof(SearchIndexInfo), StatusCodes.Status200OK)]
     public IActionResult GetIndexInfo()
     {
         SearchIndexInfo info = refreshService.GetIndexInfo();
