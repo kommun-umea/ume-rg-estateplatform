@@ -21,8 +21,6 @@ public static class PythagorasWorkspaceMapper
             NetArea = dto.NetArea,
             UpliftedArea = dto.UpliftedArea,
             CommonArea = dto.CommonArea,
-            Cost = dto.Cost,
-            Price = dto.Price,
             Capacity = dto.Capacity,
             OptimalCapacity = dto.OptimalCapacity,
             FloorId = dto.FloorId,
@@ -33,11 +31,6 @@ public static class PythagorasWorkspaceMapper
             BuildingUid = dto.BuildingUid,
             BuildingName = dto.BuildingName ?? string.Empty,
             BuildingPopularName = dto.BuildingPopularName,
-            BuildingOrigin = dto.BuildingOrigin,
-            StatusName = dto.StatusName,
-            StatusColor = dto.StatusColor,
-            RentalStatusName = dto.RentalStatusName,
-            RentalStatusColor = dto.RentalStatusColor
         };
     }
 
