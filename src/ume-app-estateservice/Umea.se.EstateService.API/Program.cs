@@ -1,6 +1,5 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Umea.se.EstateService.API;
 using Umea.se.EstateService.Logic;
 using Umea.se.EstateService.ServiceAccess;
@@ -39,9 +38,7 @@ builder.Services.AddAuthentication(options =>
 
 });
 
-builder.Services
-    .AddOpenTelemetry()
-    .UseAzureMonitor(options => { options.ConnectionString = config.ApplicationInsightsConnectionString; });
+builder.Logging.UseDefaultLoggers(config);
 
 // Swagger
 builder.Services.AddDefaultSwagger(config);
