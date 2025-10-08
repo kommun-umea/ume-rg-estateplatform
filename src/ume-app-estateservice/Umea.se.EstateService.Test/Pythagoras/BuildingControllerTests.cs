@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Mvc;
 using Umea.se.EstateService.API.Controllers;
+using Umea.se.EstateService.API.Controllers.Requests;
 using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
@@ -23,7 +25,7 @@ public class BuildingControllerTests
         PythagorasHandler service = new(client);
         BuildingController controller = new(service);
 
-        IReadOnlyList<BuildingInfoModel> buildings = await controller.GetBuildingsAsync(CancellationToken.None);
+        IReadOnlyList<BuildingInfoModel> buildings = await controller.GetBuildingsAsync(new BuildingListRequest(), CancellationToken.None);
 
         buildings.Select(b => b.Id).ShouldBe(new[] { 1, 2 });
         client.LastQueryString.ShouldBe("maxResults=50");
@@ -31,7 +33,7 @@ public class BuildingControllerTests
     }
 
     [Fact]
-    public async Task GetBuildingsContainingAsync_FiltersByNameContains()
+    public async Task GetBuildingsAsync_WithSearchTerm_FiltersByNameContains()
     {
         FakePythagorasClient client = new()
         {
@@ -44,46 +46,17 @@ public class BuildingControllerTests
         PythagorasHandler service = new(client);
         BuildingController controller = new(service);
 
-        IReadOnlyList<BuildingInfoModel> buildings = await controller.GetBuildingsContainingAsync("alp", CancellationToken.None);
+        IReadOnlyList<BuildingInfoModel> buildings = await controller.GetBuildingsAsync(
+            new BuildingListRequest { SearchTerm = "alp" },
+            CancellationToken.None);
 
         BuildingInfoModel building = buildings.ShouldHaveSingleItem();
         building.Name.ShouldBe("Alpha");
 
-        Dictionary<string, List<string>> query = Parse(client.LastQueryString);
-
-        string parameterName = query["pN[]"].ShouldHaveSingleItem();
-        parameterName.ShouldBe("ILIKEAW:name");
-        string parameterValue = query["pV[]"].ShouldHaveSingleItem();
-        parameterValue.ShouldBe("alp");
+        client.LastQueryString.ShouldNotBeNull();
+        client.LastQueryString.ShouldContain("generalSearch=alp");
+        client.LastQueryString.ShouldContain("maxResults=50");
         client.LastEndpoint.ShouldBe("rest/v1/building/info");
-    }
-
-    private static Dictionary<string, List<string>> Parse(string? query)
-    {
-        Dictionary<string, List<string>> result = new(StringComparer.Ordinal);
-
-        if (string.IsNullOrEmpty(query))
-        {
-            return result;
-        }
-
-        string[] pairs = query.Split('&', StringSplitOptions.RemoveEmptyEntries);
-        foreach (string pair in pairs)
-        {
-            string[] kv = pair.Split('=', 2);
-            string key = Uri.UnescapeDataString(kv[0]);
-            string value = kv.Length > 1 ? Uri.UnescapeDataString(kv[1]) : string.Empty;
-
-            if (!result.TryGetValue(key, out List<string>? list))
-            {
-                list = [];
-                result[key] = list;
-            }
-
-            list.Add(value);
-        }
-
-        return result;
     }
 
     [Fact]
@@ -100,38 +73,76 @@ public class BuildingControllerTests
         PythagorasHandler service = new(client);
         BuildingController controller = new(service);
 
-        IReadOnlyList<BuildingRoomModel> result = await controller.GetBuildingRoomsAsync(1, CancellationToken.None);
+        IReadOnlyList<BuildingRoomModel> result = await controller.GetBuildingRoomsAsync(1, new BuildingRoomsRequest(), CancellationToken.None);
 
         BuildingRoomModel room = result.ShouldHaveSingleItem();
         room.Id.ShouldBe(10);
+        client.LastQueryString.ShouldBe("maxResults=50");
         client.LastEndpoint.ShouldBe("rest/v1/building/1/workspace/info");
+    }
+
+    [Fact]
+    public async Task GetBuildingFloorsAsync_AppliesQueryParameters()
+    {
+        FakePythagorasClient client = new()
+        {
+            GetBuildingFloorsResult =
+            [
+                new() { Id = 5, Uid = Guid.NewGuid(), Name = "Floor 1" }
+            ],
+            GetBuildingWorkspacesResult = []
+        };
+
+        PythagorasHandler service = new(client);
+        BuildingController controller = new(service);
+
+        ActionResult<IReadOnlyList<FloorWithRoomsModel>> response = await controller.GetBuildingFloorsAsync(
+            1,
+            new BuildingFloorsRequest { Limit = 1, Offset = 5, SearchTerm = "floor" },
+            CancellationToken.None);
+
+        OkObjectResult ok = response.Result.ShouldBeOfType<OkObjectResult>();
+        IReadOnlyList<FloorWithRoomsModel>? floors = ok.Value.ShouldBeAssignableTo<IReadOnlyList<FloorWithRoomsModel>>();
+        floors.ShouldHaveSingleItem().Id.ShouldBe(5);
+
+        client.LastFloorQueryString.ShouldNotBeNull();
+        client.LastFloorQueryString.ShouldContain("generalSearch=floor");
+        client.LastFloorQueryString.ShouldContain("firstResult=5");
+        client.LastFloorQueryString.ShouldContain("maxResults=1");
+        client.LastEndpoint.ShouldBe("rest/v1/floor/5/workspace/info");
     }
 
     private sealed class FakePythagorasClient : IPythagorasClient
     {
         public IReadOnlyList<BuildingInfo> GetAsyncResult { get; set; } = [];
         public IReadOnlyList<BuildingWorkspace> GetBuildingWorkspacesResult { get; set; } = [];
+        public IReadOnlyList<Floor> GetBuildingFloorsResult { get; set; } = [];
         public string? LastQueryString { get; private set; }
-
+        public string? LastFloorQueryString { get; private set; }
         public string? LastEndpoint { get; private set; }
 
         public Task<IReadOnlyList<TDto>> GetAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, CancellationToken cancellationToken) where TDto : class, IPythagorasDto
         {
-            if (typeof(TDto) != typeof(BuildingInfo))
-            {
-                if (typeof(TDto) == typeof(BuildingWorkspace))
-                {
-                    LastEndpoint = endpoint;
-                    return Task.FromResult((IReadOnlyList<TDto>)(object)GetBuildingWorkspacesResult);
-                }
-
-                throw new NotSupportedException("Test fake only supports Building and BuildingWorkspace DTOs.");
-            }
-
             LastEndpoint = endpoint;
             LastQueryString = query?.BuildAsQueryString();
 
-            return Task.FromResult((IReadOnlyList<TDto>)(object)GetAsyncResult);
+            if (typeof(TDto) == typeof(BuildingInfo))
+            {
+                return Task.FromResult((IReadOnlyList<TDto>)(object)GetAsyncResult);
+            }
+
+            if (typeof(TDto) == typeof(BuildingWorkspace))
+            {
+                return Task.FromResult((IReadOnlyList<TDto>)(object)GetBuildingWorkspacesResult);
+            }
+
+            if (typeof(TDto) == typeof(Floor))
+            {
+                LastFloorQueryString = LastQueryString;
+                return Task.FromResult((IReadOnlyList<TDto>)(object)GetBuildingFloorsResult);
+            }
+
+            throw new NotSupportedException("Test fake only supports Building, Floor, and BuildingWorkspace DTOs.");
         }
 
         public IAsyncEnumerable<TDto> GetPaginatedAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, int pageSize, CancellationToken cancellationToken) where TDto : class, IPythagorasDto

@@ -1,4 +1,5 @@
 using Umea.se.EstateService.API.Controllers;
+using Umea.se.EstateService.API.Controllers.Requests;
 using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
@@ -23,7 +24,7 @@ public class EstateControllerTests
         PythagorasHandler service = new(client);
         EstateController controller = new(service);
 
-        IReadOnlyList<BuildingInfoModel> buildings = await controller.GetEstateBuildingsAsync(123, CancellationToken.None);
+        IReadOnlyList<BuildingInfoModel> buildings = await controller.GetEstateBuildingsAsync(123, new PagedQueryRequest(), CancellationToken.None);
 
         buildings.Count.ShouldBe(2);
         buildings.Select(b => b.Id).ShouldBe(new[] { 10, 11 });
@@ -43,7 +44,7 @@ public class EstateControllerTests
         PythagorasHandler service = new(client);
         EstateController controller = new(service);
 
-        IReadOnlyList<BuildingInfoModel> buildings = await controller.GetEstateBuildingsAsync(456, CancellationToken.None);
+        IReadOnlyList<BuildingInfoModel> buildings = await controller.GetEstateBuildingsAsync(456, new PagedQueryRequest(), CancellationToken.None);
 
         buildings.ShouldBeEmpty();
         client.LastQueryString.ShouldNotBeNull();
