@@ -1,6 +1,4 @@
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
@@ -36,7 +34,7 @@ public class RoomController(IPythagorasHandler pythagorasHandler) : ControllerBa
         [FromQuery] RoomListRequest request,
         CancellationToken cancellationToken)
     {
-        if (!ValidateRequest(request))
+        if (!TryValidateModel(request))
         {
             return ValidationProblem(ModelState);
         }
@@ -66,23 +64,4 @@ public class RoomController(IPythagorasHandler pythagorasHandler) : ControllerBa
         return query;
     }
 
-    private bool ValidateRequest(RoomListRequest request)
-    {
-        ValidationContext context = new(request);
-        List<ValidationResult> results = new List<ValidationResult>();
-
-        if (Validator.TryValidateObject(request, context, results, validateAllProperties: true))
-        {
-            return true;
-        }
-
-        foreach (ValidationResult result in results)
-        {
-            string key = result.MemberNames.FirstOrDefault() ?? string.Empty;
-            string error = result.ErrorMessage ?? "Invalid parameter combination.";
-            ModelState.AddModelError(key, error);
-        }
-
-        return false;
-    }
 }

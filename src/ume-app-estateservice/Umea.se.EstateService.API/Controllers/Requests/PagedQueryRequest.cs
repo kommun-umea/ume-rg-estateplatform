@@ -7,7 +7,7 @@ namespace Umea.se.EstateService.API.Controllers.Requests;
 /// <summary>
 /// Provides shared paging and search query parameters for list endpoints.
 /// </summary>
-public record class PagedQueryRequest
+public record PagedQueryRequest
 {
     /// <summary>
     /// The default number of items returned when no limit is provided.

@@ -8,7 +8,7 @@ namespace Umea.se.EstateService.API.Controllers.Requests;
 /// <summary>
 /// Query parameters for retrieving rooms.
 /// </summary>
-public sealed record class RoomListRequest : PagedQueryRequest, IValidatableObject
+public sealed record RoomListRequest : PagedQueryRequest, IValidatableObject
 {
     /// <summary>
     /// Explicit room identifiers to include in the response.

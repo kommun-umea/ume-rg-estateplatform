@@ -6,7 +6,7 @@ namespace Umea.se.EstateService.API.Controllers.Requests;
 /// <summary>
 /// Query parameters for retrieving estates.
 /// </summary>
-public sealed record class EstateListRequest : PagedQueryRequest
+public sealed record EstateListRequest : PagedQueryRequest
 {
     /// <summary>
     /// Indicates whether to include buildings for each estate in the response.
