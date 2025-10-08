@@ -1,10 +1,10 @@
-using System.Collections.Generic;
 using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.EstateService.Shared.ValueObjects;
+using Umea.se.EstateService.Test.TestHelpers;
 
 namespace Umea.se.EstateService.Test.Pythagoras;
 
@@ -13,10 +13,9 @@ public class PythagorasHandlerTests
     [Fact]
     public async Task GetBuildingsAsync_DelegatesToClient()
     {
-        FakePythagorasClient client = new()
-        {
-            GetBuildingInfoResult = [new() { Id = 42 }]
-        };
+        FakePythagorasClient client = new();
+        client.SetGetAsyncResult(
+            new BuildingInfo { Id = 42 });
         PythagorasHandler service = new(client);
         using CancellationTokenSource cts = new();
 
@@ -36,31 +35,27 @@ public class PythagorasHandlerTests
     public async Task GetBuildingInfoAsync_DelegatesToClientAndAddsNavigationFolder()
     {
         Guid uid = Guid.NewGuid();
-        FakePythagorasClient client = new()
-        {
-            GetBuildingInfoResult =
-            [
-                new()
-                {
-                    Id = 10,
-                    Uid = uid,
-                    Name = "Info",
-                    PopularName = "Info Popular",
-                    Grossarea = 12.5m,
-                    Netarea = 10.2m,
-                    SumGrossFloorarea = 13.4m,
-                    NumPlacedPersons = 3,
-                    GeoX = 1,
-                    GeoY = 2,
-                    GeoRotation = 3,
-                    AddressStreet = "Street",
-                    AddressZipCode = "Zip",
-                    AddressCity = "City",
-                    AddressCountry = "Country",
-                    MarkerType = PythMarkerType.Unknown
-                }
-            ]
-        };
+        FakePythagorasClient client = new();
+        client.SetGetAsyncResult(
+            new BuildingInfo
+            {
+                Id = 10,
+                Uid = uid,
+                Name = "Info",
+                PopularName = "Info Popular",
+                Grossarea = 12.5m,
+                Netarea = 10.2m,
+                SumGrossFloorarea = 13.4m,
+                NumPlacedPersons = 3,
+                GeoX = 1,
+                GeoY = 2,
+                GeoRotation = 3,
+                AddressStreet = "Street",
+                AddressZipCode = "Zip",
+                AddressCity = "City",
+                AddressCountry = "Country",
+                MarkerType = PythMarkerType.Unknown
+            });
 
         PythagorasHandler service = new(client);
 
@@ -87,10 +82,9 @@ public class PythagorasHandlerTests
     [Fact]
     public async Task GetBuildingInfoAsync_WithoutNavigationFolder_DoesNotAddFilter()
     {
-        FakePythagorasClient client = new()
-        {
-            GetBuildingInfoResult = [new() { Id = 1 }]
-        };
+        FakePythagorasClient client = new();
+        client.SetGetAsyncResult(
+            new BuildingInfo { Id = 1 });
 
         PythagorasHandler service = new(client);
 
@@ -108,10 +102,9 @@ public class PythagorasHandlerTests
     [Fact]
     public async Task GetBuildingWorkspacesAsync_DelegatesToClient()
     {
-        FakePythagorasClient client = new()
-        {
-            GetBuildingWorkspacesResult = [new() { Id = 5, BuildingId = 99, BuildingName = "B" }]
-        };
+        FakePythagorasClient client = new();
+        client.SetGetAsyncResult(
+            new BuildingWorkspace { Id = 5, BuildingId = 99, BuildingName = "B" });
 
         PythagorasHandler service = new(client);
 
@@ -130,41 +123,36 @@ public class PythagorasHandlerTests
         Guid floorZeroUid = Guid.NewGuid();
         Guid floorOneUid = Guid.NewGuid();
 
-        FakePythagorasClient client = new()
-        {
-            GetFloorsResult =
-            [
-                new()
-                {
-                    Id = 3022,
-                    Uid = floorZeroUid,
-                    Version = 3,
-                    Created = 1759786556000,
-                    Updated = 1759826938000,
-                    Name = "00",
-                    PopularName = "Ground floor",
-                    Height = 3,
-                    ReferenceHeight = -3,
-                    GrossFloorarea = 3395.81
-                },
-                new()
-                {
-                    Id = 3023,
-                    Uid = floorOneUid,
-                    Version = 3,
-                    Created = 1759786556001,
-                    Updated = 1759826948000,
-                    Name = "01",
-                    PopularName = "First floor",
-                    Height = 3,
-                    ReferenceHeight = 0,
-                    GrossFloorarea = 4372.66
-                }
-            ]
-        };
+        FakePythagorasClient client = new();
+        client.SetGetAsyncResult(
+            new Floor
+            {
+                Id = 3022,
+                Uid = floorZeroUid,
+                Version = 3,
+                Created = 1759786556000,
+                Updated = 1759826938000,
+                Name = "00",
+                PopularName = "Ground floor",
+                Height = 3,
+                ReferenceHeight = -3,
+                GrossFloorarea = 3395.81
+            },
+            new Floor
+            {
+                Id = 3023,
+                Uid = floorOneUid,
+                Version = 3,
+                Created = 1759786556001,
+                Updated = 1759826948000,
+                Name = "01",
+                PopularName = "First floor",
+                Height = 3,
+                ReferenceHeight = 0,
+                GrossFloorarea = 4372.66
+            });
 
-        client.BuildingWorkspacesResultsQueue.Enqueue(
-        [
+        client.EnqueueGetAsyncResult(
             new BuildingWorkspace
             {
                 Id = 1,
@@ -178,11 +166,9 @@ public class PythagorasHandlerTests
                 FloorId = 3022,
                 FloorUid = floorZeroUid,
                 FloorName = "00"
-            }
-        ]);
+            });
 
-        client.BuildingWorkspacesResultsQueue.Enqueue(
-        [
+        client.EnqueueGetAsyncResult(
             new BuildingWorkspace
             {
                 Id = 2,
@@ -210,8 +196,7 @@ public class PythagorasHandlerTests
                 FloorId = 3023,
                 FloorUid = floorOneUid,
                 FloorName = "01"
-            }
-        ]);
+            });
 
         PythagorasHandler service = new(client);
 
@@ -240,10 +225,9 @@ public class PythagorasHandlerTests
     [Fact]
     public async Task GetWorkspacesAsync_DelegatesToClient()
     {
-        FakePythagorasClient client = new()
-        {
-            GetWorkspacesResult = [new() { Id = 7, Name = "W" }]
-        };
+        FakePythagorasClient client = new();
+        client.SetGetAsyncResult(
+            new Workspace { Id = 7, Name = "W" });
 
         PythagorasHandler service = new(client);
 
@@ -254,64 +238,5 @@ public class PythagorasHandlerTests
         client.LastQuery.ShouldBeNull();
         RoomModel room = result.ShouldHaveSingleItem();
         room.Id.ShouldBe(7);
-    }
-
-    private sealed class FakePythagorasClient : IPythagorasClient
-    {
-        public object? LastQuery { get; private set; }
-        public CancellationToken LastCancellationToken { get; private set; }
-        public bool GetAsyncCalled { get; private set; }
-        public int GetAsyncCallCount { get; private set; }
-        public bool GetPaginatedAsyncCalled { get; private set; }
-        public int LastPageSize { get; private set; }
-        public List<string> EndpointsCalled { get; } = [];
-        public IReadOnlyList<Building> GetAsyncResult { get; set; } = [];
-        public IReadOnlyList<BuildingInfo> GetBuildingInfoResult { get; set; } = [];
-        public IReadOnlyList<BuildingWorkspace> GetBuildingWorkspacesResult { get; set; } = [];
-        public Queue<IReadOnlyList<BuildingWorkspace>> BuildingWorkspacesResultsQueue { get; } = new();
-        public IReadOnlyList<Floor> GetFloorsResult { get; set; } = [];
-        public IReadOnlyList<Workspace> GetWorkspacesResult { get; set; } = [];
-        public string? LastEndpoint { get; private set; }
-
-        public Task<IReadOnlyList<TDto>> GetAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, CancellationToken cancellationToken) where TDto : class, IPythagorasDto
-        {
-            GetAsyncCalled = true;
-            GetAsyncCallCount++;
-            LastEndpoint = endpoint;
-            LastCancellationToken = cancellationToken;
-            LastQuery = query;
-            EndpointsCalled.Add(endpoint);
-
-            if (typeof(TDto) == typeof(Building))
-            {
-                return Task.FromResult((IReadOnlyList<TDto>)(object)GetAsyncResult);
-            }
-
-            if (typeof(TDto) == typeof(BuildingInfo))
-            {
-                return Task.FromResult((IReadOnlyList<TDto>)(object)GetBuildingInfoResult);
-            }
-
-            if (typeof(TDto) == typeof(BuildingWorkspace))
-            {
-                IReadOnlyList<BuildingWorkspace> result = BuildingWorkspacesResultsQueue.Count > 0
-                    ? BuildingWorkspacesResultsQueue.Dequeue()
-                    : GetBuildingWorkspacesResult;
-
-                return Task.FromResult((IReadOnlyList<TDto>)(object)result);
-            }
-
-            if (typeof(TDto) == typeof(Floor))
-            {
-                return Task.FromResult((IReadOnlyList<TDto>)(object)GetFloorsResult);
-            }
-
-            if (typeof(TDto) == typeof(Workspace))
-            {
-                return Task.FromResult((IReadOnlyList<TDto>)(object)GetWorkspacesResult);
-            }
-
-            throw new NotSupportedException("Test fake does not support the requested DTO type.");
-        }
     }
 }
