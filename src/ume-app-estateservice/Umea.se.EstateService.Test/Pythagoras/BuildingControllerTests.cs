@@ -27,7 +27,7 @@ public class BuildingControllerTests
 
         IReadOnlyList<BuildingInfoModel> buildings = await controller.GetBuildingsAsync(new BuildingListRequest(), CancellationToken.None);
 
-        buildings.Select(b => b.Id).ShouldBe(new[] { 1, 2 });
+        buildings.Select(b => b.Id).ShouldBe([1, 2]);
         client.LastQueryString.ShouldBe("maxResults=50");
         client.LastEndpoint.ShouldBe("rest/v1/building/info");
     }

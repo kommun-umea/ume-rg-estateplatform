@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 using Umea.se.EstateService.API.Controllers.Requests;
@@ -49,7 +48,7 @@ public class RoomController(IPythagorasHandler pythagorasHandler) : ControllerBa
         ImmutableArray<int> ids = request.GetIdsOrEmpty();
         if (ids.Length > 0)
         {
-            return new PythagorasQuery<Workspace>().WithIds(ids.ToArray());
+            return new PythagorasQuery<Workspace>().WithIds([.. ids]);
         }
 
         PythagorasQuery<Workspace> query = new PythagorasQuery<Workspace>()

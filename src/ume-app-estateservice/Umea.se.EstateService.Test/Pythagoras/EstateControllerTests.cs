@@ -27,7 +27,7 @@ public class EstateControllerTests
         IReadOnlyList<BuildingInfoModel> buildings = await controller.GetEstateBuildingsAsync(123, new PagedQueryRequest(), CancellationToken.None);
 
         buildings.Count.ShouldBe(2);
-        buildings.Select(b => b.Id).ShouldBe(new[] { 10, 11 });
+        buildings.Select(b => b.Id).ShouldBe([10, 11]);
         client.LastQueryString.ShouldNotBeNull();
         client.LastQueryString.ShouldContain("navigationFolderId=123");
         client.LastEndpoint.ShouldBe("rest/v1/building/info");
@@ -69,7 +69,7 @@ public class EstateControllerTests
             }
             if (typeof(TDto) == typeof(BuildingInfoModel))
             {
-                List<BuildingInfoModel> mapped = GetAsyncResult
+                List<BuildingInfoModel> mapped = [.. GetAsyncResult
                     .Select(b => new BuildingInfoModel
                     {
                         Id = b.Id,
@@ -86,13 +86,12 @@ public class EstateControllerTests
                         ExtraInfo = new Dictionary<string, string?>(),
                         PropertyValues = new Dictionary<string, string?>(),
                         NavigationInfo = new Dictionary<string, string?>()
-                    })
-                    .ToList();
+                    })];
                 return Task.FromResult((IReadOnlyList<TDto>)(object)mapped);
             }
             if (typeof(TDto) == typeof(BuildingInfo))
             {
-                List<BuildingInfo> mapped = GetAsyncResult
+                List<BuildingInfo> mapped = [.. GetAsyncResult
                     .Select(b => new BuildingInfo
                     {
                         Id = b.Id,
@@ -125,8 +124,7 @@ public class EstateControllerTests
                         ExtraInfo = [],
                         PropertyValues = [],
                         NavigationInfo = []
-                    })
-                    .ToList();
+                    })];
                 return Task.FromResult((IReadOnlyList<TDto>)(object)mapped);
             }
 

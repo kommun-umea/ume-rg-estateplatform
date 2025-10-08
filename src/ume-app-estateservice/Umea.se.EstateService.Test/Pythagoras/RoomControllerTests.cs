@@ -49,7 +49,7 @@ public class RoomControllerTests
         RoomController controller = CreateController(service);
 
         ActionResult<IReadOnlyList<RoomModel>> response = await controller.GetRoomsAsync(
-            new RoomListRequest { Ids = new[] { 1, 2 } },
+            new RoomListRequest { Ids = [1, 2] },
             CancellationToken.None);
 
         _ = response.Result.ShouldBeOfType<OkObjectResult>();
@@ -100,7 +100,7 @@ public class RoomControllerTests
         RoomController controller = CreateController(service);
 
         ActionResult<IReadOnlyList<RoomModel>> response = await controller.GetRoomsAsync(
-            new RoomListRequest { Ids = new[] { 1 }, SearchTerm = "foo" },
+            new RoomListRequest { Ids = [1], SearchTerm = "foo" },
             CancellationToken.None);
 
         ObjectResult problem = response.Result.ShouldBeOfType<ObjectResult>();

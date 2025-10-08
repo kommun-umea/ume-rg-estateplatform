@@ -42,14 +42,14 @@ public sealed record RoomListRequest : PagedQueryRequest, IValidatableObject
             {
                 yield return new ValidationResult(
                     "Specify either ids or searchTerm, not both.",
-                    new[] { nameof(Ids), nameof(SearchTerm) });
+                    [nameof(Ids), nameof(SearchTerm)]);
             }
 
             if (BuildingId is not null)
             {
                 yield return new ValidationResult(
                     "Ids cannot be combined with buildingId filtering.",
-                    new[] { nameof(Ids), nameof(BuildingId) });
+                    [nameof(Ids), nameof(BuildingId)]);
             }
         }
     }
@@ -61,6 +61,6 @@ public sealed record RoomListRequest : PagedQueryRequest, IValidatableObject
             return [];
         }
 
-        return ImmutableArray.CreateRange(Ids);
+        return [.. Ids];
     }
 }
