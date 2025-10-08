@@ -23,12 +23,12 @@ public class EstateController(IPythagorasHandler pythagorasService) : Controller
     [HttpGet]
     [SwaggerOperation(
         Summary = "Get estates",
-        Description = "Retrieves a list of estates. Supports search and filtering via query parameters."
+        Description = "Retrieves estates with standard limit/offset paging and optional search filtering."
     )]
     [SwaggerResponse(StatusCodes.Status200OK, "A list of estates.", typeof(IReadOnlyList<EstateModel>))]
     [SwaggerResponse(StatusCodes.Status401Unauthorized, "Unauthorized.")]
     public async Task<IReadOnlyList<EstateModel>> GetEstatesAsync(
-        [FromQuery] EstateRequest request,
+        [FromQuery] EstateListRequest request,
         CancellationToken cancellationToken)
     {
         PythagorasQuery<NavigationFolder> query = BuildQuery(request);
@@ -48,40 +48,36 @@ public class EstateController(IPythagorasHandler pythagorasService) : Controller
     [HttpGet("{estateId:int}/buildings")]
     [SwaggerOperation(
         Summary = "Get buildings for an estate",
-        Description = "Retrieves all buildings associated with a specific estate."
+        Description = "Retrieves buildings for an estate with optional search term and paging parameters."
     )]
     [SwaggerResponse(StatusCodes.Status200OK, "A list of buildings for the estate.", typeof(IReadOnlyList<BuildingInfoModel>))]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid estate ID.")]
     [SwaggerResponse(StatusCodes.Status401Unauthorized, "Unauthorized.")]
     public async Task<IReadOnlyList<BuildingInfoModel>> GetEstateBuildingsAsync(
         int estateId,
+        [FromQuery] PagedQueryRequest request,
         CancellationToken cancellationToken)
     {
+        PythagorasQuery<BuildingInfo> query = new PythagorasQuery<BuildingInfo>()
+            .ApplyGeneralSearch(request)
+            .ApplyPaging(request);
+
         IReadOnlyList<BuildingInfoModel> buildings = await pythagorasService
-            .GetBuildingInfoAsync(null, estateId, cancellationToken);
+            .GetBuildingInfoAsync(query, estateId, cancellationToken);
 
         return buildings;
     }
 
-    private static PythagorasQuery<NavigationFolder> BuildQuery(EstateRequest request)
+    private static PythagorasQuery<NavigationFolder> BuildQuery(EstateListRequest request)
     {
-        PythagorasQuery<NavigationFolder> query = new PythagorasQuery<NavigationFolder>();
-
-        if (!string.IsNullOrWhiteSpace(request.SearchTerm))
-        {
-            query = query.GeneralSearch(request.SearchTerm);
-        }
+        PythagorasQuery<NavigationFolder> query = new PythagorasQuery<NavigationFolder>()
+            .ApplyGeneralSearch(request);
 
         if (request.IncludeBuildings)
         {
             query = query.WithQueryParameter("includeAscendantBuildings", true);
         }
 
-        if (request.Limit > 0)
-        {
-            query = query.Take(50);
-        }
-
-        return query;
+        return query.ApplyPaging(request);
     }
 }

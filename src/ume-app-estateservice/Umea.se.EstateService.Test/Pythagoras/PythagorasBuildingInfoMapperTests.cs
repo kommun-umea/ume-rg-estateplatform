@@ -34,7 +34,7 @@ public class PythagorasBuildingInfoMapperTests
             Origin = "Source",
             CurrencyId = 17,
             CurrencyName = "SEK",
-            FlagStatusIds = new[] { 1, 2, 3 },
+            FlagStatusIds = [1, 2, 3],
             BusinessTypeId = 6,
             BusinessTypeName = "Business",
             ProspectOfBuildingId = 9,
