@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
 using Umea.se.EstateService.API.Controllers.Requests;
 using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Logic.Search;
@@ -12,8 +13,26 @@ namespace Umea.se.EstateService.API.Controllers;
 [AuthorizeApiKey]
 public class SearchController(SearchHandler searchHandler) : ControllerBase
 {
+    /// <summary>
+    /// Search for Pythagoras documents (estates, buildings, rooms) by query and type.
+    /// </summary>
+    /// <remarks>
+    /// Returns a list of matching documents based on the provided query, type, and optional filters.
+    /// </remarks>
+    /// <param name="req">The search request parameters.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <response code="200">Returns a list of matching Pythagoras documents.</response>
+    /// <response code="400">If the request parameters are invalid.</response>
     [HttpGet]
-    public async Task<ICollection<PythagorasDocument>> Search(AutocompleteRequest req, CancellationToken cancellationToken)
+    [SwaggerOperation(
+        Summary = "Search for Pythagoras documents",
+        Description = "Search for estates, buildings, or rooms using a query string and filters."
+    )]
+    [SwaggerResponse(StatusCodes.Status200OK, "A list of matching Pythagoras documents.", typeof(ICollection<PythagorasDocument>))]
+    [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid request parameters.")]
+    public async Task<ICollection<PythagorasDocument>> Search(
+        [FromQuery][SwaggerParameter("Search request parameters.", Required = true)] AutocompleteRequest req,
+        CancellationToken cancellationToken)
     {
         IReadOnlyList<SearchResult> results = await searchHandler.SearchAsync(
             req.Query,
