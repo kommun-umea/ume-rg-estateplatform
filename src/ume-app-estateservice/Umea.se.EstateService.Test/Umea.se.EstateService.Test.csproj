@@ -8,7 +8,6 @@
     <IsTestProject>true</IsTestProject>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <NoWarn>CA2007</NoWarn>
-    <UserSecretsId>c6442447-46d8-4642-9539-53d4c916135c</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,7 +19,6 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Shouldly" />
     <PackageReference Include="Umea.se.TestToolkit" />
-    <PackageReference Include="Umea.se.Toolkit" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio">
       <PrivateAssets>all</PrivateAssets>
