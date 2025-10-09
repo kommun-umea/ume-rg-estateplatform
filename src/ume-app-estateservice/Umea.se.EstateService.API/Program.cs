@@ -12,11 +12,20 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 ApplicationConfig config = new(builder.Configuration);
 
-builder.Services.ConnectToKeyVault(config.KeyVaultUrl);
-
-if (!config.SuppressKeyVaultConfigs)
+if (!builder.Environment.IsEnvironment("IntegrationTest"))
 {
-    config.LoadKeyVaultSecrets();
+    builder.Services.ConnectToKeyVault(config.KeyVaultUrl);
+
+    if (!config.SuppressKeyVaultConfigs)
+    {
+        config.LoadKeyVaultSecrets();
+    }
+
+    builder.Logging.UseDefaultLoggers(config);
+}
+else
+{
+    builder.Logging.ClearProviders();
 }
 
 builder.Services
@@ -38,11 +47,12 @@ builder.Services.AddAuthentication(options =>
 
 });
 
-builder.Logging.UseDefaultLoggers(config);
-
 // Swagger
-builder.Services.AddDefaultSwagger(config);
-builder.Services.ConfigureSwaggerGen(options => options.CustomSchemaIds(x => x.FullName));
+if (!builder.Environment.IsEnvironment("IntegrationTest"))
+{
+    builder.Services.AddDefaultSwagger(config);
+    builder.Services.ConfigureSwaggerGen(options => options.CustomSchemaIds(x => x.FullName));
+}
 
 builder.Services.AddAllowedOriginsCorsPolicy(config.AllowedOrigins);
 
@@ -57,7 +67,10 @@ builder.Services.AddControllers(options =>
 
 WebApplication app = builder.Build();
 
-app.UseDefaultSwagger(config);
+if (!app.Environment.IsEnvironment("IntegrationTest"))
+{
+    app.UseDefaultSwagger(config);
+}
 app.UseHttpsRedirection();
 app.UseAllowedOriginsCorsPolicy();
 
@@ -67,3 +80,5 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+public partial class Program;
