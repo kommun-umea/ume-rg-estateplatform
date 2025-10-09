@@ -6,5 +6,6 @@ internal enum Field : byte
     PopularName = 2,
     Path = 3,
     AncestorName = 4,
-    AncestorPopularName = 5
+    AncestorPopularName = 5,
+    Address = 6
 }

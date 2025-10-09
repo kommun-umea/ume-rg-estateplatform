@@ -26,10 +26,10 @@ public class PythagorasBuildingInfoMapperTests
             GeoY = 20.2,
             GeoRotation = 10.5,
             AddressName = "Primary",
-            AddressStreet = "Main Street",
-            AddressZipCode = "12345",
-            AddressCity = "Town",
-            AddressCountry = "Country",
+            AddressStreet = "Skolgatan 31A",
+            AddressZipCode = "901 84",
+            AddressCity = "Umeå",
+            AddressCountry = "Sverige",
             AddressExtra = "Extra",
             Origin = "Source",
             CurrencyId = 17,
@@ -55,7 +55,7 @@ public class PythagorasBuildingInfoMapperTests
         model.NetArea.ShouldBe(dto.Netarea ?? 0);
         model.SumGrossFloorArea.ShouldBe(dto.SumGrossFloorarea ?? 0);
         model.NumPlacedPersons.ShouldBe(dto.NumPlacedPersons);
-        model.Address.ShouldBe(new AddressModel("Main Street", "12345", "Town", "Country", "Extra"));
+        model.Address.ShouldBe(new AddressModel("Skolgatan 31A", "901 84", "Umeå", "Sverige", "Extra"));
         model.GeoLocation.ShouldNotBeNull();
         model.GeoLocation!.Lat.ShouldBe(dto.GeoX);
         model.GeoLocation.Lon.ShouldBe(dto.GeoY);
