@@ -1,16 +1,16 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
-using Umea.se.Toolkit.Auth;
 
 namespace Umea.se.EstateService.API.Controllers;
 
 [Produces("application/json")]
 [Route(ApiRoutes.Rooms)]
-[AuthorizeApiKey]
+[Authorize(Policy = AuthPolicy.EstateMunicipalEmployee)]
 public class RoomController(IPythagorasHandler pythagorasHandler) : ControllerBase
 {
     /// <summary>
