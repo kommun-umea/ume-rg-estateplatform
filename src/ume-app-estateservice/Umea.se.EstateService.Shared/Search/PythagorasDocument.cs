@@ -4,7 +4,9 @@ namespace Umea.se.EstateService.Shared.Search;
 
 public sealed class PythagorasDocument
 {
-    public string Id { get; set; } = default!;
+    public readonly record struct DocumentKey(NodeType Type, int Id);
+
+    public int Id { get; set; }
     public NodeType Type { get; set; }
     public string Name { get; set; } = default!;
     public string? PopularName { get; set; }
@@ -19,5 +21,6 @@ public sealed class PythagorasDocument
     public double RankScore { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public string? Slug { get; set; }
+    [JsonIgnore]
+    public DocumentKey Key => new(Type, Id);
 }
-

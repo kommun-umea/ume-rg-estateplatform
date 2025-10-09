@@ -12,13 +12,13 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
 {
     public async Task<ICollection<PythagorasDocument>> GetDocumentsAsync()
     {
-        Dictionary<string, PythagorasDocument> docs = [];
+        Dictionary<PythagorasDocument.DocumentKey, PythagorasDocument> docs = [];
         await AddEstatesAndBuildings(docs).ConfigureAwait(false);
         await AddWorkspaces(docs).ConfigureAwait(false);
         return [.. docs.Values];
     }
 
-    private async Task AddEstatesAndBuildings(Dictionary<string, PythagorasDocument> docs)
+    private async Task AddEstatesAndBuildings(Dictionary<PythagorasDocument.DocumentKey, PythagorasDocument> docs)
     {
         PythagorasQuery<NavigationFolder> query = new PythagorasQuery<NavigationFolder>()
             .WithQueryParameter("includeAscendantBuildings", true);
@@ -28,15 +28,15 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
         foreach (EstateModel estate in estates)
         {
             PythagorasDocument estateDoc = CreateDocumentFromSearchable(estate);
-            docs[estateDoc.Id] = estateDoc;
+            docs[estateDoc.Key] = estateDoc;
 
             foreach (BuildingModel building in estate.Buildings ?? [])
             {
-                string key = $"building-{building.Id}";
-                if (!docs.TryGetValue(key, out PythagorasDocument? doc))
+                PythagorasDocument.DocumentKey buildingKey = new(NodeType.Building, building.Id);
+                if (!docs.TryGetValue(buildingKey, out PythagorasDocument? doc))
                 {
                     doc = CreateDocumentFromSearchable(building);
-                    docs[doc.Id] = doc;
+                    docs[doc.Key] = doc;
                 }
 
                 doc.Ancestors.Add(CreateAncestorFromDocument(estateDoc));
@@ -44,7 +44,7 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
         }
     }
 
-    private async Task AddWorkspaces(Dictionary<string, PythagorasDocument> docs)
+    private async Task AddWorkspaces(Dictionary<PythagorasDocument.DocumentKey, PythagorasDocument> docs)
     {
         PythagorasQuery<Workspace> query = new();
 
@@ -54,11 +54,11 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
         {
             PythagorasDocument doc = CreateDocumentFromSearchable(workspace);
 
-            docs[doc.Id] = doc;
+            docs[doc.Key] = doc;
 
             if (workspace.BuildingId is int buildingId)
             {
-                string buildingKey = $"building-{buildingId}";
+                PythagorasDocument.DocumentKey buildingKey = new(NodeType.Building, buildingId);
                 if (docs.TryGetValue(buildingKey, out PythagorasDocument? buildingDoc))
                 {
                     doc.Ancestors.AddRange(buildingDoc.Ancestors);
@@ -78,11 +78,9 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
             _ => throw new ArgumentException($"Unknown searchable type: {item.GetType().Name}", nameof(item))
         };
 
-        string idPrefix = nodeType.ToString().ToLower();
-
         return new PythagorasDocument
         {
-            Id = $"{idPrefix}-{item.Id}",
+            Id = item.Id,
             Type = nodeType,
             Name = item.Name,
             Address = item.Address != null ? $"{item.Address.Street} {item.Address.ZipCode} {item.Address.City}" : null,

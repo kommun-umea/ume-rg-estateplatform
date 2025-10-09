@@ -86,13 +86,13 @@ public class SearchHandler(IPythagorasDocumentProvider documentProvider)
             return results;
         }
 
-        string buildingKey = $"building-{buildingId.Value}";
+        int buildingIdValue = buildingId.Value;
 
         return type switch
         {
-            AutocompleteType.Building => results.Where(r => string.Equals(r.Item.Id, buildingKey, StringComparison.OrdinalIgnoreCase)),
-            _ => results.Where(r => string.Equals(r.Item.Id, buildingKey, StringComparison.OrdinalIgnoreCase) ||
-                                     r.Item.Ancestors.Any(a => string.Equals(a.Id, buildingKey, StringComparison.OrdinalIgnoreCase)))
+            AutocompleteType.Building => results.Where(r => r.Item.Type == NodeType.Building && r.Item.Id == buildingIdValue),
+            _ => results.Where(r => (r.Item.Type == NodeType.Building && r.Item.Id == buildingIdValue) ||
+                                     r.Item.Ancestors.Any(a => a.Type == NodeType.Building && a.Id == buildingIdValue))
         };
     }
 
