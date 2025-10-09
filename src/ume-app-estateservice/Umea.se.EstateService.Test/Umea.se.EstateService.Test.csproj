@@ -8,6 +8,7 @@
     <IsTestProject>true</IsTestProject>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <NoWarn>CA2007</NoWarn>
+    <UserSecretsId>c6442447-46d8-4642-9539-53d4c916135c</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,6 +19,8 @@
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Shouldly" />
+    <PackageReference Include="Umea.se.TestToolkit" />
+    <PackageReference Include="Umea.se.Toolkit" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio">
       <PrivateAssets>all</PrivateAssets>
@@ -29,7 +32,6 @@
     <ProjectReference Include="..\Umea.se.EstateService.API\Umea.se.EstateService.API.csproj" />
     <ProjectReference Include="..\Umea.se.EstateService.Logic\Umea.se.EstateService.Logic.csproj" />
     <ProjectReference Include="..\Umea.se.EstateService.ServiceAccess\Umea.se.EstateService.ServiceAccess.csproj" />
-    <ProjectReference Include="..\..\..\ume-nuget\src\Umea.se.TestToolkit\Umea.se.TestToolkit\Umea.se.TestToolkit.csproj" />
   </ItemGroup>
 
   <ItemGroup>
