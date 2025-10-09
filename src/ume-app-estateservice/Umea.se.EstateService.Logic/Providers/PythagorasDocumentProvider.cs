@@ -13,17 +13,37 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
     public async Task<ICollection<PythagorasDocument>> GetDocumentsAsync()
     {
         Dictionary<PythagorasDocument.DocumentKey, PythagorasDocument> docs = [];
-        await AddEstatesAndBuildings(docs).ConfigureAwait(false);
-        await AddWorkspaces(docs).ConfigureAwait(false);
+        IReadOnlyDictionary<int, AddressModel?> buildingAddresses = await LoadBuildingAddressesAsync().ConfigureAwait(false);
+        await AddEstatesAndBuildings(docs, buildingAddresses).ConfigureAwait(false);
+        await AddWorkspaces(docs, buildingAddresses).ConfigureAwait(false);
         return [.. docs.Values];
     }
 
-    private async Task AddEstatesAndBuildings(Dictionary<PythagorasDocument.DocumentKey, PythagorasDocument> docs)
+    private async Task<IReadOnlyDictionary<int, AddressModel?>> LoadBuildingAddressesAsync()
+    {
+        IReadOnlyList<BuildingInfoModel> buildings = await pythagorasHandler.GetBuildingsAsync().ConfigureAwait(false);
+        if (buildings.Count == 0)
+        {
+            return new Dictionary<int, AddressModel?>();
+        }
+
+        Dictionary<int, AddressModel?> result = new(buildings.Count);
+        foreach (BuildingInfoModel building in buildings)
+        {
+            result[building.Id] = building.Address;
+        }
+
+        return result;
+    }
+
+    private async Task AddEstatesAndBuildings(
+        Dictionary<PythagorasDocument.DocumentKey, PythagorasDocument> docs,
+        IReadOnlyDictionary<int, AddressModel?> buildingAddresses)
     {
         PythagorasQuery<NavigationFolder> query = new PythagorasQuery<NavigationFolder>()
             .WithQueryParameter("includeAscendantBuildings", true);
 
-        IReadOnlyList<EstateModel> estates = await pythagorasHandler.GetEstatesAsync(query);
+        IReadOnlyList<EstateModel> estates = await pythagorasHandler.GetEstatesAsync(query).ConfigureAwait(false);
 
         foreach (EstateModel estate in estates)
         {
@@ -32,6 +52,11 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
 
             foreach (BuildingModel building in estate.Buildings ?? [])
             {
+                if (buildingAddresses.TryGetValue(building.Id, out AddressModel? address))
+                {
+                    building.Address = address;
+                }
+
                 PythagorasDocument.DocumentKey buildingKey = new(NodeType.Building, building.Id);
                 if (!docs.TryGetValue(buildingKey, out PythagorasDocument? doc))
                 {
@@ -44,11 +69,13 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
         }
     }
 
-    private async Task AddWorkspaces(Dictionary<PythagorasDocument.DocumentKey, PythagorasDocument> docs)
+    private async Task AddWorkspaces(
+        Dictionary<PythagorasDocument.DocumentKey, PythagorasDocument> docs,
+        IReadOnlyDictionary<int, AddressModel?> buildingAddresses)
     {
         PythagorasQuery<Workspace> query = new();
 
-        IReadOnlyList<RoomModel> workspaces = await pythagorasHandler.GetRoomsAsync(query);
+        IReadOnlyList<RoomModel> workspaces = await pythagorasHandler.GetRoomsAsync(query).ConfigureAwait(false);
 
         foreach (RoomModel workspace in workspaces)
         {
@@ -59,6 +86,11 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
             if (workspace.BuildingId is int buildingId)
             {
                 PythagorasDocument.DocumentKey buildingKey = new(NodeType.Building, buildingId);
+                if (buildingAddresses.TryGetValue(buildingId, out AddressModel? address))
+                {
+                    doc.Address = FormatAddress(address);
+                }
+
                 if (docs.TryGetValue(buildingKey, out PythagorasDocument? buildingDoc))
                 {
                     doc.Ancestors.AddRange(buildingDoc.Ancestors);
@@ -83,13 +115,31 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
             Id = item.Id,
             Type = nodeType,
             Name = item.Name,
-            Address = item.Address != null ? $"{item.Address.Street} {item.Address.ZipCode} {item.Address.City}" : null,
+            Address = FormatAddress(item.Address),
             PopularName = item.PopularName,
             Geo = MapGeoLocation(item.GeoLocation),
             RankScore = rankScore,
             UpdatedAt = item.UpdatedAt,
             Ancestors = []
         };
+    }
+
+    private static string? FormatAddress(AddressModel? address)
+    {
+        if (address is null)
+        {
+            return null;
+        }
+
+        string[] parts =
+        [
+            address.Street,
+            address.ZipCode,
+            address.City
+        ];
+
+        string formatted = string.Join(' ', parts.Where(static p => !string.IsNullOrWhiteSpace(p)));
+        return string.IsNullOrWhiteSpace(formatted) ? null : formatted;
     }
 
     private static Shared.Search.GeoPoint? MapGeoLocation(GeoPointModel? geoLocationModel)

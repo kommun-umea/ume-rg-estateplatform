@@ -26,6 +26,7 @@ public sealed class InMemorySearchService
         { Field.Path, 2.0 },
         { Field.AncestorName, 1.5 },
         { Field.AncestorPopularName, 1.0 },
+        { Field.Address, 8.0 },
     };
 
     // strong bump when the term hits the start of key fields
@@ -97,6 +98,7 @@ public sealed class InMemorySearchService
             IndexField(Field.Name, it.Name);
             IndexField(Field.PopularName, it.PopularName);
             IndexField(Field.Path, it.Path);
+            IndexField(Field.Address, it.Address);
             foreach (Ancestor a in it.Ancestors ?? [])
             {
                 IndexField(Field.AncestorName, a.Name);
