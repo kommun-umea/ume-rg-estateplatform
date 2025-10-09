@@ -5,21 +5,25 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
-using Umea.se.EstateService.Test.TestHelpers;
 using Umea.se.EstateService.API;
+using Umea.se.EstateService.ServiceAccess;
+using Umea.se.EstateService.Test.TestHelpers;
+using Umea.se.TestToolkit.TestInfrastructure;
 
 namespace Umea.se.EstateService.Test.Pythagoras;
 
-public class RoomControllerTests : IClassFixture<TestApiFactory>
+public class RoomControllerTests : ControllerTestCloud<TestApiFactory, Program, HttpClientNames>
 {
     private readonly HttpClient _client;
     private readonly FakePythagorasClient _fakeClient;
 
-    public RoomControllerTests(TestApiFactory factory)
+    public RoomControllerTests()
     {
-        _client = factory.CreateClient();
+        _client = Client;
         _client.DefaultRequestHeaders.Add("X-Api-Key", TestApiFactory.ApiKey);
-        _fakeClient = factory.FakeClient;
+        _fakeClient = WebAppFactory.FakeClient;
+
+        MockManager.SetupUser(user => user.WithName("Integration Tester").WithActualAuthorization());
     }
 
     [Fact]
