@@ -7,4 +7,6 @@ public class ApplicationConfig(IConfiguration configuration) : ApplicationConfig
 {
     public string PythagorasApiKey => GetValue("Pythagoras-Api-Key");
     public string PythagorasBaseUrl => GetValue("Pythagoras-Base-Url");
+    public string TokenServiceAddress => GetValue("TokenService:Address");
+    public string AuthGroupGuidEstateMunicipalEmployee => GetValue("AuthGroupGuids:EstateMunicipalEmployee");
 }
