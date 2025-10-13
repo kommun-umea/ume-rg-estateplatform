@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Linq;
 using Umea.se.EstateService.Logic.Search.Analysis;
 using Umea.se.EstateService.Logic.Search.Indexing;
 using Umea.se.EstateService.Shared.Search;

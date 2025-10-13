@@ -2,16 +2,19 @@
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 using Umea.se.EstateService.API.Controllers.Requests;
+using Umea.se.EstateService.API.Authorization;
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
+using Umea.se.Toolkit.Auth;
 
 namespace Umea.se.EstateService.API.Controllers;
 
 [Produces("application/json")]
 [Route(ApiRoutes.Estates)]
-[Authorize(Policy = AuthPolicy.EstateMunicipalEmployee)]
+[AuthorizeApiKey]
+[Authorize(Policy = AuthPolicies.Employee)]
 public class EstateController(IPythagorasHandler pythagorasService) : ControllerBase
 {
     /// <summary>
