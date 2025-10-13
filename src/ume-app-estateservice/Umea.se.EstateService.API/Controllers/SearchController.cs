@@ -2,17 +2,20 @@
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 using Umea.se.EstateService.API.Controllers.Requests;
+using Umea.se.EstateService.API.Authorization;
 using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Logic.Search;
 using Umea.se.EstateService.Shared.Autocomplete;
 using Umea.se.EstateService.Shared.Search;
+using Umea.se.Toolkit.Auth;
 
 namespace Umea.se.EstateService.API.Controllers;
 
 [ApiController]
 [Produces("application/json")]
 [Route(ApiRoutes.Search)]
-[Authorize(Policy = AuthPolicy.EstateMunicipalEmployee)]
+[AuthorizeApiKey]
+[Authorize(Policy = AuthPolicies.Employee)]
 public class SearchController(SearchHandler searchHandler) : ControllerBase
 {
     /// <summary>

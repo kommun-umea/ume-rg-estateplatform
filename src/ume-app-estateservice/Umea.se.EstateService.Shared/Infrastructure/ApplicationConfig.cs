@@ -8,5 +8,7 @@ public class ApplicationConfig(IConfiguration configuration) : ApplicationConfig
     public string PythagorasApiKey => GetValue("Pythagoras-Api-Key");
     public string PythagorasBaseUrl => GetValue("Pythagoras-Base-Url");
     public string TokenServiceAddress => GetValue("TokenService:Address");
-    public string AuthGroupGuidEstateMunicipalEmployee => GetValue("AuthGroupGuids:EstateMunicipalEmployee");
+    public string EmployeeIdpClaimValue => GetValue("Authentication:Employee:IdpClaimValue") ?? "AzureActiveDirectory";
+    public string? EmployeeClaimType => GetValue("Authentication:Employee:Claim:Type");
+    public string? EmployeeClaimValue => GetValue("Authentication:Employee:Claim:Value");
 }

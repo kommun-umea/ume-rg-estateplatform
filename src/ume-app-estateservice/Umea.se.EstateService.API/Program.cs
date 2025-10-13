@@ -1,10 +1,9 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc.Filters;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.Extensions.Primitives;
 using Umea.se.EstateService.API;
+using Umea.se.EstateService.API.Authorization;
 using Umea.se.EstateService.Logic;
 using Umea.se.EstateService.ServiceAccess;
 using Umea.se.EstateService.Shared;
@@ -61,43 +60,17 @@ builder.Services
         options.TokenValidationParameters.ValidAudience = config.ApiName;
     });
 
-bool allowApiKeyPolicyFallback = builder.Configuration.GetValue("Authentication:EnableApiKeyPolicyFallback", builder.Environment.IsDevelopment());
-
-AuthorizationBuilder authorizationBuilder = builder.Services.AddAuthorizationBuilder();
-authorizationBuilder.AddPolicy(AuthPolicy.EstateMunicipalEmployee, policy =>
+builder.Services.AddAuthorization(options =>
 {
-    policy.RequireAssertion(context =>
+    options.AddPolicy(AuthPolicies.Employee, static policy =>
     {
-        if (IsEmployee(context.User))
-        {
-            return true;
-        }
-
-        if (!allowApiKeyPolicyFallback)
-        {
-            return false;
-        }
-
-        HttpContext? httpContext = context.Resource switch
-        {
-            HttpContext ctx => ctx,
-            AuthorizationFilterContext filterContext => filterContext.HttpContext,
-            _ => null
-        };
-
-        if (httpContext is null)
-        {
-            return false;
-        }
-
-        if (!httpContext.Request.Headers.TryGetValue("X-Api-Key", out StringValues apiKeyValues))
-        {
-            return false;
-        }
-
-        return apiKeyValues.Any(headerValue => string.Equals(headerValue, config.ApiKey, StringComparison.Ordinal));
+        policy.Requirements.Add(new EmployeeRequirement());
     });
 });
+
+builder.Services.AddSingleton<IAuthorizationHandler, EmployeeAuthorizationHandler>();
+
+builder.Logging.UseDefaultLoggers(config);
 
 // Swagger
 if (!builder.Environment.IsEnvironment("IntegrationTest"))
@@ -132,12 +105,3 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
-
-
-public partial class Program;
-
-static bool IsEmployee(ClaimsPrincipal user)
-{
-    Claim? idpClaim = user.Claims.FirstOrDefault(claim => string.Equals(claim.Type, "idp", StringComparison.OrdinalIgnoreCase));
-    return idpClaim is not null && string.Equals(idpClaim.Value, "AzureActiveDirectory", StringComparison.OrdinalIgnoreCase);
-}
