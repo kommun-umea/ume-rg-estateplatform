@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 
@@ -114,6 +113,20 @@ public sealed class FakePythagorasClient : IPythagorasClient
         }
 
         return Task.FromResult<IReadOnlyDictionary<int, TValue>>(new Dictionary<int, TValue>());
+    }
+
+    public Task<IReadOnlyDictionary<int, CalculatedPropertyValueDto>> GetBuildingCalculatedPropertyValuesAsync(int buildingId, CalculatedPropertyValueRequest? request = null, CancellationToken cancellationToken = default)
+    {
+        string endpoint = $"rest/v1/building/{buildingId}/property/calculatedvalue";
+        string queryString = request?.BuildQueryString() ?? string.Empty;
+        Requests.Add(new RequestCapture(typeof(CalculatedPropertyValueDto), endpoint, request, queryString, cancellationToken));
+
+        if (_dictionaryResults.TryGetValue(typeof(CalculatedPropertyValueDto), out Queue<object>? queue) && queue.Count > 0)
+        {
+            return Task.FromResult((IReadOnlyDictionary<int, CalculatedPropertyValueDto>)queue.Dequeue());
+        }
+
+        return Task.FromResult<IReadOnlyDictionary<int, CalculatedPropertyValueDto>>(new Dictionary<int, CalculatedPropertyValueDto>());
     }
 
     public IAsyncEnumerable<T> GetPaginatedAsync<T>(string endpoint, PythagorasQuery<T>? query, int pageSize, CancellationToken cancellationToken) where T : class, IPythagorasDto

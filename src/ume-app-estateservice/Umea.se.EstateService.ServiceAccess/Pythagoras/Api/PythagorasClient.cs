@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
@@ -28,7 +27,22 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
     {
         ArgumentNullException.ThrowIfNull(endpoint);
         query ??= new PythagorasQuery<TValue>();
-        return QueryDictionaryAsync(endpoint, query, cancellationToken);
+        string requestPath = NormalizeEndpoint(endpoint);
+        string queryString = query.BuildAsQueryString();
+        return QueryDictionaryAsync<TValue>(requestPath, queryString, cancellationToken);
+    }
+
+    public Task<IReadOnlyDictionary<int, CalculatedPropertyValueDto>> GetBuildingCalculatedPropertyValuesAsync(int buildingId, CalculatedPropertyValueRequest? request = null, CancellationToken cancellationToken = default)
+    {
+        if (buildingId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
+        }
+
+        string endpoint = $"rest/v1/building/{buildingId}/property/calculatedvalue";
+        string requestPath = NormalizeEndpoint(endpoint);
+        string queryString = request?.BuildQueryString() ?? string.Empty;
+        return QueryDictionaryAsync<CalculatedPropertyValueDto>(requestPath, queryString, cancellationToken);
     }
 
     public async IAsyncEnumerable<TDto> GetPaginatedAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, int pageSize = 50, [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -75,29 +89,50 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
         string queryString = query.BuildAsQueryString();
         string requestUri = BuildRequestUri(requestPath, queryString);
 
-        using HttpResponseMessage response = await HttpClient.GetAsync(requestUri, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
-
-        using Stream contentStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        using Stream contentStream = await GetContentStreamAsync(requestUri, cancellationToken).ConfigureAwait(false);
         List<TDto>? payload = await JsonSerializer.DeserializeAsync<List<TDto>>(contentStream, _serializerOptions, cancellationToken).ConfigureAwait(false);
 
         return payload ?? [];
     }
 
-    private async Task<IReadOnlyDictionary<int, TValue>> QueryDictionaryAsync<TValue>(string endpoint, PythagorasQuery<TValue> query, CancellationToken cancellationToken)
+    private async Task<IReadOnlyDictionary<int, TValue>> QueryDictionaryAsync<TValue>(string requestPath, string queryString, CancellationToken cancellationToken)
         where TValue : class
     {
-        string requestPath = NormalizeEndpoint(endpoint);
-        string queryString = query.BuildAsQueryString();
         string requestUri = BuildRequestUri(requestPath, queryString);
 
-        using HttpResponseMessage response = await HttpClient.GetAsync(requestUri, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
-
-        using Stream contentStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        using Stream contentStream = await GetContentStreamAsync(requestUri, cancellationToken).ConfigureAwait(false);
         Dictionary<int, TValue>? payload = await JsonSerializer.DeserializeAsync<Dictionary<int, TValue>>(contentStream, _serializerOptions, cancellationToken).ConfigureAwait(false);
 
         return payload ?? new Dictionary<int, TValue>();
+    }
+
+    private async Task<Stream> GetContentStreamAsync(string requestUri, CancellationToken cancellationToken)
+    {
+        HttpResponseMessage response = await HttpClient.GetAsync(requestUri, cancellationToken).ConfigureAwait(false);
+
+        if (response.IsSuccessStatusCode)
+        {
+            return await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        string? errorBody = null;
+        try
+        {
+            errorBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception readException)
+        {
+            throw new PythagorasApiException(
+                $"Pythagoras API request failed with status code {response.StatusCode}.",
+                response.StatusCode,
+                errorBody,
+                readException);
+        }
+
+        throw new PythagorasApiException(
+            $"Pythagoras API request failed with status code {response.StatusCode}.",
+            response.StatusCode,
+            errorBody);
     }
 
     private static string BuildRequestUri(string path, string query) => string.IsNullOrEmpty(query) ? path : $"{path}?{query}";
