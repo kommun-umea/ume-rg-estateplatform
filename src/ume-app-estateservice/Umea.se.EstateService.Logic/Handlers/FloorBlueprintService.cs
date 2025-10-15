@@ -1,8 +1,10 @@
 using System.Net.Http.Headers;
+using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.Logic.Models;
 using Umea.se.EstateService.Logic.Exceptions;
+using Umea.se.EstateService.Logic.Helpers;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 
@@ -12,6 +14,13 @@ public sealed class FloorBlueprintService(
     IPythagorasClient pythagorasClient,
     ILogger<FloorBlueprintService> logger) : IFloorBlueprintService
 {
+    private static readonly string[] NodesToRemove = new[]
+    {
+        "svgPageBorder",
+        "svgSignature",
+        "svgStamp"
+    };
+
     private readonly IPythagorasClient _pythagorasClient = pythagorasClient;
     private readonly ILogger<FloorBlueprintService> _logger = logger;
 
@@ -63,11 +72,49 @@ public sealed class FloorBlueprintService(
             await responseStream.CopyToAsync(buffer, cancellationToken).ConfigureAwait(false);
             buffer.Position = 0;
 
+            if (format == BlueprintFormat.Svg)
+            {
+                MemoryStream? cleaned = TryCleanSvg(buffer);
+                if (cleaned is not null)
+                {
+                    buffer = cleaned;
+                }
+                else
+                {
+                    buffer.Position = 0;
+                }
+            }
+
             string contentType = response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
             string resolvedFileName = TryResolveFileName(response.Content.Headers.ContentDisposition);
             string fileName = EnsureFileName(resolvedFileName, floorId, format);
 
             return new FloorBlueprint(buffer, contentType, fileName);
+        }
+    }
+
+    private MemoryStream? TryCleanSvg(MemoryStream source)
+    {
+        try
+        {
+            source.Position = 0;
+            XDocument document = XDocument.Load(source);
+            SvgCleaner.RemoveNodes(document, NodesToRemove);
+            document = SvgCleaner.CropSvgToContent(document);
+
+            MemoryStream cleaned = new();
+            document.Save(cleaned, SaveOptions.DisableFormatting | SaveOptions.OmitDuplicateNamespaces);
+            cleaned.Position = 0;
+            return cleaned;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to clean SVG blueprint before returning result.");
+            return null;
+        }
+        finally
+        {
+            source.Position = 0;
         }
     }
 
