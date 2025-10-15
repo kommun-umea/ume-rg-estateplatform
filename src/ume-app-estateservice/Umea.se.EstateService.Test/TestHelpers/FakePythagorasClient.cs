@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 
 namespace Umea.se.EstateService.Test.TestHelpers;
 
@@ -109,4 +110,20 @@ public sealed class FakePythagorasClient : IPythagorasClient
         object? Query,
         string? QueryString,
         CancellationToken CancellationToken);
+    public Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException("SendAsync is not supported by FakePythagorasClient. Use a dedicated fake for blueprint tests.");
+    }
+
+    public Func<int, BlueprintFormat, bool, CancellationToken, Task<HttpResponseMessage>>? OnGetFloorBlueprintAsync { get; set; }
+
+    public Task<HttpResponseMessage> GetFloorBlueprintAsync(int floorId, BlueprintFormat format, bool includeWorkspaceTexts, CancellationToken cancellationToken = default)
+    {
+        if (OnGetFloorBlueprintAsync is null)
+        {
+            throw new NotSupportedException("Configure OnGetFloorBlueprintAsync before calling this method.");
+        }
+
+        return OnGetFloorBlueprintAsync(floorId, format, includeWorkspaceTexts, cancellationToken);
+    }
 }

@@ -6,8 +6,8 @@ using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess;
-using Umea.se.TestToolkit.TestInfrastructure;
 using Microsoft.AspNetCore.TestHost;
+using Umea.se.TestToolkit.TestInfrastructure;
 
 namespace Umea.se.EstateService.Test.TestHelpers;
 
