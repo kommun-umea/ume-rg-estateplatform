@@ -1,6 +1,4 @@
-using System.Globalization;
 using System.Runtime.CompilerServices;
-using System.Text;
 using System.Text.Json;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
@@ -123,7 +121,7 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
             throw new ArgumentOutOfRangeException(nameof(floorId), "Floor id must be positive.");
         }
 
-        string endpoint = $"rest/v1/floor/gmodel/print/{FormatToSegment(format)}{BuildFloorIdsQuery([floorId])}";
+        string endpoint = $"rest/v1/floor/{floorId}/gmodel/print/{FormatToSegment(format)}";
         FloorBlueprintRequestPayload payload = FloorBlueprintRequestPayload.CreateDefault();
 
         HttpRequestMessage request = new(HttpMethod.Post, endpoint)
@@ -132,29 +130,6 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
         };
 
         return HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-    }
-
-    private static string BuildFloorIdsQuery(IReadOnlyList<int> floorIds)
-    {
-        if (floorIds.Count == 0)
-        {
-            return string.Empty;
-        }
-
-        StringBuilder sb = new();
-        sb.Append('?');
-        for (int i = 0; i < floorIds.Count; i++)
-        {
-            if (i > 0)
-            {
-                sb.Append('&');
-            }
-
-            sb.Append("floorIds%5B%5D=");
-            sb.Append(Uri.EscapeDataString(floorIds[i].ToString(CultureInfo.InvariantCulture)));
-        }
-
-        return sb.ToString();
     }
 
     private static FormUrlEncodedContent BuildBlueprintContent(FloorBlueprintRequestPayload payload)

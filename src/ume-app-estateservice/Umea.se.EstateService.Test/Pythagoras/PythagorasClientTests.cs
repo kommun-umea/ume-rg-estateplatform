@@ -3,6 +3,7 @@ using System.Text;
 using Umea.se.EstateService.ServiceAccess;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.Test.TestData;
 
 namespace Umea.se.EstateService.Test.Pythagoras;
@@ -185,6 +186,22 @@ public class PythagorasClientTests
             HttpResponseMessage response = new(HttpStatusCode.OK)
             {
                 Content = new StringContent(json, Encoding.UTF8, "application/json")
+            };
+
+            return Task.FromResult(response);
+        }
+    }
+
+    private sealed class BlueprintCapturingHandler : HttpMessageHandler
+    {
+        public HttpRequestMessage? LastRequest { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            LastRequest = request;
+            HttpResponseMessage response = new(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent([])
             };
 
             return Task.FromResult(response);
