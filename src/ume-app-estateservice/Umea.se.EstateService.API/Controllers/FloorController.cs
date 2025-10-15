@@ -44,7 +44,9 @@ public sealed class FloorController(
     {
         if (!ModelState.IsValid)
         {
-            return ValidationProblem(ModelState);
+            return ValidationProblem(
+                modelStateDictionary: ModelState,
+                statusCode: StatusCodes.Status400BadRequest);
         }
 
         try

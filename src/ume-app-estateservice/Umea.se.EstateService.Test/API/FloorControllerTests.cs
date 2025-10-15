@@ -49,7 +49,7 @@ public class FloorControllerTests
             new FloorBlueprintRequest(),
             CancellationToken.None);
 
-        ObjectResult problem = result.ShouldBeOfType<ObjectResult>();
+        BadRequestObjectResult problem = result.ShouldBeOfType<BadRequestObjectResult>();
         ValidationProblemDetails details = problem.Value.ShouldBeOfType<ValidationProblemDetails>();
         details.Status.ShouldBe(StatusCodes.Status400BadRequest);
     }
