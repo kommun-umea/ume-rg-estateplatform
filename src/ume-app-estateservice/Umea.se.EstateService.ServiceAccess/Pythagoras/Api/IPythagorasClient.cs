@@ -5,4 +5,5 @@ namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 public interface IPythagorasClient
 {
     Task<IReadOnlyList<TDto>> GetAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, CancellationToken cancellationToken = default) where TDto : class, IPythagorasDto;
+    Task<IReadOnlyDictionary<int, TValue>> GetDictionaryAsync<TValue>(string endpoint, PythagorasQuery<TValue>? query, CancellationToken cancellationToken = default) where TValue : class;
 }

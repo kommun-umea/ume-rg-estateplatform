@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
@@ -20,6 +21,14 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
         ArgumentNullException.ThrowIfNull(endpoint);
         query ??= new PythagorasQuery<TDto>();
         return QueryAsync(endpoint, query, cancellationToken);
+    }
+
+    public Task<IReadOnlyDictionary<int, TValue>> GetDictionaryAsync<TValue>(string endpoint, PythagorasQuery<TValue>? query, CancellationToken cancellationToken = default)
+        where TValue : class
+    {
+        ArgumentNullException.ThrowIfNull(endpoint);
+        query ??= new PythagorasQuery<TValue>();
+        return QueryDictionaryAsync(endpoint, query, cancellationToken);
     }
 
     public async IAsyncEnumerable<TDto> GetPaginatedAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, int pageSize = 50, [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -73,6 +82,22 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
         List<TDto>? payload = await JsonSerializer.DeserializeAsync<List<TDto>>(contentStream, _serializerOptions, cancellationToken).ConfigureAwait(false);
 
         return payload ?? [];
+    }
+
+    private async Task<IReadOnlyDictionary<int, TValue>> QueryDictionaryAsync<TValue>(string endpoint, PythagorasQuery<TValue> query, CancellationToken cancellationToken)
+        where TValue : class
+    {
+        string requestPath = NormalizeEndpoint(endpoint);
+        string queryString = query.BuildAsQueryString();
+        string requestUri = BuildRequestUri(requestPath, queryString);
+
+        using HttpResponseMessage response = await HttpClient.GetAsync(requestUri, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+
+        using Stream contentStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        Dictionary<int, TValue>? payload = await JsonSerializer.DeserializeAsync<Dictionary<int, TValue>>(contentStream, _serializerOptions, cancellationToken).ConfigureAwait(false);
+
+        return payload ?? new Dictionary<int, TValue>();
     }
 
     private static string BuildRequestUri(string path, string query) => string.IsNullOrEmpty(query) ? path : $"{path}?{query}";

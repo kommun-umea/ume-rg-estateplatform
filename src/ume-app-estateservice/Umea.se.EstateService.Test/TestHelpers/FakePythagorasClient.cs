@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 
@@ -10,6 +11,7 @@ namespace Umea.se.EstateService.Test.TestHelpers;
 public sealed class FakePythagorasClient : IPythagorasClient
 {
     private readonly ConcurrentDictionary<Type, Queue<object>> _results = new();
+    private readonly ConcurrentDictionary<Type, Queue<object>> _dictionaryResults = new();
 
     /// <summary>
     /// Captured requests in invocation order.
@@ -83,6 +85,37 @@ public sealed class FakePythagorasClient : IPythagorasClient
         return Task.FromResult<IReadOnlyList<T>>([]);
     }
 
+    public void SetGetDictionaryAsyncResult<TValue>(IReadOnlyDictionary<int, TValue> result) where TValue : class
+    {
+        Queue<object> queue = GetDictionaryQueue(typeof(TValue));
+        queue.Clear();
+        queue.Enqueue(result);
+    }
+
+    public void SetGetDictionaryAsyncResult<TValue>(Dictionary<int, TValue> result) where TValue : class
+        => SetGetDictionaryAsyncResult((IReadOnlyDictionary<int, TValue>)result);
+
+    public void EnqueueGetDictionaryAsyncResult<TValue>(IReadOnlyDictionary<int, TValue> result) where TValue : class
+    {
+        GetDictionaryQueue(typeof(TValue)).Enqueue(result);
+    }
+
+    public void EnqueueGetDictionaryAsyncResult<TValue>(Dictionary<int, TValue> result) where TValue : class
+        => EnqueueGetDictionaryAsyncResult((IReadOnlyDictionary<int, TValue>)result);
+
+    public Task<IReadOnlyDictionary<int, TValue>> GetDictionaryAsync<TValue>(string endpoint, PythagorasQuery<TValue>? query, CancellationToken cancellationToken) where TValue : class
+    {
+        string? queryString = query?.BuildAsQueryString();
+        Requests.Add(new RequestCapture(typeof(TValue), endpoint, query, queryString, cancellationToken));
+
+        if (_dictionaryResults.TryGetValue(typeof(TValue), out Queue<object>? queue) && queue.Count > 0)
+        {
+            return Task.FromResult((IReadOnlyDictionary<int, TValue>)queue.Dequeue());
+        }
+
+        return Task.FromResult<IReadOnlyDictionary<int, TValue>>(new Dictionary<int, TValue>());
+    }
+
     public IAsyncEnumerable<T> GetPaginatedAsync<T>(string endpoint, PythagorasQuery<T>? query, int pageSize, CancellationToken cancellationToken) where T : class, IPythagorasDto
         => throw new NotSupportedException();
 
@@ -91,12 +124,18 @@ public sealed class FakePythagorasClient : IPythagorasClient
         return _results.GetOrAdd(dtoType, _ => new Queue<object>());
     }
 
+    private Queue<object> GetDictionaryQueue(Type valueType)
+    {
+        return _dictionaryResults.GetOrAdd(valueType, _ => new Queue<object>());
+    }
+
     /// <summary>
     /// Clears configured results and captured requests.
     /// </summary>
     public void Reset()
     {
         _results.Clear();
+        _dictionaryResults.Clear();
         Requests.Clear();
     }
 

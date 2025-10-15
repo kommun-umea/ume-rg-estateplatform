@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.Shared.Models;
 
 namespace Umea.se.EstateService.Logic.Interfaces;
@@ -12,4 +14,5 @@ public interface IPythagorasHandler
     Task<IReadOnlyList<BuildingRoomModel>> GetBuildingWorkspacesAsync(int buildingId, PythagorasQuery<BuildingWorkspace>? query = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<FloorWithRoomsModel>> GetBuildingFloorsWithRoomsAsync(int buildingId, PythagorasQuery<Floor>? floorQuery = null, PythagorasQuery<BuildingWorkspace>? workspaceQuery = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<RoomModel>> GetRoomsAsync(PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default);
+    Task<IReadOnlyDictionary<BuildingPropertyCategoryId, CalculatedPropertyValueDto>> GetBuildingCalculatedPropertyValuesAsync(int buildingId, PythagorasQuery<CalculatedPropertyValueDto>? query = null, CancellationToken cancellationToken = default);
 }

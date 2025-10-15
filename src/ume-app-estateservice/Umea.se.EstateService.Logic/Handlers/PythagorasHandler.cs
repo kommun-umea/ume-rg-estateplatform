@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.Logic.Mappers;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
@@ -16,6 +17,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
     private static string FloorWorkspacesEndpoint(int floorId) => $"rest/v1/floor/{floorId}/workspace/info";
 
     private static string BuildingWorkspacesEndpoint(int buildingId) => $"rest/v1/building/{buildingId}/workspace/info";
+    private static string BuildingCalculatedPropertyValuesEndpoint(int buildingId) => $"rest/v1/building/{buildingId}/property/calculatedvalue";
 
     public async Task<IReadOnlyList<BuildingInfoModel>> GetBuildingsAsync(PythagorasQuery<BuildingInfo>? query = null, CancellationToken cancellationToken = default)
     {
@@ -114,5 +116,34 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
             .ConfigureAwait(false);
 
         return PythagorasEstateMapper.ToModel(payload);
+    }
+
+    public async Task<IReadOnlyDictionary<BuildingPropertyCategoryId, CalculatedPropertyValueDto>> GetBuildingCalculatedPropertyValuesAsync(
+        int buildingId,
+        PythagorasQuery<CalculatedPropertyValueDto>? query = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (buildingId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
+        }
+
+        IReadOnlyDictionary<int, CalculatedPropertyValueDto> rawValues = await pythagorasClient
+            .GetDictionaryAsync(BuildingCalculatedPropertyValuesEndpoint(buildingId), query, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (rawValues.Count == 0)
+        {
+            return new Dictionary<BuildingPropertyCategoryId, CalculatedPropertyValueDto>();
+        }
+
+        Dictionary<BuildingPropertyCategoryId, CalculatedPropertyValueDto> mapped = new(rawValues.Count);
+        foreach (KeyValuePair<int, CalculatedPropertyValueDto> entry in rawValues)
+        {
+            BuildingPropertyCategoryId categoryId = (BuildingPropertyCategoryId)entry.Key;
+            mapped[categoryId] = entry.Value;
+        }
+
+        return mapped;
     }
 }
