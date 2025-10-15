@@ -2,6 +2,7 @@ using Umea.se.EstateService.Logic.Providers;
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.EstateService.Shared.Search;
 using Umea.se.EstateService.Shared.ValueObjects;
@@ -86,6 +87,9 @@ public class PythagorasDocumentProviderTests
             => throw new NotSupportedException();
 
         public Task<IReadOnlyList<FloorWithRoomsModel>> GetBuildingFloorsWithRoomsAsync(int buildingId, PythagorasQuery<Floor>? floorQuery = null, PythagorasQuery<BuildingWorkspace>? workspaceQuery = null, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<IReadOnlyDictionary<BuildingPropertyCategoryId, CalculatedPropertyValueDto>> GetBuildingCalculatedPropertyValuesAsync(int buildingId, PythagorasQuery<CalculatedPropertyValueDto>? query = null, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
     }
 }
