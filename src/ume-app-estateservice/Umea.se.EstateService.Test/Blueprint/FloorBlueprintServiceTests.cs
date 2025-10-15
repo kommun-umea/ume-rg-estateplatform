@@ -33,9 +33,9 @@ public class FloorBlueprintServiceTests
             }
         };
 
-        FloorBlueprintService service = new(client, NullLogger<FloorBlueprintService>.Instance);
+        FloorBlueprintHandler fbHandler = new(client, NullLogger<FloorBlueprintHandler>.Instance);
 
-        FloorBlueprint result = await service.GetBlueprintAsync(42, BlueprintFormat.Pdf, includeWorkspaceTexts: false);
+        FloorBlueprint result = await fbHandler.GetBlueprintAsync(42, BlueprintFormat.Pdf, includeWorkspaceTexts: false);
 
         result.FileName.ShouldBe("source.pdf");
         result.ContentType.ShouldBe("application/pdf");
@@ -53,10 +53,10 @@ public class FloorBlueprintServiceTests
             OnGetFloorBlueprintAsync = (_, _, _, _) => throw new HttpRequestException("fail")
         };
 
-        FloorBlueprintService service = new(client, NullLogger<FloorBlueprintService>.Instance);
+        FloorBlueprintHandler fbHandler = new(client, NullLogger<FloorBlueprintHandler>.Instance);
 
         await Should.ThrowAsync<FloorBlueprintUnavailableException>(() =>
-            service.GetBlueprintAsync(5, BlueprintFormat.Svg, includeWorkspaceTexts: false));
+            fbHandler.GetBlueprintAsync(5, BlueprintFormat.Svg, includeWorkspaceTexts: false));
     }
 
     [Fact]
@@ -80,9 +80,9 @@ public class FloorBlueprintServiceTests
             }
         };
 
-        FloorBlueprintService service = new(client, NullLogger<FloorBlueprintService>.Instance);
+        FloorBlueprintHandler fbHandler = new(client, NullLogger<FloorBlueprintHandler>.Instance);
 
-        FloorBlueprint result = await service.GetBlueprintAsync(11, BlueprintFormat.Svg, includeWorkspaceTexts: false);
+        FloorBlueprint result = await fbHandler.GetBlueprintAsync(11, BlueprintFormat.Svg, includeWorkspaceTexts: false);
 
         result.FileName.ShouldBe("floor.svg");
     }
@@ -91,10 +91,10 @@ public class FloorBlueprintServiceTests
     public async Task GetBlueprintAsync_WithInvalidFloorId_ThrowsValidationException()
     {
         FakePythagorasClient client = new();
-        FloorBlueprintService service = new(client, NullLogger<FloorBlueprintService>.Instance);
+        FloorBlueprintHandler fbHandler = new(client, NullLogger<FloorBlueprintHandler>.Instance);
 
         await Should.ThrowAsync<FloorBlueprintValidationException>(() =>
-            service.GetBlueprintAsync(0, BlueprintFormat.Pdf, includeWorkspaceTexts: false));
+            fbHandler.GetBlueprintAsync(0, BlueprintFormat.Pdf, includeWorkspaceTexts: false));
     }
 
     [Fact]
@@ -132,9 +132,9 @@ public class FloorBlueprintServiceTests
             }
         };
 
-        FloorBlueprintService service = new(client, NullLogger<FloorBlueprintService>.Instance);
+        FloorBlueprintHandler fbHandler = new(client, NullLogger<FloorBlueprintHandler>.Instance);
 
-        FloorBlueprint result = await service.GetBlueprintAsync(5, BlueprintFormat.Svg, includeWorkspaceTexts: false);
+        FloorBlueprint result = await fbHandler.GetBlueprintAsync(5, BlueprintFormat.Svg, includeWorkspaceTexts: false);
 
         result.Content.Position = 0;
         using StreamReader reader = new(result.Content, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);

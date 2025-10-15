@@ -14,7 +14,7 @@ public static class DependencyInjectorLogic
         services.AddSingleton<IPythagorasHandler, PythagorasHandler>();
         services.AddSingleton<SearchHandler>();
         services.AddSingleton<IPythagorasDocumentProvider, PythagorasDocumentProvider>();
-        services.AddSingleton<IFloorBlueprintService, FloorBlueprintService>();
+        services.AddSingleton<IFloorBlueprintService, FloorBlueprintHandler>();
         services.AddOptions<SearchIndexRefreshOptions>()
             .BindConfiguration(SearchIndexRefreshOptions.SectionName);
         services.AddSingleton<SearchIndexRefreshService>();
