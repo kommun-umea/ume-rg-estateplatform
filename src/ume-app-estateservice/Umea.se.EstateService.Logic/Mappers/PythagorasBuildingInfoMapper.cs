@@ -36,7 +36,7 @@ public static class PythagorasBuildingInfoMapper
 
         return dtos.Count == 0
             ? []
-            : dtos.Select(ToModel).ToArray();
+            : dtos.Select(d => ToModel(d, null)).ToArray();
     }
 
     private static GeoPointModel? CreateGeoPoint(BuildingInfo dto)
@@ -73,7 +73,7 @@ public static class PythagorasBuildingInfoMapper
             dto.AddressExtra ?? string.Empty);
     }
 
-    private static IReadOnlyDictionary<string, string?> ToDictionary(Dictionary<string, string?>? source)
+    private static Dictionary<string, string?> ToDictionary(Dictionary<string, string?>? source)
     {
         if (source is null || source.Count == 0)
         {
@@ -93,14 +93,33 @@ public static class PythagorasBuildingInfoMapper
             return null;
         }
 
-        string? drawings = TryGetOutputValue(properties, BuildingPropertyCategoryId.Drawings);
-        string? buildingInformation = TryGetOutputValue(properties, BuildingPropertyCategoryId.BuildingInformation);
-        string? operationsGroups = TryGetOutputValue(properties, BuildingPropertyCategoryId.OperationsGroups);
-        string? noticeBoard = TryGetOutputValue(properties, BuildingPropertyCategoryId.EstatePortalNoticeBoard);
+        string? externalOwner = TryGetOutputValue(properties, BuildingPropertyCategoryId.ExternalOwner);
+        string? propertyDesignation = TryGetOutputValue(properties, BuildingPropertyCategoryId.PropertyDesignation);
 
-        bool hasData = drawings is not null
-            || buildingInformation is not null
-            || operationsGroups is not null
+        string? noticeBoardText = TryGetOutputValue(properties, BuildingPropertyCategoryId.NoticeBoardText);
+        BuildingExtendedPropertiesModel.NoticeBoardModel? noticeBoard = null;
+
+        if (!string.IsNullOrEmpty(noticeBoardText))
+        {
+            noticeBoard = new()
+            {
+                Text = TryGetOutputValue(properties, BuildingPropertyCategoryId.PropertyDesignation),
+                StartDate = DateTime.TryParse(
+                TryGetOutputValue(properties, BuildingPropertyCategoryId.NoticeBoardStartDate),
+                out DateTime startDate)
+                ? startDate
+                : null,
+                EndDate = DateTime.TryParse(
+                TryGetOutputValue(properties, BuildingPropertyCategoryId.NoticeBoardEndDate),
+                out DateTime endDate)
+                ? endDate
+                : null
+            };
+        }
+        
+
+        bool hasData = externalOwner is not null
+            || propertyDesignation is not null
             || noticeBoard is not null;
 
         if (!hasData)
@@ -110,10 +129,9 @@ public static class PythagorasBuildingInfoMapper
 
         return new BuildingExtendedPropertiesModel
         {
-            DrawingsValue = drawings,
-            BuildingInformationValue = buildingInformation,
-            OperationsGroupsValue = operationsGroups,
-            EstatePortalNoticeBoardValue = noticeBoard
+            ExternalOwner = externalOwner,
+            PropertyDesignation = propertyDesignation,
+            NoticeBoard = noticeBoard
         };
     }
 

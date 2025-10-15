@@ -4,6 +4,7 @@ using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.EstateService.Shared.Search;
 using Umea.se.EstateService.Shared.ValueObjects;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 
 namespace Umea.se.EstateService.Test.Search;
 
