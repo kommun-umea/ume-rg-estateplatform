@@ -1,4 +1,5 @@
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.EstateService.Shared.ValueObjects;
 
@@ -6,7 +7,7 @@ namespace Umea.se.EstateService.Logic.Mappers;
 
 public static class PythagorasBuildingInfoMapper
 {
-    public static BuildingInfoModel ToModel(BuildingInfo dto)
+    public static BuildingInfoModel ToModel(BuildingInfo dto, BuildingExtendedPropertiesModel? extendedProperties = null)
     {
         ArgumentNullException.ThrowIfNull(dto);
 
@@ -24,7 +25,8 @@ public static class PythagorasBuildingInfoMapper
             Address = CreateAddress(dto),
             ExtraInfo = ToDictionary(dto.ExtraInfo),
             PropertyValues = ToDictionary(dto.PropertyValues),
-            NavigationInfo = ToDictionary(dto.NavigationInfo)
+            NavigationInfo = ToDictionary(dto.NavigationInfo),
+            ExtendedProperties = extendedProperties
         };
     }
 
@@ -79,5 +81,51 @@ public static class PythagorasBuildingInfoMapper
         }
 
         return source.ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.OrdinalIgnoreCase);
+    }
+
+    public static BuildingExtendedPropertiesModel? ToExtendedPropertiesModel(
+        IReadOnlyDictionary<BuildingPropertyCategoryId, CalculatedPropertyValueDto> properties)
+    {
+        ArgumentNullException.ThrowIfNull(properties);
+
+        if (properties.Count == 0)
+        {
+            return null;
+        }
+
+        string? drawings = TryGetOutputValue(properties, BuildingPropertyCategoryId.Drawings);
+        string? buildingInformation = TryGetOutputValue(properties, BuildingPropertyCategoryId.BuildingInformation);
+        string? operationsGroups = TryGetOutputValue(properties, BuildingPropertyCategoryId.OperationsGroups);
+        string? noticeBoard = TryGetOutputValue(properties, BuildingPropertyCategoryId.EstatePortalNoticeBoard);
+
+        bool hasData = drawings is not null
+            || buildingInformation is not null
+            || operationsGroups is not null
+            || noticeBoard is not null;
+
+        if (!hasData)
+        {
+            return null;
+        }
+
+        return new BuildingExtendedPropertiesModel
+        {
+            DrawingsValue = drawings,
+            BuildingInformationValue = buildingInformation,
+            OperationsGroupsValue = operationsGroups,
+            EstatePortalNoticeBoardValue = noticeBoard
+        };
+    }
+
+    private static string? TryGetOutputValue(
+        IReadOnlyDictionary<BuildingPropertyCategoryId, CalculatedPropertyValueDto> properties,
+        BuildingPropertyCategoryId key)
+    {
+        if (!properties.TryGetValue(key, out CalculatedPropertyValueDto? value) || value is null)
+        {
+            return null;
+        }
+
+        return value.OutputValue;
     }
 }

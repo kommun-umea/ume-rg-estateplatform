@@ -6,8 +6,11 @@ namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 /// </summary>
 public enum BuildingPropertyCategoryId
 {
-    Drawings = 2,
-    BuildingInformation = 4,
-    OperationsGroups = 8,
-    EstatePortalNoticeBoard = 34
+    PropertyDesignation = 56,
+    YearOfConstruction = 226,
+    ExternalOwner = 234,
+    Note = 236,
+    NoticeBoardText = 239,
+    NoticeBoardStartDate = 240,
+    NoticeBoardEndDate = 241,
 }

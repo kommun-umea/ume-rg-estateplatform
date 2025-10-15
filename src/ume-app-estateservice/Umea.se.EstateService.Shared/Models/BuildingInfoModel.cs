@@ -19,6 +19,7 @@ public sealed class BuildingInfoModel : ISearchable
     public IReadOnlyDictionary<string, string?> ExtraInfo { get; init; } = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
     public IReadOnlyDictionary<string, string?> PropertyValues { get; init; } = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
     public IReadOnlyDictionary<string, string?> NavigationInfo { get; init; } = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+    public BuildingExtendedPropertiesModel? ExtendedProperties { get; init; }
 
     [MemberNotNullWhen(true, nameof(GeoLocation))]
     public bool HasGeoLocation => GeoLocation is not null;
