@@ -14,7 +14,7 @@ namespace Umea.se.EstateService.API.Controllers;
 public class SearchController(SearchHandler searchHandler) : ControllerBase
 {
     /// <summary>
-    /// Search for Pythagoras documents (estates, buildings, rooms) by query and type.
+    /// Search for Pythagoras documents (estates, buildings, rooms) by query and types.
     /// </summary>
     /// <remarks>
     /// Returns a list of matching documents based on the provided query, type, and optional filters.
@@ -36,7 +36,7 @@ public class SearchController(SearchHandler searchHandler) : ControllerBase
     {
         IReadOnlyList<SearchResult> results = await searchHandler.SearchAsync(
             req.Query,
-            req.Type,
+            req.Types,
             req.Limit,
             req.BuildingId,
             cancellationToken)

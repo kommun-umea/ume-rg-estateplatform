@@ -434,9 +434,10 @@ public sealed class InMemorySearchService
             .ThenBy(kv2 => _docs[kv2.Key].PopularName ?? _docs[kv2.Key].Name);
 
         // Apply type filter before taking MaxResults
-        if (options.FilterByType.HasValue)
+        if (options.FilterByTypes is { Count: > 0 } filterTypes)
         {
-            sortedDocs = sortedDocs.Where(kv2 => _docs[kv2.Key].Type == options.FilterByType.Value);
+            HashSet<NodeType> filterSet = filterTypes as HashSet<NodeType> ?? new HashSet<NodeType>(filterTypes);
+            sortedDocs = sortedDocs.Where(kv2 => filterSet.Contains(_docs[kv2.Key].Type));
         }
 
         SearchResult[] results = [.. sortedDocs

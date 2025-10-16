@@ -8,5 +8,5 @@ public sealed record QueryOptions(
     int FuzzyMaxEdits = 1,
     int MaxResults = 20,
     bool PreferEstatesOnTie = true,
-    NodeType? FilterByType = null
+    IReadOnlyCollection<NodeType>? FilterByTypes = null
 );

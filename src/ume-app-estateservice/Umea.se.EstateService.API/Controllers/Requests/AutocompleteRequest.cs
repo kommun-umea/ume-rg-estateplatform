@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 using Umea.se.EstateService.Shared.Autocomplete;
 
@@ -12,8 +11,7 @@ public sealed record AutocompleteRequest : IValidatableObject
 
     [FromQuery(Name = "type")]
     [Required]
-    [JsonConverter(typeof(JsonStringEnumConverter))]
-    public AutocompleteType Type { get; init; } = AutocompleteType.Any;
+    public AutocompleteType[] Types { get; init; } = [AutocompleteType.Any];
 
     [FromQuery(Name = "query")]
     [Required]
@@ -30,7 +28,21 @@ public sealed record AutocompleteRequest : IValidatableObject
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        if (Type is AutocompleteType.Room && BuildingId is int id && id <= 0)
+        if (Types.Length > 1 && Types.Contains(AutocompleteType.Any))
+        {
+            yield return new ValidationResult(
+                "The 'Any' type cannot be combined with other values.",
+                [nameof(Types)]);
+        }
+
+        if (Types.Distinct().Count() != Types.Length)
+        {
+            yield return new ValidationResult(
+                "Duplicate type values are not allowed.",
+                [nameof(Types)]);
+        }
+
+        if (Types.Contains(AutocompleteType.Room) && BuildingId is int id && id <= 0)
         {
             yield return new ValidationResult(
                 "BuildingId must be positive when provided for workspace autocomplete.",
@@ -38,4 +50,3 @@ public sealed record AutocompleteRequest : IValidatableObject
         }
     }
 }
-
