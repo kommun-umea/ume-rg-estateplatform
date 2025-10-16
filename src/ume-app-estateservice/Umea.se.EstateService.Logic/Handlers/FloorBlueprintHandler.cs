@@ -14,12 +14,12 @@ public sealed class FloorBlueprintHandler(
     IPythagorasClient pythagorasClient,
     ILogger<FloorBlueprintHandler> logger) : IFloorBlueprintService
 {
-    private static readonly string[] NodesToRemove = new[]
-    {
+    private static readonly string[] _nodesToRemove =
+    [
         "svgPageBorder",
         "svgSignature",
         "svgStamp"
-    };
+    ];
 
     private readonly IPythagorasClient _pythagorasClient = pythagorasClient;
     private readonly ILogger<FloorBlueprintHandler> _logger = logger;
@@ -99,7 +99,7 @@ public sealed class FloorBlueprintHandler(
         {
             source.Position = 0;
             XDocument document = XDocument.Load(source);
-            SvgCleaner.RemoveNodes(document, NodesToRemove);
+            SvgCleaner.RemoveNodes(document, _nodesToRemove);
             document = SvgCleaner.CropSvgToContent(document);
 
             MemoryStream cleaned = new();

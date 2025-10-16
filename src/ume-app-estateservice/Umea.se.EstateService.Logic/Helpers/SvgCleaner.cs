@@ -12,7 +12,7 @@ public static class SvgCleaner
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(idsToRemove);
 
-        HashSet<string> idSet = new HashSet<string>(
+        HashSet<string> idSet = new(
             idsToRemove.Where(id => !string.IsNullOrWhiteSpace(id)),
             StringComparer.Ordinal);
 
@@ -58,7 +58,7 @@ public static class SvgCleaner
             return document;
         }
 
-        List<XNode> contentToMove = innerSvg.Nodes().ToList();
+        List<XNode> contentToMove = [.. innerSvg.Nodes()];
         rootSvg.SetAttributeValue("viewBox", innerViewBox.Value);
 
         XAttribute? innerAspectRatio = innerSvg.Attribute("preserveAspectRatio");

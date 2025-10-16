@@ -135,10 +135,10 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
     private static FormUrlEncodedContent BuildBlueprintContent(FloorBlueprintRequestPayload payload)
     {
         string requestJson = JsonSerializer.Serialize(payload, _serializerOptions);
-        List<KeyValuePair<string, string>> pairs = new(1)
-        {
+        List<KeyValuePair<string, string>> pairs =
+        [
             new("requestObject", requestJson)
-        };
+        ];
 
         return new FormUrlEncodedContent(pairs);
     }

@@ -3,7 +3,6 @@ using System.Text;
 using Umea.se.EstateService.ServiceAccess;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.Test.TestData;
 
 namespace Umea.se.EstateService.Test.Pythagoras;
