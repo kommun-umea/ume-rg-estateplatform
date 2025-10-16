@@ -6,7 +6,8 @@ public sealed record QueryOptions(
     bool EnablePrefix = true,
     bool EnableFuzzy = true,
     int FuzzyMaxEdits = 1,
-    int MaxResults = 20,
+    int MaxResults = 50,
     bool PreferEstatesOnTie = true,
-    IReadOnlyCollection<NodeType>? FilterByTypes = null
+    IReadOnlyCollection<NodeType>? FilterByTypes = null,
+    bool EnableContains = true
 );

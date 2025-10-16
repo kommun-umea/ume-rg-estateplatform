@@ -46,6 +46,26 @@ public sealed class InMemorySearchService
         { NodeType.Room, 0.0 }
     };
 
+    private static HashSet<string> GenerateNgrams(string token, int minSize = 3, int maxSize = 6)
+    {
+        HashSet<string> ngrams = new(StringComparer.Ordinal);
+        if (string.IsNullOrEmpty(token) || token.Length < minSize)
+        {
+            return ngrams;
+        }
+
+        int upper = Math.Min(token.Length, maxSize);
+        for (int n = minSize; n <= upper; n++)
+        {
+            for (int i = 0; i <= token.Length - n; i++)
+            {
+                ngrams.Add(token.Substring(i, n));
+            }
+        }
+
+        return ngrams;
+    }
+
     public InMemorySearchService(IEnumerable<PythagorasDocument> items)
     {
         _symSpell = new SymSpell(1024, _symSpellMaxEdits);
@@ -77,7 +97,7 @@ public sealed class InMemorySearchService
             _docs.Add(it);
             int tokenCount = 0;
 
-            void IndexField(Field f, string? value)
+            void IndexField(Field f, string? value, bool createNgrams = false)
             {
                 int pos = 0;
                 foreach (string tok in TextNormalizer.Tokenize(value))
@@ -92,11 +112,19 @@ public sealed class InMemorySearchService
                     {
                         _termFrequencies[tok] = 1;
                     }
+
+                    if (createNgrams && tok.Length >= 3)
+                    {
+                        foreach (string ngram in GenerateNgrams(tok))
+                        {
+                            _idx.Add(ngram, docId, f, -1);
+                        }
+                    }
                 }
             }
 
-            IndexField(Field.Name, it.Name);
-            IndexField(Field.PopularName, it.PopularName);
+            IndexField(Field.Name, it.Name, createNgrams: true);
+            IndexField(Field.PopularName, it.PopularName, createNgrams: true);
             IndexField(Field.Path, it.Path);
             IndexField(Field.Address, it.Address);
             foreach (Ancestor a in it.Ancestors ?? [])
@@ -152,6 +180,17 @@ public sealed class InMemorySearchService
                         {
                             bucket.Add(t);
                         }
+                    }
+                }
+            }
+
+            if (options.EnableContains)
+            {
+                foreach (string ngram in GenerateNgrams(qt))
+                {
+                    if (_idx.Inverted.ContainsKey(ngram))
+                    {
+                        bucket.Add(ngram);
                     }
                 }
             }
