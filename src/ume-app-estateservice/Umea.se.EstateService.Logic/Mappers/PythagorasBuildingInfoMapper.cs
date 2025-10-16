@@ -97,13 +97,13 @@ public static class PythagorasBuildingInfoMapper
         string? propertyDesignation = TryGetOutputValue(properties, BuildingPropertyCategoryId.PropertyDesignation);
 
         string? noticeBoardText = TryGetOutputValue(properties, BuildingPropertyCategoryId.NoticeBoardText);
-        BuildingExtendedPropertiesModel.NoticeBoardModel? noticeBoard = null;
+        BuildingNoticeBoardModel? noticeBoard = null;
 
         if (!string.IsNullOrEmpty(noticeBoardText))
         {
-            noticeBoard = new()
+            noticeBoard = new BuildingNoticeBoardModel
             {
-                Text = TryGetOutputValue(properties, BuildingPropertyCategoryId.PropertyDesignation),
+                Text = noticeBoardText,
                 StartDate = DateTime.TryParse(
                 TryGetOutputValue(properties, BuildingPropertyCategoryId.NoticeBoardStartDate),
                 out DateTime startDate)
