@@ -7,15 +7,13 @@ using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Logic.Search;
 using Umea.se.EstateService.Shared.Autocomplete;
 using Umea.se.EstateService.Shared.Search;
-using Umea.se.Toolkit.Auth;
 
 namespace Umea.se.EstateService.API.Controllers;
 
 [ApiController]
 [Produces("application/json")]
 [Route(ApiRoutes.Search)]
-[AuthorizeApiKey]
-[Authorize(Policy = AuthPolicies.Employee)]
+[Authorize(Policy = AuthPolicies.EmployeeOrApiKey)]
 public class SearchController(SearchHandler searchHandler) : ControllerBase
 {
     /// <summary>

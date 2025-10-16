@@ -1,7 +1,8 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authorization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.OpenApi.Models;
 using Umea.se.EstateService.API;
 using Umea.se.EstateService.API.Authorization;
 using Umea.se.EstateService.Logic;
@@ -56,28 +57,68 @@ builder.Services
     {
         options.RequireHttpsMetadata = false;
         options.Authority = config.TokenServiceAddress;
-        options.Audience = config.ApiName;
-        options.TokenValidationParameters.ValidAudience = config.ApiName;
+        options.MapInboundClaims = false; // Keep raw claim types like "idp" and "scope".
+        List<string> validAudiences = new();
+        if (!string.IsNullOrWhiteSpace(config.ApiName))
+        {
+            validAudiences.Add(config.ApiName);
+        }
+
+        if (!string.IsNullOrWhiteSpace(config.EmployeeClaimValue))
+        {
+            validAudiences.Add(config.EmployeeClaimValue);
+        }
+
+        if (validAudiences.Count > 0)
+        {
+            options.TokenValidationParameters.ValidAudiences = validAudiences;
+        }
     });
 
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy(AuthPolicies.Employee, static policy =>
+    options.AddPolicy(AuthPolicies.EmployeeOrApiKey, policy =>
     {
-        policy.Requirements.Add(new EmployeeRequirement());
+        policy.Requirements.Add(new EmployeeOrApiKeyRequirement(new[] { "Default" }));
     });
 });
 
-builder.Services.AddSingleton<IAuthorizationHandler, EmployeeAuthorizationHandler>();
+builder.Services.AddSingleton<IAuthorizationHandler, EmployeeOrApiKeyAuthorizationHandler>();
 
 builder.Logging.UseDefaultLoggers(config);
 
 // Swagger
-if (!builder.Environment.IsEnvironment("IntegrationTest"))
+builder.Services.AddDefaultSwagger(config);
+builder.Services.ConfigureSwaggerGen(options =>
 {
-    builder.Services.AddDefaultSwagger(config);
-    builder.Services.ConfigureSwaggerGen(options => options.CustomSchemaIds(x => x.FullName));
-}
+    options.CustomSchemaIds(x => x.FullName);
+
+    if (!options.SwaggerGeneratorOptions.SecuritySchemes.ContainsKey("Bearer"))
+    {
+        options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+        {
+            Description = "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\"",
+            Name = "Authorization",
+            In = ParameterLocation.Header,
+            Type = SecuritySchemeType.Http,
+            Scheme = "Bearer",
+            BearerFormat = "JWT",
+        });
+    }
+
+    if (!options.SwaggerGeneratorOptions.SecuritySchemes.ContainsKey("ApiKey"))
+    {
+        options.AddSecurityDefinition("ApiKey", new OpenApiSecurityScheme
+        {
+            Description = "API Key sent in the X-Api-Key header.",
+            Name = "X-Api-Key",
+            In = ParameterLocation.Header,
+            Type = SecuritySchemeType.ApiKey,
+        });
+    }
+
+    options.OperationFilter<AuthorizeEmployeeOrApiKeyOperationFilter>();
+});
 
 builder.Services.AddAllowedOriginsCorsPolicy(config.AllowedOrigins);
 

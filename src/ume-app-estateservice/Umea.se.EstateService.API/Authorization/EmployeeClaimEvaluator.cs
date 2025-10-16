@@ -1,3 +1,4 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Umea.se.EstateService.Shared.Infrastructure;
 
@@ -12,18 +13,91 @@ public static class EmployeeClaimEvaluator
             return false;
         }
 
-        string? idpClaimValue = user.FindFirstValue("idp");
-        if (!string.IsNullOrWhiteSpace(idpClaimValue) && string.Equals(idpClaimValue, config.EmployeeIdpClaimValue, StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        if (string.IsNullOrWhiteSpace(config.EmployeeClaimType) || string.IsNullOrWhiteSpace(config.EmployeeClaimValue))
+        string? idpClaimValue = FindFirstValue(user, "idp");
+        if (string.IsNullOrWhiteSpace(idpClaimValue) || !string.Equals(idpClaimValue, config.EmployeeIdpClaimValue, StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
 
-        string? employeeClaim = user.FindFirstValue(config.EmployeeClaimType);
-        return !string.IsNullOrWhiteSpace(employeeClaim) && string.Equals(employeeClaim, config.EmployeeClaimValue, StringComparison.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(config.EmployeeClaimValue))
+        {
+            return false;
+        }
+
+        return FindAllValues(user, "scope")
+            .Any(claim => ClaimValueMatches(claim, config.EmployeeClaimValue));
+    }
+
+    private static string? FindFirstValue(ClaimsPrincipal user, string claimType)
+    {
+        foreach (string candidate in ResolveClaimTypes(claimType))
+        {
+            string? value = user.FindFirstValue(candidate);
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<string> FindAllValues(ClaimsPrincipal user, string claimType)
+    {
+        foreach (string candidate in ResolveClaimTypes(claimType))
+        {
+            foreach (Claim claim in user.FindAll(candidate))
+            {
+                yield return claim.Value;
+            }
+        }
+    }
+
+    private static IEnumerable<string> ResolveClaimTypes(string claimType)
+    {
+        HashSet<string> claimTypes = new(StringComparer.OrdinalIgnoreCase);
+
+        if (!string.IsNullOrWhiteSpace(claimType))
+        {
+            claimTypes.Add(claimType);
+
+            if (JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.TryGetValue(claimType, out string? mappedClaimType))
+            {
+                claimTypes.Add(mappedClaimType);
+            }
+
+            foreach (KeyValuePair<string, string> mapping in JwtSecurityTokenHandler.DefaultInboundClaimTypeMap)
+            {
+                if (string.Equals(mapping.Value, claimType, StringComparison.OrdinalIgnoreCase))
+                {
+                    claimTypes.Add(mapping.Key);
+                }
+            }
+        }
+
+        return claimTypes;
+    }
+
+    private static bool ClaimValueMatches(string claimValue, string expectedValue)
+    {
+        if (string.IsNullOrWhiteSpace(claimValue))
+        {
+            return false;
+        }
+
+        if (string.Equals(claimValue, expectedValue, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        foreach (string segment in claimValue.Split([' ', ','], StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (string.Equals(segment, expectedValue, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
