@@ -107,6 +107,8 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
                     doc.Ancestors.Add(CreateAncestorFromDocument(buildingDoc));
                 }
             }
+
+            doc.GrossArea = (decimal?)workspace.GrossArea;
         }
     }
 
