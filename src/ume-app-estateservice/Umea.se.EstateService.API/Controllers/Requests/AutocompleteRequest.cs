@@ -10,7 +10,7 @@ public sealed record AutocompleteRequest : IValidatableObject
     public const int MaxLimit = 1000;
 
     [FromQuery(Name = "type")]
-    public AutocompleteType[] Types { get; init; } = [AutocompleteType.Any];
+    public HashSet<AutocompleteType> Types { get; init; } = new() { AutocompleteType.Any };
 
     [FromQuery(Name = "query")]
     [Required]
@@ -21,31 +21,13 @@ public sealed record AutocompleteRequest : IValidatableObject
     [Range(1, MaxLimit, ErrorMessage = "Limit must be between {1} and {2}.")]
     public int Limit { get; init; } = 10;
 
-    [FromQuery(Name = "buildingId")]
-    [Range(1, int.MaxValue, ErrorMessage = "BuildingId must be positive when provided.")]
-    public int? BuildingId { get; init; }
-
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        if (Types.Length > 1 && Types.Contains(AutocompleteType.Any))
+        if (Types.Count > 1 && Types.Contains(AutocompleteType.Any))
         {
             yield return new ValidationResult(
                 "The 'Any' type cannot be combined with other values.",
                 [nameof(Types)]);
-        }
-
-        if (Types.Distinct().Count() != Types.Length)
-        {
-            yield return new ValidationResult(
-                "Duplicate type values are not allowed.",
-                [nameof(Types)]);
-        }
-
-        if (Types.Contains(AutocompleteType.Room) && BuildingId is int id && id <= 0)
-        {
-            yield return new ValidationResult(
-                "BuildingId must be positive when provided for workspace autocomplete.",
-                [nameof(BuildingId)]);
         }
     }
 }

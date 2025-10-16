@@ -20,7 +20,6 @@ public class SearchHandler(IPythagorasDocumentProvider documentProvider)
         string query,
         IReadOnlyCollection<AutocompleteType> types,
         int limit,
-        int? buildingId,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(query))
@@ -34,8 +33,6 @@ public class SearchHandler(IPythagorasDocumentProvider documentProvider)
 
         QueryOptions options = new(MaxResults: Math.Max(limit, 1), FilterByTypes: filterByTypes);
         IEnumerable<SearchResult> results = service.Search(query, options);
-
-        results = ApplyBuildingFilter(results, types, buildingId);
 
         return [.. results.Take(limit)];
     }
@@ -77,26 +74,6 @@ public class SearchHandler(IPythagorasDocumentProvider documentProvider)
         InMemorySearchService service = new(documents);
         _searchService = service;
         return service;
-    }
-
-    private static IEnumerable<SearchResult> ApplyBuildingFilter(
-        IEnumerable<SearchResult> results,
-        IReadOnlyCollection<AutocompleteType> types,
-        int? buildingId)
-    {
-        if (buildingId is null)
-        {
-            return results;
-        }
-
-        int buildingIdValue = buildingId.Value;
-        bool includesOnlyBuilding = types.Count == 1 && types.Contains(AutocompleteType.Building);
-
-        return includesOnlyBuilding
-            ? results.Where(r => r.Item.Type == NodeType.Building && r.Item.Id == buildingIdValue)
-            : results.Where(r =>
-                (r.Item.Type == NodeType.Building && r.Item.Id == buildingIdValue) ||
-                r.Item.Ancestors.Any(a => a.Type == NodeType.Building && a.Id == buildingIdValue));
     }
 
     private static IReadOnlyCollection<NodeType>? BuildNodeTypeFilter(IReadOnlyCollection<AutocompleteType> types)
