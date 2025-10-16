@@ -27,6 +27,7 @@ public class PythagorasDocumentProviderTests
         PythagorasDocument building = documents.Single(d => d.Type == NodeType.Building && d.Id == FakePythagorasHandler.BuildingId);
         building.Address.ShouldBe("Skolgatan 31A 901 84 Umeå");
         building.NumChildren.ShouldBe(1);
+        building.GrossArea.ShouldBe(555m);
 
         PythagorasDocument room = documents.Single(d => d.Type == NodeType.Room && d.Id == FakePythagorasHandler.RoomId);
         room.Address.ShouldBe(building.Address);
@@ -69,7 +70,8 @@ public class PythagorasDocumentProviderTests
             {
                 Id = BuildingId,
                 Name = "Building Info",
-                Address = address
+                Address = address,
+                GrossArea = 555m
             };
 
             return Task.FromResult<IReadOnlyList<BuildingInfoModel>>([model]);
