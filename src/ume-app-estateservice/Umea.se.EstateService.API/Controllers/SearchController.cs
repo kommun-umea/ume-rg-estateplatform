@@ -3,6 +3,7 @@ using Swashbuckle.AspNetCore.Annotations;
 using Umea.se.EstateService.API.Controllers.Requests;
 using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Logic.Search;
+using Umea.se.EstateService.Shared.Autocomplete;
 using Umea.se.EstateService.Shared.Search;
 using Umea.se.Toolkit.Auth;
 
@@ -34,9 +35,13 @@ public class SearchController(SearchHandler searchHandler) : ControllerBase
         [FromQuery][SwaggerParameter("Search request parameters.", Required = true)] AutocompleteRequest req,
         CancellationToken cancellationToken)
     {
+        IReadOnlyCollection<AutocompleteType> types = req.Types?.Length > 0
+            ? req.Types
+            : Array.Empty<AutocompleteType>();
+
         IReadOnlyList<SearchResult> results = await searchHandler.SearchAsync(
             req.Query,
-            req.Types,
+            types,
             req.Limit,
             req.BuildingId,
             cancellationToken)
