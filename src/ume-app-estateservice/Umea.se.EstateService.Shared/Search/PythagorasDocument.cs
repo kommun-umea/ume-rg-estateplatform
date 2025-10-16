@@ -21,6 +21,8 @@ public sealed class PythagorasDocument
     public double RankScore { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public string? Slug { get; set; }
+    public int NumChildren { get; set; }
+    public decimal? GrossArea { get; set; }
     [JsonIgnore]
     public DocumentKey Key => new(Type, Id);
 }

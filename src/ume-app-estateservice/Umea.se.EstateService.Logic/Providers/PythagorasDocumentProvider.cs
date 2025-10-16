@@ -48,10 +48,13 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
         foreach (EstateModel estate in estates)
         {
             PythagorasDocument estateDoc = CreateDocumentFromSearchable(estate);
+            estateDoc.GrossArea = estate.GrossArea;
             docs[estateDoc.Key] = estateDoc;
 
             foreach (BuildingModel building in estate.Buildings ?? [])
             {
+                estateDoc.NumChildren++;
+
                 if (buildingAddresses.TryGetValue(building.Id, out AddressModel? address))
                 {
                     building.Address = address;
@@ -93,6 +96,7 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
 
                 if (docs.TryGetValue(buildingKey, out PythagorasDocument? buildingDoc))
                 {
+                    buildingDoc.NumChildren++;
                     doc.Ancestors.AddRange(buildingDoc.Ancestors);
                     doc.Ancestors.Add(CreateAncestorFromDocument(buildingDoc));
                 }
