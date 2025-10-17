@@ -64,4 +64,41 @@ public class InMemorySearchServiceAddressTests
         results.ShouldContain(r => r.Item.Id == room.Id);
         results.ShouldNotContain(r => r.Item.Id == other.Id);
     }
+
+    [Fact]
+    public void Search_PrioritizesPopularNamePrefixOverSuppressedEntries()
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+
+        PythagorasDocument suppressed = new()
+        {
+            Id = 1,
+            Type = NodeType.Building,
+            Name = "458-06",
+            PopularName = "(Ta bort)STADSHUSET RYTTMÄSTAREN",
+            Address = null,
+            Ancestors = [],
+            UpdatedAt = now,
+            RankScore = 1
+        };
+
+        PythagorasDocument desired = new()
+        {
+            Id = 2,
+            Type = NodeType.Building,
+            Name = "458-01, -09, -18, -19",
+            PopularName = "Stadshuset norra flygeln, kuben, länken",
+            Address = "SKOLGATAN 31, 903 25 UMEÅ",
+            Ancestors = [],
+            UpdatedAt = now,
+            RankScore = 2
+        };
+
+        InMemorySearchService service = new([suppressed, desired]);
+
+        List<SearchResult> results = [.. service.Search("stadshus", new QueryOptions(MaxResults: 5))];
+
+        results.Count.ShouldBeGreaterThanOrEqualTo(2);
+        results[0].Item.Id.ShouldBe(desired.Id);
+    }
 }
