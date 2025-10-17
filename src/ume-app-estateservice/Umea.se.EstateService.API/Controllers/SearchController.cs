@@ -1,5 +1,4 @@
-﻿using System.Linq;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 using Umea.se.EstateService.API.Controllers.Requests;
 using Umea.se.EstateService.Logic.Handlers;

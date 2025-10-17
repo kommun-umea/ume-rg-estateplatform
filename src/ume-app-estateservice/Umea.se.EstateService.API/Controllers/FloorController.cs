@@ -4,6 +4,9 @@ using Umea.se.EstateService.API.Controllers.Requests;
 using Umea.se.EstateService.Logic.Exceptions;
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.Logic.Models;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
+using Umea.se.EstateService.Shared.Models;
 using Umea.se.Toolkit.Auth;
 
 namespace Umea.se.EstateService.API.Controllers;
@@ -14,10 +17,45 @@ namespace Umea.se.EstateService.API.Controllers;
 [AuthorizeApiKey]
 public sealed class FloorController(
     IFloorBlueprintService blueprintService,
+    IPythagorasHandler pythagorasHandler,
     ILogger<FloorController> logger) : ControllerBase
 {
     private readonly IFloorBlueprintService _blueprintService = blueprintService;
+    private readonly IPythagorasHandler _pythagorasHandler = pythagorasHandler;
     private readonly ILogger<FloorController> _logger = logger;
+
+    /// <summary>
+    /// Retrieves metadata for a specific floor.
+    /// </summary>
+    /// <param name="floorId">The floor identifier.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The requested floor metadata.</returns>
+    [HttpGet("{floorId:int}")]
+    [SwaggerOperation(
+        Summary = "Get floor",
+        Description = "Retrieves metadata for a floor using the floorIds[] filter."
+    )]
+    [SwaggerResponse(StatusCodes.Status200OK, "Floor metadata", typeof(FloorInfoModel))]
+    [SwaggerResponse(StatusCodes.Status404NotFound, "Floor not found.")]
+    public async Task<ActionResult<FloorInfoModel>> GetFloorAsync(
+        int floorId,
+        CancellationToken cancellationToken)
+    {
+        PythagorasQuery<Floor> query = new PythagorasQuery<Floor>()
+            .WithQueryParameterValues("floorIds[]", new[] { floorId });
+
+        IReadOnlyList<FloorInfoModel> floors = await _pythagorasHandler
+            .GetFloorsAsync(query, cancellationToken)
+            .ConfigureAwait(false);
+
+        FloorInfoModel? floor = floors.FirstOrDefault();
+        if (floor is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(floor);
+    }
 
     /// <summary>
     /// Retrieves a floor blueprint in PDF or SVG format.
