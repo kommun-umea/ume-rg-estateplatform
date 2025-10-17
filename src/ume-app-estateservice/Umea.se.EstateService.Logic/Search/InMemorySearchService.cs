@@ -49,6 +49,7 @@ public sealed class InMemorySearchService
         { NodeType.Building, 0.0 },
         { NodeType.Room, 0.0 }
     };
+    private const double _ngramPositionWeight = 0.6;
 
     private static HashSet<string> GenerateNgrams(string token, int minSize = 3, int maxSize = 6)
     {
@@ -315,7 +316,8 @@ public sealed class InMemorySearchService
                             popularStartsWith = true;
                         }
 
-                        tfWeighted += _w[p.Field] * p.Positions.Count;
+                        double positionWeight = ComputePositionWeight(p.Positions);
+                        tfWeighted += _w[p.Field] * p.Positions.Count * positionWeight;
                     }
 
                     double bm25 = ComputeBm25(tfWeighted, idf, _docLengths[docId], avgdl);
@@ -461,6 +463,30 @@ public sealed class InMemorySearchService
         const double b = 0.75;
         double denominator = tfWeighted + k1 * (1 - b + b * (docLength / avgdl));
         return denominator <= 0 ? 0 : idf * (tfWeighted * (k1 + 1)) / denominator;
+    }
+
+    private static double ComputePositionWeight(IReadOnlyList<int> positions)
+    {
+        if (positions.Count == 0)
+        {
+            return 1.0;
+        }
+
+        int first = positions[0];
+        for (int i = 1; i < positions.Count; i++)
+        {
+            if (positions[i] < first)
+            {
+                first = positions[i];
+            }
+        }
+
+        if (first < 0)
+        {
+            return _ngramPositionWeight;
+        }
+
+        return 1.0 / (1 + first);
     }
 
     private SearchResult[] ComposeResults(
