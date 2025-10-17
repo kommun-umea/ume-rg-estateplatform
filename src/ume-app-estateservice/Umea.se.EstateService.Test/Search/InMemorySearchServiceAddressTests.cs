@@ -57,7 +57,7 @@ public class InMemorySearchServiceAddressTests
 
         InMemorySearchService service = new([building, room, other]);
 
-        List<SearchResult> results = service.Search("Skolgatan 31A", new QueryOptions(MaxResults: 5)).ToList();
+        List<SearchResult> results = [.. service.Search("Skolgatan 31A", new QueryOptions(MaxResults: 5))];
 
         results.Count.ShouldBeGreaterThanOrEqualTo(2);
         results.ShouldContain(r => r.Item.Id == building.Id);

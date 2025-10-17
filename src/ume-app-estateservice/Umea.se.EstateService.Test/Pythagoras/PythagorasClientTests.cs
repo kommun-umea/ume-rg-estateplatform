@@ -191,6 +191,22 @@ public class PythagorasClientTests
         }
     }
 
+    private sealed class BlueprintCapturingHandler : HttpMessageHandler
+    {
+        public HttpRequestMessage? LastRequest { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            LastRequest = request;
+            HttpResponseMessage response = new(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent([])
+            };
+
+            return Task.FromResult(response);
+        }
+    }
+
     private sealed class PagingHandler(IReadOnlyDictionary<int, string> pages) : HttpMessageHandler
     {
         public int RequestCount { get; private set; }

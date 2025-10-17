@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.Toolkit.ExternalService;
 
 namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
@@ -100,4 +101,52 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
 
         return normalized;
     }
+
+    public Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (request.RequestUri is null)
+        {
+            throw new ArgumentException("Request must have RequestUri set.", nameof(request));
+        }
+
+        return HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+    }
+
+    public Task<HttpResponseMessage> GetFloorBlueprintAsync(int floorId, BlueprintFormat format, bool includeWorkspaceTexts, CancellationToken cancellationToken = default)
+    {
+        if (floorId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(floorId), "Floor id must be positive.");
+        }
+
+        string endpoint = $"rest/v1/floor/{floorId}/gmodel/print/{FormatToSegment(format)}";
+        FloorBlueprintRequestPayload payload = FloorBlueprintRequestPayload.CreateDefault();
+
+        HttpRequestMessage request = new(HttpMethod.Post, endpoint)
+        {
+            Content = BuildBlueprintContent(payload)
+        };
+
+        return HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+    }
+
+    private static FormUrlEncodedContent BuildBlueprintContent(FloorBlueprintRequestPayload payload)
+    {
+        string requestJson = JsonSerializer.Serialize(payload, _serializerOptions);
+        List<KeyValuePair<string, string>> pairs =
+        [
+            new("requestObject", requestJson)
+        ];
+
+        return new FormUrlEncodedContent(pairs);
+    }
+
+    private static string FormatToSegment(BlueprintFormat format) => format switch
+    {
+        BlueprintFormat.Pdf => "pdf",
+        BlueprintFormat.Svg => "svg",
+        _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Unsupported blueprint format.")
+    };
 }
