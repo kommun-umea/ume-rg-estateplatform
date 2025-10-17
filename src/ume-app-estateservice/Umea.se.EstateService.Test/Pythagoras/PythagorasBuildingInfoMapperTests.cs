@@ -39,10 +39,7 @@ public class PythagorasBuildingInfoMapperTests
             BusinessTypeName = "Business",
             ProspectOfBuildingId = 9,
             IsProspect = true,
-            ProspectStartDate = 1000,
-            ExtraInfo = new() { ["key"] = "value" },
-            PropertyValues = new() { ["prop"] = "123" },
-            NavigationInfo = new() { ["nav"] = "info" }
+            ProspectStartDate = 1000
         };
 
         BuildingInfoModel model = PythagorasBuildingInfoMapper.ToModel(dto);
@@ -59,12 +56,6 @@ public class PythagorasBuildingInfoMapperTests
         model.GeoLocation.ShouldNotBeNull();
         model.GeoLocation!.Lat.ShouldBe(dto.GeoX);
         model.GeoLocation.Lon.ShouldBe(dto.GeoY);
-        model.ExtraInfo.ContainsKey("key").ShouldBeTrue();
-        model.ExtraInfo["key"].ShouldBe("value");
-        model.PropertyValues.ContainsKey("prop").ShouldBeTrue();
-        model.PropertyValues["prop"].ShouldBe("123");
-        model.NavigationInfo.ContainsKey("nav").ShouldBeTrue();
-        model.NavigationInfo["nav"].ShouldBe("info");
     }
 
     [Fact]
