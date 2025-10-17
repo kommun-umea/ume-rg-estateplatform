@@ -12,5 +12,5 @@ public sealed class FloorWithRoomsModel
     public double? Height { get; init; }
     public double? ReferenceHeight { get; init; }
     public double? GrossFloorArea { get; init; }
-    public IReadOnlyList<BuildingRoomModel> Rooms { get; init; } = Array.Empty<BuildingRoomModel>();
+    public IReadOnlyList<BuildingRoomModel> Rooms { get; init; } = [];
 }

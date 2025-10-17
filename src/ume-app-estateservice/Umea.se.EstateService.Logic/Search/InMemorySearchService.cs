@@ -12,6 +12,10 @@ public sealed class InMemorySearchService
     private readonly Dictionary<int, int> _docLengths = []; // token count per doc
     private readonly Dictionary<string, int> _termFrequencies = new(StringComparer.Ordinal);
     private readonly Dictionary<string, double> _idf = new(StringComparer.Ordinal);
+    private static readonly JsonSerializerOptions _jsonSerializerOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+    };
 
     public int DocumentCount => _docs.Count;
 
@@ -46,6 +50,26 @@ public sealed class InMemorySearchService
         { NodeType.Room, 0.0 }
     };
 
+    private static HashSet<string> GenerateNgrams(string token, int minSize = 3, int maxSize = 6)
+    {
+        HashSet<string> ngrams = new(StringComparer.Ordinal);
+        if (string.IsNullOrEmpty(token) || token.Length < minSize)
+        {
+            return ngrams;
+        }
+
+        int upper = Math.Min(token.Length, maxSize);
+        for (int n = minSize; n <= upper; n++)
+        {
+            for (int i = 0; i <= token.Length - n; i++)
+            {
+                ngrams.Add(token.Substring(i, n));
+            }
+        }
+
+        return ngrams;
+    }
+
     public InMemorySearchService(IEnumerable<PythagorasDocument> items)
     {
         _symSpell = new SymSpell(1024, _symSpellMaxEdits);
@@ -55,10 +79,7 @@ public sealed class InMemorySearchService
     public static InMemorySearchService FromJsonFile(string path)
     {
         string json = File.ReadAllText(path);
-        List<PythagorasDocument> items = JsonSerializer.Deserialize<List<PythagorasDocument>>(json, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        }) ?? [];
+        List<PythagorasDocument> items = JsonSerializer.Deserialize<List<PythagorasDocument>>(json, _jsonSerializerOptions) ?? [];
         return new InMemorySearchService(items);
     }
 
@@ -77,7 +98,7 @@ public sealed class InMemorySearchService
             _docs.Add(it);
             int tokenCount = 0;
 
-            void IndexField(Field f, string? value)
+            void IndexField(Field f, string? value, bool createNgrams = false)
             {
                 int pos = 0;
                 foreach (string tok in TextNormalizer.Tokenize(value))
@@ -92,11 +113,19 @@ public sealed class InMemorySearchService
                     {
                         _termFrequencies[tok] = 1;
                     }
+
+                    if (createNgrams && tok.Length >= 3)
+                    {
+                        foreach (string ngram in GenerateNgrams(tok))
+                        {
+                            _idx.Add(ngram, docId, f, -1);
+                        }
+                    }
                 }
             }
 
-            IndexField(Field.Name, it.Name);
-            IndexField(Field.PopularName, it.PopularName);
+            IndexField(Field.Name, it.Name, createNgrams: true);
+            IndexField(Field.PopularName, it.PopularName, createNgrams: true);
             IndexField(Field.Path, it.Path);
             IndexField(Field.Address, it.Address);
             foreach (Ancestor a in it.Ancestors ?? [])
@@ -152,6 +181,17 @@ public sealed class InMemorySearchService
                         {
                             bucket.Add(t);
                         }
+                    }
+                }
+            }
+
+            if (options.EnableContains)
+            {
+                foreach (string ngram in GenerateNgrams(qt))
+                {
+                    if (_idx.Inverted.ContainsKey(ngram))
+                    {
+                        bucket.Add(ngram);
                     }
                 }
             }
@@ -423,7 +463,7 @@ public sealed class InMemorySearchService
         return denominator <= 0 ? 0 : idf * (tfWeighted * (k1 + 1)) / denominator;
     }
 
-    private IEnumerable<SearchResult> ComposeResults(
+    private SearchResult[] ComposeResults(
         Dictionary<int, double> docScores,
         Dictionary<int, Dictionary<string, string>> matchedPerDoc,
         QueryOptions options)
@@ -434,9 +474,10 @@ public sealed class InMemorySearchService
             .ThenBy(kv2 => _docs[kv2.Key].PopularName ?? _docs[kv2.Key].Name);
 
         // Apply type filter before taking MaxResults
-        if (options.FilterByType.HasValue)
+        if (options.FilterByTypes is { Count: > 0 } filterTypes)
         {
-            sortedDocs = sortedDocs.Where(kv2 => _docs[kv2.Key].Type == options.FilterByType.Value);
+            HashSet<NodeType> filterSet = filterTypes as HashSet<NodeType> ?? [.. filterTypes];
+            sortedDocs = sortedDocs.Where(kv2 => filterSet.Contains(_docs[kv2.Key].Type));
         }
 
         SearchResult[] results = [.. sortedDocs

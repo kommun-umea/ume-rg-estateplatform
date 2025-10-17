@@ -3,6 +3,7 @@ using Swashbuckle.AspNetCore.Annotations;
 using Umea.se.EstateService.API.Controllers.Requests;
 using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Logic.Search;
+using Umea.se.EstateService.Shared.Autocomplete;
 using Umea.se.EstateService.Shared.Search;
 using Umea.se.Toolkit.Auth;
 
@@ -14,7 +15,7 @@ namespace Umea.se.EstateService.API.Controllers;
 public class SearchController(SearchHandler searchHandler) : ControllerBase
 {
     /// <summary>
-    /// Search for Pythagoras documents (estates, buildings, rooms) by query and type.
+    /// Search for Pythagoras documents (estates, buildings, rooms) by query and types.
     /// </summary>
     /// <remarks>
     /// Returns a list of matching documents based on the provided query, type, and optional filters.
@@ -34,11 +35,14 @@ public class SearchController(SearchHandler searchHandler) : ControllerBase
         [FromQuery][SwaggerParameter("Search request parameters.", Required = true)] AutocompleteRequest req,
         CancellationToken cancellationToken)
     {
+        IReadOnlyCollection<AutocompleteType> types = req.Type is { Count: > 0 }
+            ? req.Type
+            : Array.Empty<AutocompleteType>();
+
         IReadOnlyList<SearchResult> results = await searchHandler.SearchAsync(
             req.Query,
-            req.Type,
+            types,
             req.Limit,
-            req.BuildingId,
             cancellationToken)
             .ConfigureAwait(false);
 

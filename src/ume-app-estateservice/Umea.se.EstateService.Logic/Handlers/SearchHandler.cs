@@ -16,7 +16,11 @@ public class SearchHandler(IPythagorasDocumentProvider documentProvider)
 
     public int GetDocumentCount() => _searchService?.DocumentCount ?? 0;
 
-    public async Task<IReadOnlyList<SearchResult>> SearchAsync(string query, AutocompleteType type, int limit, int? buildingId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<SearchResult>> SearchAsync(
+        string query,
+        IReadOnlyCollection<AutocompleteType> types,
+        int limit,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(query))
         {
@@ -25,17 +29,10 @@ public class SearchHandler(IPythagorasDocumentProvider documentProvider)
 
         InMemorySearchService service = await EnsureSearchServiceAsync(cancellationToken).ConfigureAwait(false);
 
-        // Pass type filter to search so it can return the right number of results
-        NodeType? filterByType = null;
-        if (type != AutocompleteType.Any && _autoCompleteTypeToNodeType.TryGetValue(type, out NodeType nodeType))
-        {
-            filterByType = nodeType;
-        }
+        IReadOnlyCollection<NodeType>? filterByTypes = BuildNodeTypeFilter(types);
 
-        QueryOptions options = new(MaxResults: Math.Max(limit, 1), FilterByType: filterByType);
+        QueryOptions options = new(MaxResults: Math.Max(limit, 1), FilterByTypes: filterByTypes);
         IEnumerable<SearchResult> results = service.Search(query, options);
-
-        results = ApplyBuildingFilter(results, type, buildingId);
 
         return [.. results.Take(limit)];
     }
@@ -79,26 +76,29 @@ public class SearchHandler(IPythagorasDocumentProvider documentProvider)
         return service;
     }
 
-    private static IEnumerable<SearchResult> ApplyBuildingFilter(IEnumerable<SearchResult> results, AutocompleteType type, int? buildingId)
+    private static HashSet<NodeType>? BuildNodeTypeFilter(IReadOnlyCollection<AutocompleteType> types)
     {
-        if (buildingId is null)
+        if (types.Count == 0 || types.Contains(AutocompleteType.Any))
         {
-            return results;
+            return null;
         }
 
-        int buildingIdValue = buildingId.Value;
-
-        return type switch
+        HashSet<NodeType> nodeTypes = [];
+        foreach (AutocompleteType type in types)
         {
-            AutocompleteType.Building => results.Where(r => r.Item.Type == NodeType.Building && r.Item.Id == buildingIdValue),
-            _ => results.Where(r => (r.Item.Type == NodeType.Building && r.Item.Id == buildingIdValue) ||
-                                     r.Item.Ancestors.Any(a => a.Type == NodeType.Building && a.Id == buildingIdValue))
-        };
+            if (_autoCompleteTypeToNodeType.TryGetValue(type, out NodeType nodeType))
+            {
+                nodeTypes.Add(nodeType);
+            }
+        }
+
+        return nodeTypes.Count == 0 ? null : nodeTypes;
     }
 
     private static readonly Dictionary<AutocompleteType, NodeType> _autoCompleteTypeToNodeType = new()
     {
         { AutocompleteType.Building, NodeType.Building },
-        { AutocompleteType.Room, NodeType.Room }
+        { AutocompleteType.Room, NodeType.Room },
+        { AutocompleteType.Estate, NodeType.Estate }
     };
 }

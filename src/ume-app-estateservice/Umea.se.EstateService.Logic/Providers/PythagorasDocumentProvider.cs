@@ -13,24 +13,24 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
     public async Task<ICollection<PythagorasDocument>> GetDocumentsAsync()
     {
         Dictionary<PythagorasDocument.DocumentKey, PythagorasDocument> docs = [];
-        IReadOnlyDictionary<int, AddressModel?> buildingAddresses = await LoadBuildingAddressesAsync().ConfigureAwait(false);
-        await AddEstatesAndBuildings(docs, buildingAddresses).ConfigureAwait(false);
-        await AddWorkspaces(docs, buildingAddresses).ConfigureAwait(false);
+        IReadOnlyDictionary<int, BuildingInfoModel> buildingInfos = await LoadBuildingInfosAsync().ConfigureAwait(false);
+        await AddEstatesAndBuildings(docs, buildingInfos).ConfigureAwait(false);
+        await AddWorkspaces(docs, buildingInfos).ConfigureAwait(false);
         return [.. docs.Values];
     }
 
-    private async Task<IReadOnlyDictionary<int, AddressModel?>> LoadBuildingAddressesAsync()
+    private async Task<IReadOnlyDictionary<int, BuildingInfoModel>> LoadBuildingInfosAsync()
     {
         IReadOnlyList<BuildingInfoModel> buildings = await pythagorasHandler.GetBuildingsAsync().ConfigureAwait(false);
         if (buildings.Count == 0)
         {
-            return new Dictionary<int, AddressModel?>();
+            return new Dictionary<int, BuildingInfoModel>();
         }
 
-        Dictionary<int, AddressModel?> result = new(buildings.Count);
+        Dictionary<int, BuildingInfoModel> result = new(buildings.Count);
         foreach (BuildingInfoModel building in buildings)
         {
-            result[building.Id] = building.Address;
+            result[building.Id] = building;
         }
 
         return result;
@@ -38,7 +38,7 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
 
     private async Task AddEstatesAndBuildings(
         Dictionary<PythagorasDocument.DocumentKey, PythagorasDocument> docs,
-        IReadOnlyDictionary<int, AddressModel?> buildingAddresses)
+        IReadOnlyDictionary<int, BuildingInfoModel> buildingInfos)
     {
         PythagorasQuery<NavigationFolder> query = new PythagorasQuery<NavigationFolder>()
             .WithQueryParameter("includeAscendantBuildings", true);
@@ -48,13 +48,17 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
         foreach (EstateModel estate in estates)
         {
             PythagorasDocument estateDoc = CreateDocumentFromSearchable(estate);
+            estateDoc.GrossArea = estate.GrossArea;
             docs[estateDoc.Key] = estateDoc;
 
             foreach (BuildingModel building in estate.Buildings ?? [])
             {
-                if (buildingAddresses.TryGetValue(building.Id, out AddressModel? address))
+                estateDoc.NumChildren++;
+
+                BuildingInfoModel? buildingInfo = null;
+                if (buildingInfos.TryGetValue(building.Id, out buildingInfo))
                 {
-                    building.Address = address;
+                    building.Address = buildingInfo.Address;
                 }
 
                 PythagorasDocument.DocumentKey buildingKey = new(NodeType.Building, building.Id);
@@ -64,6 +68,11 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
                     docs[doc.Key] = doc;
                 }
 
+                if (buildingInfo is not null)
+                {
+                    doc.GrossArea = buildingInfo.GrossArea;
+                }
+
                 doc.Ancestors.Add(CreateAncestorFromDocument(estateDoc));
             }
         }
@@ -71,7 +80,7 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
 
     private async Task AddWorkspaces(
         Dictionary<PythagorasDocument.DocumentKey, PythagorasDocument> docs,
-        IReadOnlyDictionary<int, AddressModel?> buildingAddresses)
+        IReadOnlyDictionary<int, BuildingInfoModel> buildingInfos)
     {
         PythagorasQuery<Workspace> query = new();
 
@@ -86,17 +95,20 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
             if (workspace.BuildingId is int buildingId)
             {
                 PythagorasDocument.DocumentKey buildingKey = new(NodeType.Building, buildingId);
-                if (buildingAddresses.TryGetValue(buildingId, out AddressModel? address))
+                if (buildingInfos.TryGetValue(buildingId, out BuildingInfoModel? buildingInfo))
                 {
-                    doc.Address = FormatAddress(address);
+                    doc.Address = FormatAddress(buildingInfo.Address);
                 }
 
                 if (docs.TryGetValue(buildingKey, out PythagorasDocument? buildingDoc))
                 {
+                    buildingDoc.NumChildren++;
                     doc.Ancestors.AddRange(buildingDoc.Ancestors);
                     doc.Ancestors.Add(CreateAncestorFromDocument(buildingDoc));
                 }
             }
+
+            doc.GrossArea = (decimal?)workspace.GrossArea;
         }
     }
 

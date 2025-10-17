@@ -11,7 +11,7 @@ internal sealed class TermIndex
     {
         if (!Inverted.TryGetValue(term, out List<Posting>? list))
         {
-            list = new List<Posting>();
+            list = [];
             Inverted[term] = list;
         }
         Posting? last = list.Count > 0 ? list[^1] : null;

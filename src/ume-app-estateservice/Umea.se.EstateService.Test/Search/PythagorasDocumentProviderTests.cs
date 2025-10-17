@@ -20,11 +20,19 @@ public class PythagorasDocumentProviderTests
 
         documents.ShouldNotBeEmpty();
 
+        PythagorasDocument estate = documents.Single(d => d.Type == NodeType.Estate && d.Id == FakePythagorasHandler.EstateId);
+        estate.NumChildren.ShouldBe(1);
+        estate.GrossArea.ShouldBe(123.45m);
+
         PythagorasDocument building = documents.Single(d => d.Type == NodeType.Building && d.Id == FakePythagorasHandler.BuildingId);
         building.Address.ShouldBe("Skolgatan 31A 901 84 Umeå");
+        building.NumChildren.ShouldBe(1);
+        building.GrossArea.ShouldBe(555m);
 
         PythagorasDocument room = documents.Single(d => d.Type == NodeType.Room && d.Id == FakePythagorasHandler.RoomId);
         room.Address.ShouldBe(building.Address);
+        room.NumChildren.ShouldBe(0);
+        room.GrossArea.ShouldBe(42.25m);
     }
 
     private sealed class FakePythagorasHandler : IPythagorasHandler
@@ -40,6 +48,7 @@ public class PythagorasDocumentProviderTests
                 Id = EstateId,
                 Name = "Estate",
                 PopularName = "Estate Popular",
+                GrossArea = 123.45m,
                 Buildings =
                 [
                     new BuildingModel
@@ -61,7 +70,8 @@ public class PythagorasDocumentProviderTests
             {
                 Id = BuildingId,
                 Name = "Building Info",
-                Address = address
+                Address = address,
+                GrossArea = 555m
             };
 
             return Task.FromResult<IReadOnlyList<BuildingInfoModel>>([model]);
@@ -73,7 +83,8 @@ public class PythagorasDocumentProviderTests
             {
                 Id = RoomId,
                 Name = "Room",
-                BuildingId = BuildingId
+                BuildingId = BuildingId,
+                GrossArea = 42.25
             };
 
             return Task.FromResult<IReadOnlyList<RoomModel>>([room]);

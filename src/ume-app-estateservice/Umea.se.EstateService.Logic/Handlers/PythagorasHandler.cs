@@ -72,7 +72,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
 
         if (floors.Count == 0)
         {
-            return Array.Empty<FloorWithRoomsModel>();
+            return [];
         }
 
         List<FloorWithRoomsModel> result = new(floors.Count);
