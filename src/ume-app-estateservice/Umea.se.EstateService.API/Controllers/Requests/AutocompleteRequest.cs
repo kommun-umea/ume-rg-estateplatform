@@ -10,7 +10,7 @@ public sealed record AutocompleteRequest : IValidatableObject
     public const int MaxLimit = 1000;
 
     [FromQuery(Name = "type")]
-    public HashSet<AutocompleteType> Types { get; init; } = new() { AutocompleteType.Any };
+    public HashSet<AutocompleteType> Types { get; init; } = [AutocompleteType.Any];
 
     [FromQuery(Name = "query")]
     [Required]

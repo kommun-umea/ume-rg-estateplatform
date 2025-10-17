@@ -8,7 +8,7 @@ public static class PythagorasFloorMapper
     public static FloorWithRoomsModel ToModel(Floor dto)
     {
         ArgumentNullException.ThrowIfNull(dto);
-        return ToModel(dto, Array.Empty<BuildingRoomModel>());
+        return ToModel(dto, []);
     }
 
     public static FloorWithRoomsModel ToModel(Floor dto, IReadOnlyList<BuildingRoomModel> rooms)

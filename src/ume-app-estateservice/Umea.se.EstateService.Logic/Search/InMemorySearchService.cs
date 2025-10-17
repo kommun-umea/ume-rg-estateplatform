@@ -12,6 +12,10 @@ public sealed class InMemorySearchService
     private readonly Dictionary<int, int> _docLengths = []; // token count per doc
     private readonly Dictionary<string, int> _termFrequencies = new(StringComparer.Ordinal);
     private readonly Dictionary<string, double> _idf = new(StringComparer.Ordinal);
+    private static readonly JsonSerializerOptions _jsonSerializerOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+    };
 
     public int DocumentCount => _docs.Count;
 
@@ -75,10 +79,7 @@ public sealed class InMemorySearchService
     public static InMemorySearchService FromJsonFile(string path)
     {
         string json = File.ReadAllText(path);
-        List<PythagorasDocument> items = JsonSerializer.Deserialize<List<PythagorasDocument>>(json, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        }) ?? [];
+        List<PythagorasDocument> items = JsonSerializer.Deserialize<List<PythagorasDocument>>(json, _jsonSerializerOptions) ?? [];
         return new InMemorySearchService(items);
     }
 
@@ -462,7 +463,7 @@ public sealed class InMemorySearchService
         return denominator <= 0 ? 0 : idf * (tfWeighted * (k1 + 1)) / denominator;
     }
 
-    private IEnumerable<SearchResult> ComposeResults(
+    private SearchResult[] ComposeResults(
         Dictionary<int, double> docScores,
         Dictionary<int, Dictionary<string, string>> matchedPerDoc,
         QueryOptions options)
@@ -475,7 +476,7 @@ public sealed class InMemorySearchService
         // Apply type filter before taking MaxResults
         if (options.FilterByTypes is { Count: > 0 } filterTypes)
         {
-            HashSet<NodeType> filterSet = filterTypes as HashSet<NodeType> ?? new HashSet<NodeType>(filterTypes);
+            HashSet<NodeType> filterSet = filterTypes as HashSet<NodeType> ?? [.. filterTypes];
             sortedDocs = sortedDocs.Where(kv2 => filterSet.Contains(_docs[kv2.Key].Type));
         }
 

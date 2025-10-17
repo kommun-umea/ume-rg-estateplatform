@@ -76,7 +76,7 @@ public class SearchHandler(IPythagorasDocumentProvider documentProvider)
         return service;
     }
 
-    private static IReadOnlyCollection<NodeType>? BuildNodeTypeFilter(IReadOnlyCollection<AutocompleteType> types)
+    private static HashSet<NodeType>? BuildNodeTypeFilter(IReadOnlyCollection<AutocompleteType> types)
     {
         if (types.Count == 0 || types.Contains(AutocompleteType.Any))
         {
