@@ -5,6 +5,7 @@ using Umea.se.Toolkit.Auth;
 
 namespace Umea.se.EstateService.API.Controllers;
 
+[ApiController]
 [Produces("application/json")]
 [Route(ApiRoutes.Admin)]
 [AuthorizeApiKey]
@@ -36,7 +37,10 @@ public sealed class AdminController(SearchIndexRefreshService refreshService) : 
         {
             RefreshStatus.Started => Accepted(new { message = "Search index refresh started" }),
             RefreshStatus.AlreadyRunning => Accepted(new { message = "Search index refresh already running" }),
-            _ => StatusCode(500, new { message = "Unknown refresh status" })
+            _ => Problem(
+                statusCode: StatusCodes.Status500InternalServerError,
+                title: "Unknown refresh status",
+                detail: "Search index refresh completed with an unknown status.")
         };
     }
 
@@ -56,7 +60,7 @@ public sealed class AdminController(SearchIndexRefreshService refreshService) : 
         Description = "Returns details about the search index, including document count, last and next refresh times, refresh interval, and refresh status."
     )]
     [ProducesResponseType(typeof(SearchIndexInfo), StatusCodes.Status200OK)]
-    public IActionResult GetIndexInfo()
+    public ActionResult<SearchIndexInfo> GetIndexInfo()
     {
         SearchIndexInfo info = refreshService.GetIndexInfo();
         return Ok(info);

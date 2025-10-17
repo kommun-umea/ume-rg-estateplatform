@@ -4,19 +4,58 @@ using Umea.se.EstateService.API.Controllers.Requests;
 using Umea.se.EstateService.Logic.Exceptions;
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.Logic.Models;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
+using Umea.se.EstateService.Shared.Models;
 using Umea.se.Toolkit.Auth;
 
 namespace Umea.se.EstateService.API.Controllers;
 
+[ApiController]
 [Produces("application/json")]
 [Route(ApiRoutes.Floors)]
 [AuthorizeApiKey]
 public sealed class FloorController(
     IFloorBlueprintService blueprintService,
+    IPythagorasHandler pythagorasHandler,
     ILogger<FloorController> logger) : ControllerBase
 {
     private readonly IFloorBlueprintService _blueprintService = blueprintService;
+    private readonly IPythagorasHandler _pythagorasHandler = pythagorasHandler;
     private readonly ILogger<FloorController> _logger = logger;
+
+    /// <summary>
+    /// Retrieves metadata for a specific floor.
+    /// </summary>
+    /// <param name="floorId">The floor identifier.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The requested floor metadata.</returns>
+    [HttpGet("{floorId:int}")]
+    [SwaggerOperation(
+        Summary = "Get floor",
+        Description = "Retrieves metadata for a floor using the floorIds[] filter."
+    )]
+    [SwaggerResponse(StatusCodes.Status200OK, "Floor metadata", typeof(FloorInfoModel))]
+    [SwaggerResponse(StatusCodes.Status404NotFound, "Floor not found.")]
+    public async Task<ActionResult<FloorInfoModel>> GetFloorAsync(
+        int floorId,
+        CancellationToken cancellationToken)
+    {
+        PythagorasQuery<Floor> query = new PythagorasQuery<Floor>()
+            .WithQueryParameterValues("floorIds[]", new[] { floorId });
+
+        IReadOnlyList<FloorInfoModel> floors = await _pythagorasHandler
+            .GetFloorsAsync(query, cancellationToken)
+            .ConfigureAwait(false);
+
+        FloorInfoModel? floor = floors.FirstOrDefault();
+        if (floor is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(floor);
+    }
 
     /// <summary>
     /// Retrieves a floor blueprint in PDF or SVG format.
@@ -44,9 +83,12 @@ public sealed class FloorController(
     {
         if (!ModelState.IsValid)
         {
-            return ValidationProblem(
-                modelStateDictionary: ModelState,
-                statusCode: StatusCodes.Status400BadRequest);
+            ValidationProblemDetails validationProblem = new(ModelState)
+            {
+                Status = StatusCodes.Status400BadRequest
+            };
+
+            return BadRequest(validationProblem);
         }
 
         try
@@ -58,27 +100,62 @@ public sealed class FloorController(
         catch (FloorBlueprintValidationException ex)
         {
             _logger.LogWarning(ex, "Validation error while generating blueprint for floor {FloorId}", floorId);
-            return BadRequest(new { message = ex.Message });
+            ProblemDetails problem = new()
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Invalid blueprint request",
+                Detail = ex.Message
+            };
+
+            return BadRequest(problem);
         }
         catch (FloorBlueprintUnavailableException ex)
         {
             _logger.LogError(ex, "Blueprint unavailable for floor {FloorId}", floorId);
-            return StatusCode(StatusCodes.Status502BadGateway, new { message = ex.Message });
+            ProblemDetails problem = new()
+            {
+                Status = StatusCodes.Status502BadGateway,
+                Title = "Blueprint unavailable",
+                Detail = ex.Message
+            };
+
+            return StatusCode(StatusCodes.Status502BadGateway, problem);
         }
         catch (KeyNotFoundException ex)
         {
             _logger.LogWarning(ex, "Floor {FloorId} not found when requesting blueprint", floorId);
-            return NotFound(new { message = "Floor not found." });
+            ProblemDetails problem = new()
+            {
+                Status = StatusCodes.Status404NotFound,
+                Title = "Floor not found",
+                Detail = "The requested floor could not be located."
+            };
+
+            return NotFound(problem);
         }
         catch (InvalidOperationException ex)
         {
             _logger.LogWarning(ex, "Conflict while generating blueprint for floor {FloorId}", floorId);
-            return Conflict(new { message = ex.Message });
+            ProblemDetails problem = new()
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "Blueprint generation conflict",
+                Detail = ex.Message
+            };
+
+            return Conflict(problem);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unexpected error while generating blueprint for floor {FloorId}", floorId);
-            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Unexpected error while generating blueprint." });
+            ProblemDetails problem = new()
+            {
+                Status = StatusCodes.Status500InternalServerError,
+                Title = "Blueprint generation failed",
+                Detail = "Unexpected error while generating blueprint."
+            };
+
+            return StatusCode(StatusCodes.Status500InternalServerError, problem);
         }
     }
 }

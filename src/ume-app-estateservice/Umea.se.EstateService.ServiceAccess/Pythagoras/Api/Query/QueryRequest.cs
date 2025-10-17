@@ -9,5 +9,5 @@ public sealed record QueryRequest
     public ImmutableList<Filter> Filters { get; init; } = [];
     public Order? OrderBy { get; init; }
     public Paging? Page { get; init; }
-    public ImmutableDictionary<string, string> AdditionalParameters { get; init; } = ImmutableDictionary<string, string>.Empty.WithComparers(StringComparer.OrdinalIgnoreCase);
+    public ImmutableList<KeyValuePair<string, string>> AdditionalParameters { get; init; } = ImmutableList<KeyValuePair<string, string>>.Empty;
 }

@@ -1,5 +1,6 @@
 ﻿namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 
+using System.Collections.Immutable;
 using System.Linq.Expressions;
 using System.Net.Http;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api.Query;
@@ -59,7 +60,42 @@ public class PythagorasQuery<T> where T : class
         }
 
         string formattedValue = ExpressionHelpers.FormatValue(value);
-        QueryRequest newReq = _req with { AdditionalParameters = _req.AdditionalParameters.SetItem(trimmedName, formattedValue) };
+        ImmutableList<KeyValuePair<string, string>> updated = _req.AdditionalParameters
+            .RemoveAll(kvp => string.Equals(kvp.Key, trimmedName, StringComparison.OrdinalIgnoreCase))
+            .Add(new(trimmedName, formattedValue));
+
+        QueryRequest newReq = _req with { AdditionalParameters = updated };
+        return new PythagorasQuery<T>(newReq, _usedSkip, _usedTake, _usedPage);
+    }
+
+    public PythagorasQuery<T> WithQueryParameterValues<TValue>(
+        string name,
+        IEnumerable<TValue> values)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(values);
+
+        string trimmedName = name.Trim();
+        if (trimmedName.Length == 0)
+        {
+            throw new ArgumentException("Parameter name must contain characters.", nameof(name));
+        }
+
+        if (QueryStringWriter.IsReservedKey(trimmedName))
+        {
+            throw new ArgumentException($"The parameter name '{trimmedName}' is reserved and cannot be used.", nameof(name));
+        }
+
+        ImmutableList<KeyValuePair<string, string>> updated = _req.AdditionalParameters
+            .RemoveAll(kvp => string.Equals(kvp.Key, trimmedName, StringComparison.OrdinalIgnoreCase));
+
+        foreach (TValue value in values)
+        {
+            string formattedValue = ExpressionHelpers.FormatValue(value);
+            updated = updated.Add(new(trimmedName, formattedValue));
+        }
+
+        QueryRequest newReq = _req with { AdditionalParameters = updated };
         return new PythagorasQuery<T>(newReq, _usedSkip, _usedTake, _usedPage);
     }
 

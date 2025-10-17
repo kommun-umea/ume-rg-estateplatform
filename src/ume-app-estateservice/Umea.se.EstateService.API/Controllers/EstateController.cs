@@ -9,13 +9,54 @@ using Umea.se.Toolkit.Auth;
 
 namespace Umea.se.EstateService.API.Controllers;
 
+[ApiController]
 [Produces("application/json")]
 [Route(ApiRoutes.Estates)]
 [AuthorizeApiKey]
 public class EstateController(IPythagorasHandler pythagorasService) : ControllerBase
 {
-    /// <summary>
-    /// Gets a list of estates.
+        /// <summary>
+        /// Gets a specific estate.
+        /// </summary>
+        /// <param name="estateId">The estate identifier.</param>
+        /// <param name="request">Query parameters controlling optional expansions.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>The requested estate or 404 when it does not exist.</returns>
+        [HttpGet("{estateId:int}")]
+        [SwaggerOperation(
+            Summary = "Get estate",
+            Description = "Retrieves a single estate with optional building information."
+        )]
+        [SwaggerResponse(StatusCodes.Status200OK, "The requested estate.", typeof(EstateModel))]
+        [SwaggerResponse(StatusCodes.Status404NotFound, "Estate not found.")]
+        public async Task<ActionResult<EstateModel>> GetEstateAsync(
+            int estateId,
+            [FromQuery] EstateDetailsRequest request,
+            CancellationToken cancellationToken)
+        {
+            PythagorasQuery<NavigationFolder> query = new PythagorasQuery<NavigationFolder>()
+                .Where(folder => folder.Id, estateId);
+
+            if (request.IncludeBuildings)
+            {
+                query = query.WithQueryParameter("includeAscendantBuildings", true);
+            }
+
+            IReadOnlyList<EstateModel> estates = await pythagorasService
+                .GetEstatesAsync(query, cancellationToken)
+                .ConfigureAwait(false);
+
+            EstateModel? estate = estates.FirstOrDefault();
+            if (estate is null)
+            {
+                return NotFound();
+            }
+
+            return Ok(estate);
+        }
+
+        /// <summary>
+        /// Gets a list of estates.
     /// </summary>
     /// <param name="request">Query parameters for filtering and searching estates.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -27,7 +68,7 @@ public class EstateController(IPythagorasHandler pythagorasService) : Controller
     )]
     [SwaggerResponse(StatusCodes.Status200OK, "A list of estates.", typeof(IReadOnlyList<EstateModel>))]
     [SwaggerResponse(StatusCodes.Status401Unauthorized, "Unauthorized.")]
-    public async Task<IReadOnlyList<EstateModel>> GetEstatesAsync(
+    public async Task<ActionResult<IReadOnlyList<EstateModel>>> GetEstatesAsync(
         [FromQuery] EstateListRequest request,
         CancellationToken cancellationToken)
     {
@@ -36,7 +77,7 @@ public class EstateController(IPythagorasHandler pythagorasService) : Controller
         IReadOnlyList<EstateModel> estates = await pythagorasService
             .GetEstatesAsync(query, cancellationToken);
 
-        return estates;
+        return Ok(estates);
     }
 
     /// <summary>
@@ -53,7 +94,7 @@ public class EstateController(IPythagorasHandler pythagorasService) : Controller
     [SwaggerResponse(StatusCodes.Status200OK, "A list of buildings for the estate.", typeof(IReadOnlyList<BuildingInfoModel>))]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid estate ID.")]
     [SwaggerResponse(StatusCodes.Status401Unauthorized, "Unauthorized.")]
-    public async Task<IReadOnlyList<BuildingInfoModel>> GetEstateBuildingsAsync(
+    public async Task<ActionResult<IReadOnlyList<BuildingInfoModel>>> GetEstateBuildingsAsync(
         int estateId,
         [FromQuery] PagedQueryRequest request,
         CancellationToken cancellationToken)
@@ -65,7 +106,7 @@ public class EstateController(IPythagorasHandler pythagorasService) : Controller
         IReadOnlyList<BuildingInfoModel> buildings = await pythagorasService
             .GetBuildingInfoAsync(query, estateId, cancellationToken);
 
-        return buildings;
+        return Ok(buildings);
     }
 
     private static PythagorasQuery<NavigationFolder> BuildQuery(EstateListRequest request)

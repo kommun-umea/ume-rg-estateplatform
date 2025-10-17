@@ -12,6 +12,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
     private const string WorkspacesEndpoint = "rest/v1/workspace/info";
     private const string BuildingsInfoEndpoint = "rest/v1/building/info";
     private const string NavigationFoldersEndpoint = "rest/v1/navigationfolder/info";
+    private const string FloorsInfoEndpoint = "rest/v1/floor/info";
     private static string BuildingFloorsEndpoint(int buildingId) => $"rest/v1/building/{buildingId}/floor";
     private static string FloorWorkspacesEndpoint(int floorId) => $"rest/v1/floor/{floorId}/workspace/info";
 
@@ -114,5 +115,14 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
             .ConfigureAwait(false);
 
         return PythagorasEstateMapper.ToModel(payload);
+    }
+
+    public async Task<IReadOnlyList<FloorInfoModel>> GetFloorsAsync(PythagorasQuery<Floor>? query = null, CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<Floor> payload = await pythagorasClient
+            .GetAsync(FloorsInfoEndpoint, query, cancellationToken)
+            .ConfigureAwait(false);
+
+        return PythagorasFloorInfoMapper.ToModel(payload);
     }
 }
