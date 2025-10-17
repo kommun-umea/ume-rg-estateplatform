@@ -10,6 +10,7 @@ using Umea.se.Toolkit.Auth;
 
 namespace Umea.se.EstateService.API.Controllers;
 
+[ApiController]
 [Produces("application/json")]
 [Route(ApiRoutes.Rooms)]
 [AuthorizeApiKey]
@@ -33,11 +34,6 @@ public class RoomController(IPythagorasHandler pythagorasHandler) : ControllerBa
         [FromQuery] RoomListRequest request,
         CancellationToken cancellationToken)
     {
-        if (!TryValidateModel(request))
-        {
-            return ValidationProblem(ModelState);
-        }
-
         PythagorasQuery<Workspace> query = BuildQuery(request);
         IReadOnlyList<RoomModel> rooms = await pythagorasHandler.GetRoomsAsync(query, cancellationToken);
         return Ok(rooms);

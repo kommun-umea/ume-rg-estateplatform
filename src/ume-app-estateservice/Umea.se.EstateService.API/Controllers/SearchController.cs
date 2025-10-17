@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.Linq;
+using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 using Umea.se.EstateService.API.Controllers.Requests;
 using Umea.se.EstateService.Logic.Handlers;
@@ -9,6 +10,7 @@ using Umea.se.Toolkit.Auth;
 
 namespace Umea.se.EstateService.API.Controllers;
 
+[ApiController]
 [Produces("application/json")]
 [Route(ApiRoutes.Search)]
 [AuthorizeApiKey]
@@ -31,7 +33,7 @@ public class SearchController(SearchHandler searchHandler) : ControllerBase
     )]
     [SwaggerResponse(StatusCodes.Status200OK, "A list of matching Pythagoras documents.", typeof(ICollection<PythagorasDocument>))]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid request parameters.")]
-    public async Task<ICollection<PythagorasDocument>> Search(
+    public async Task<ActionResult<ICollection<PythagorasDocument>>> Search(
         [FromQuery][SwaggerParameter("Search request parameters.", Required = true)] AutocompleteRequest req,
         CancellationToken cancellationToken)
     {
@@ -46,6 +48,8 @@ public class SearchController(SearchHandler searchHandler) : ControllerBase
             cancellationToken)
             .ConfigureAwait(false);
 
-        return [.. results.Select(r => r.Item)];
+        List<PythagorasDocument> documents = [.. results.Select(result => result.Item)];
+
+        return Ok(documents);
     }
 }

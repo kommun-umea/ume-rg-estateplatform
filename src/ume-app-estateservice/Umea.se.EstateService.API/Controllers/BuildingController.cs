@@ -9,6 +9,7 @@ using Umea.se.Toolkit.Auth;
 
 namespace Umea.se.EstateService.API.Controllers;
 
+[ApiController]
 [Produces("application/json")]
 [Route(ApiRoutes.Buildings)]
 [AuthorizeApiKey]
@@ -29,11 +30,12 @@ public class BuildingController(IPythagorasHandler pythagorasService) : Controll
         Description = "Retrieves buildings using limit/offset paging, search, and optional estate filtering."
     )]
     [SwaggerResponse(StatusCodes.Status200OK, "List of buildings", typeof(IReadOnlyList<BuildingInfoModel>))]
-    public Task<IReadOnlyList<BuildingInfoModel>> GetBuildingsAsync(
+    public async Task<ActionResult<IReadOnlyList<BuildingInfoModel>>> GetBuildingsAsync(
         [FromQuery] BuildingListRequest request,
         CancellationToken cancellationToken)
     {
-        return QueryBuildingsAsync(request, cancellationToken);
+        IReadOnlyList<BuildingInfoModel> buildings = await QueryBuildingsAsync(request, cancellationToken).ConfigureAwait(false);
+        return Ok(buildings);
     }
 
     /// <summary>
@@ -50,7 +52,7 @@ public class BuildingController(IPythagorasHandler pythagorasService) : Controll
     )]
     [SwaggerResponse(StatusCodes.Status200OK, "List of rooms for the building", typeof(IReadOnlyList<BuildingRoomModel>))]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid buildingId")]
-    public Task<IReadOnlyList<BuildingRoomModel>> GetBuildingRoomsAsync(
+    public async Task<ActionResult<IReadOnlyList<BuildingRoomModel>>> GetBuildingRoomsAsync(
         int buildingId,
         [FromQuery] BuildingRoomsRequest request,
         CancellationToken cancellationToken)
@@ -59,7 +61,11 @@ public class BuildingController(IPythagorasHandler pythagorasService) : Controll
             .ApplyGeneralSearch(request)
             .ApplyPaging(request);
 
-        return pythagorasService.GetBuildingWorkspacesAsync(buildingId, query, cancellationToken);
+        IReadOnlyList<BuildingRoomModel> rooms = await pythagorasService
+            .GetBuildingWorkspacesAsync(buildingId, query, cancellationToken)
+            .ConfigureAwait(false);
+
+        return Ok(rooms);
     }
 
     /// <summary>

@@ -9,6 +9,7 @@ using Umea.se.Toolkit.Auth;
 
 namespace Umea.se.EstateService.API.Controllers;
 
+[ApiController]
 [Produces("application/json")]
 [Route(ApiRoutes.Estates)]
 [AuthorizeApiKey]
@@ -27,7 +28,7 @@ public class EstateController(IPythagorasHandler pythagorasService) : Controller
     )]
     [SwaggerResponse(StatusCodes.Status200OK, "A list of estates.", typeof(IReadOnlyList<EstateModel>))]
     [SwaggerResponse(StatusCodes.Status401Unauthorized, "Unauthorized.")]
-    public async Task<IReadOnlyList<EstateModel>> GetEstatesAsync(
+    public async Task<ActionResult<IReadOnlyList<EstateModel>>> GetEstatesAsync(
         [FromQuery] EstateListRequest request,
         CancellationToken cancellationToken)
     {
@@ -36,7 +37,7 @@ public class EstateController(IPythagorasHandler pythagorasService) : Controller
         IReadOnlyList<EstateModel> estates = await pythagorasService
             .GetEstatesAsync(query, cancellationToken);
 
-        return estates;
+        return Ok(estates);
     }
 
     /// <summary>
@@ -53,7 +54,7 @@ public class EstateController(IPythagorasHandler pythagorasService) : Controller
     [SwaggerResponse(StatusCodes.Status200OK, "A list of buildings for the estate.", typeof(IReadOnlyList<BuildingInfoModel>))]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid estate ID.")]
     [SwaggerResponse(StatusCodes.Status401Unauthorized, "Unauthorized.")]
-    public async Task<IReadOnlyList<BuildingInfoModel>> GetEstateBuildingsAsync(
+    public async Task<ActionResult<IReadOnlyList<BuildingInfoModel>>> GetEstateBuildingsAsync(
         int estateId,
         [FromQuery] PagedQueryRequest request,
         CancellationToken cancellationToken)
@@ -65,7 +66,7 @@ public class EstateController(IPythagorasHandler pythagorasService) : Controller
         IReadOnlyList<BuildingInfoModel> buildings = await pythagorasService
             .GetBuildingInfoAsync(query, estateId, cancellationToken);
 
-        return buildings;
+        return Ok(buildings);
     }
 
     private static PythagorasQuery<NavigationFolder> BuildQuery(EstateListRequest request)
