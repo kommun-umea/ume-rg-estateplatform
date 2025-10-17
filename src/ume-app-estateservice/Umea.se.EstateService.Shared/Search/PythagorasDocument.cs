@@ -21,7 +21,13 @@ public sealed class PythagorasDocument
     public double RankScore { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public string? Slug { get; set; }
+    /// <summary>
+    /// Number of children for the entity, if available.
+    /// </summary>
     public int NumChildren { get; set; }
+    /// <summary>
+    /// Total area for the entity, if available.
+    /// </summary>
     public decimal? GrossArea { get; set; }
     [JsonIgnore]
     public DocumentKey Key => new(Type, Id);

@@ -35,8 +35,8 @@ public class SearchController(SearchHandler searchHandler) : ControllerBase
         [FromQuery][SwaggerParameter("Search request parameters.", Required = true)] AutocompleteRequest req,
         CancellationToken cancellationToken)
     {
-        IReadOnlyCollection<AutocompleteType> types = req.Types is { Count: > 0 }
-            ? req.Types
+        IReadOnlyCollection<AutocompleteType> types = req.Type is { Count: > 0 }
+            ? req.Type
             : Array.Empty<AutocompleteType>();
 
         IReadOnlyList<SearchResult> results = await searchHandler.SearchAsync(

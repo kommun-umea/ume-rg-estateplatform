@@ -10,7 +10,7 @@ public sealed record AutocompleteRequest : IValidatableObject
     public const int MaxLimit = 1000;
 
     [FromQuery(Name = "type")]
-    public HashSet<AutocompleteType> Types { get; init; } = [AutocompleteType.Any];
+    public HashSet<AutocompleteType> Type { get; init; } = [AutocompleteType.Any];
 
     [FromQuery(Name = "query")]
     [Required]
@@ -23,11 +23,11 @@ public sealed record AutocompleteRequest : IValidatableObject
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        if (Types.Count > 1 && Types.Contains(AutocompleteType.Any))
+        if (Type.Count > 1 && Type.Contains(AutocompleteType.Any))
         {
             yield return new ValidationResult(
                 "The 'Any' type cannot be combined with other values.",
-                [nameof(Types)]);
+                [nameof(Type)]);
         }
     }
 }
