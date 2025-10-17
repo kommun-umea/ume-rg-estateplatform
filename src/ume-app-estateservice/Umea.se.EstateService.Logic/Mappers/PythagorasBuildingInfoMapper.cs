@@ -21,10 +21,7 @@ public static class PythagorasBuildingInfoMapper
             NetArea = dto.Netarea ?? 0m,
             SumGrossFloorArea = dto.SumGrossFloorarea ?? 0m,
             NumPlacedPersons = dto.NumPlacedPersons,
-            Address = CreateAddress(dto),
-            ExtraInfo = ToDictionary(dto.ExtraInfo),
-            PropertyValues = ToDictionary(dto.PropertyValues),
-            NavigationInfo = ToDictionary(dto.NavigationInfo)
+            Address = CreateAddress(dto)
         };
     }
 
@@ -69,15 +66,5 @@ public static class PythagorasBuildingInfoMapper
             dto.AddressCity ?? string.Empty,
             dto.AddressCountry ?? string.Empty,
             dto.AddressExtra ?? string.Empty);
-    }
-
-    private static IReadOnlyDictionary<string, string?> ToDictionary(Dictionary<string, string?>? source)
-    {
-        if (source is null || source.Count == 0)
-        {
-            return new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-        }
-
-        return source.ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.OrdinalIgnoreCase);
     }
 }
