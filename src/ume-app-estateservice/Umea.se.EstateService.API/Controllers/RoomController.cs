@@ -13,7 +13,7 @@ namespace Umea.se.EstateService.API.Controllers;
 [ApiController]
 [Produces("application/json")]
 [Route(ApiRoutes.Rooms)]
-[Authorize(Policy = ToolkitAuthPolicies.EmployeeOrApiKey)]
+[AuthorizeJwtOrApiKey]
 public class RoomController(IPythagorasHandler pythagorasHandler) : ControllerBase
 {
     /// <summary>

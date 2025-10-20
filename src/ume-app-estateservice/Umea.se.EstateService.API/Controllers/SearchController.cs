@@ -1,5 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 using Umea.se.EstateService.API.Controllers.Requests;
 using Umea.se.EstateService.Logic.Handlers;
@@ -13,7 +12,7 @@ namespace Umea.se.EstateService.API.Controllers;
 [ApiController]
 [Produces("application/json")]
 [Route(ApiRoutes.Search)]
-[Authorize(Policy = ToolkitAuthPolicies.EmployeeOrApiKey)]
+[AuthorizeJwtOrApiKey]
 public class SearchController(SearchHandler searchHandler) : ControllerBase
 {
     /// <summary>

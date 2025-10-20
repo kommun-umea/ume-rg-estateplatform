@@ -7,8 +7,8 @@ using Umea.se.EstateService.Logic;
 using Umea.se.EstateService.ServiceAccess;
 using Umea.se.EstateService.Shared;
 using Umea.se.EstateService.Shared.Infrastructure;
-using Umea.se.Toolkit.Auth;
-using Umea.se.Toolkit.Auth.Authorization;
+using Umea.se.Toolkit.Auth.Authorization.Jwt;
+using Umea.se.Toolkit.Auth.Extensions;
 using Umea.se.Toolkit.EntryPoints;
 using Umea.se.Toolkit.Filters;
 
@@ -46,11 +46,14 @@ builder.Services.AddDefaultHttpClient(HttpClientNames.Pythagoras, options =>
     options.DefaultRequestHeaders.Add("api_key", config.PythagorasApiKey);
 });
 
-builder.Services.AddEmployeeOrApiKeyAuthorization(options =>
+builder.Services.AddJwtOrApiKeyAuthorization(options =>
 {
-    options.EmployeeIdpClaimValue = config.EmployeeIdpClaimValue;
-    options.EmployeeClaimValue = config.EmployeeClaimValue;
+    options.RequiredClaims =
+    [
+        new RequiredClaim("idp", "AzureActiveDirectory")
+    ];
 });
+
 config.ValidateApiKeys();
 
 AuthenticationBuilder authenticationBuilder = builder.Services

@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 <<<<<<< HEAD
@@ -17,7 +16,7 @@ namespace Umea.se.EstateService.API.Controllers;
 [ApiController]
 [Produces("application/json")]
 [Route(ApiRoutes.Buildings)]
-[Authorize(Policy = ToolkitAuthPolicies.EmployeeOrApiKey)]
+[AuthorizeJwtOrApiKey]
 public class BuildingController(IPythagorasHandler pythagorasService) : ControllerBase
 {
     /// <summary>
