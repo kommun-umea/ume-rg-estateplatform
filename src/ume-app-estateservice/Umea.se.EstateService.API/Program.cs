@@ -46,7 +46,11 @@ builder.Services.AddDefaultHttpClient(HttpClientNames.Pythagoras, options =>
     options.DefaultRequestHeaders.Add("api_key", config.PythagorasApiKey);
 });
 
-builder.Services.AddEmployeeOrApiKeyAuthorization(config);
+builder.Services.AddEmployeeOrApiKeyAuthorization(options =>
+{
+    options.EmployeeIdpClaimValue = config.EmployeeIdpClaimValue;
+    options.EmployeeClaimValue = config.EmployeeClaimValue;
+});
 config.ValidateApiKeys();
 
 AuthenticationBuilder authenticationBuilder = builder.Services

@@ -14,7 +14,6 @@ namespace Umea.se.EstateService.API.Controllers;
 [Produces("application/json")]
 [Route(ApiRoutes.Search)]
 [Authorize(Policy = ToolkitAuthPolicies.EmployeeOrApiKey)]
-[AllowApiKeys("Default")]
 public class SearchController(SearchHandler searchHandler) : ControllerBase
 {
     /// <summary>
