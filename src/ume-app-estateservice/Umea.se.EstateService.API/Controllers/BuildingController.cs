@@ -16,7 +16,7 @@ namespace Umea.se.EstateService.API.Controllers;
 [ApiController]
 [Produces("application/json")]
 [Route(ApiRoutes.Buildings)]
-[AuthorizeJwtOrApiKey]
+[AuthorizeJwtOrApiKey("Default")]
 public class BuildingController(IPythagorasHandler pythagorasService) : ControllerBase
 {
     /// <summary>
