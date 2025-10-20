@@ -1,4 +1,3 @@
-using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Umea.se.EstateService.Shared.Infrastructure;
 
@@ -6,15 +5,22 @@ namespace Umea.se.EstateService.API.Authorization;
 
 public static class EmployeeClaimEvaluator
 {
+    private static readonly string[] IdpClaimTypes =
+    [
+        "idp",
+        "http://schemas.microsoft.com/identity/claims/identityprovider",
+    ];
+
+    private static readonly string[] ScopeClaimTypes =
+    [
+        "scope",
+        "scp",
+        "http://schemas.microsoft.com/identity/claims/scope",
+    ];
+
     public static bool IsEmployee(ClaimsPrincipal? user, ApplicationConfig config)
     {
-        if (user is null)
-        {
-            return false;
-        }
-
-        string? idpClaimValue = FindFirstValue(user, "idp");
-        if (string.IsNullOrWhiteSpace(idpClaimValue) || !string.Equals(idpClaimValue, config.EmployeeIdpClaimValue, StringComparison.OrdinalIgnoreCase))
+        if (user?.Identity?.IsAuthenticated != true)
         {
             return false;
         }
@@ -24,15 +30,21 @@ public static class EmployeeClaimEvaluator
             return false;
         }
 
-        return FindAllValues(user, "scope")
-            .Any(claim => ClaimValueMatches(claim, config.EmployeeClaimValue));
+        string? identityProvider = GetFirstNonEmptyValue(user, IdpClaimTypes);
+        if (string.IsNullOrWhiteSpace(identityProvider)
+            || !string.Equals(identityProvider, config.EmployeeIdpClaimValue, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return HasScope(user, config.EmployeeClaimValue);
     }
 
-    private static string? FindFirstValue(ClaimsPrincipal user, string claimType)
+    private static string? GetFirstNonEmptyValue(ClaimsPrincipal user, IEnumerable<string> claimTypes)
     {
-        foreach (string candidate in ResolveClaimTypes(claimType))
+        foreach (string claimType in claimTypes)
         {
-            string? value = user.FindFirstValue(candidate);
+            string? value = user.FindFirst(claimType)?.Value;
             if (!string.IsNullOrWhiteSpace(value))
             {
                 return value;
@@ -42,57 +54,37 @@ public static class EmployeeClaimEvaluator
         return null;
     }
 
-    private static IEnumerable<string> FindAllValues(ClaimsPrincipal user, string claimType)
+    private static bool HasScope(ClaimsPrincipal user, string expectedScope)
     {
-        foreach (string candidate in ResolveClaimTypes(claimType))
+        foreach (string claimType in ScopeClaimTypes)
         {
-            foreach (Claim claim in user.FindAll(candidate))
+            foreach (Claim claim in user.FindAll(claimType))
             {
-                yield return claim.Value;
-            }
-        }
-    }
-
-    private static IEnumerable<string> ResolveClaimTypes(string claimType)
-    {
-        HashSet<string> claimTypes = new(StringComparer.OrdinalIgnoreCase);
-
-        if (!string.IsNullOrWhiteSpace(claimType))
-        {
-            claimTypes.Add(claimType);
-
-            if (JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.TryGetValue(claimType, out string? mappedClaimType))
-            {
-                claimTypes.Add(mappedClaimType);
-            }
-
-            foreach (KeyValuePair<string, string> mapping in JwtSecurityTokenHandler.DefaultInboundClaimTypeMap)
-            {
-                if (string.Equals(mapping.Value, claimType, StringComparison.OrdinalIgnoreCase))
+                if (ScopeMatches(claim.Value, expectedScope))
                 {
-                    claimTypes.Add(mapping.Key);
+                    return true;
                 }
             }
         }
 
-        return claimTypes;
+        return false;
     }
 
-    private static bool ClaimValueMatches(string claimValue, string expectedValue)
+    private static bool ScopeMatches(string? claimValue, string expectedScope)
     {
         if (string.IsNullOrWhiteSpace(claimValue))
         {
             return false;
         }
 
-        if (string.Equals(claimValue, expectedValue, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(claimValue, expectedScope, StringComparison.OrdinalIgnoreCase))
         {
             return true;
         }
 
         foreach (string segment in claimValue.Split([' ', ','], StringSplitOptions.RemoveEmptyEntries))
         {
-            if (string.Equals(segment, expectedValue, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(segment, expectedScope, StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }

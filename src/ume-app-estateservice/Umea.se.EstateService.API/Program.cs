@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.OpenApi.Models;
 using Umea.se.EstateService.API;
 using Umea.se.EstateService.API.Authorization;
@@ -46,7 +46,7 @@ builder.Services.AddDefaultHttpClient(HttpClientNames.Pythagoras, options =>
     options.DefaultRequestHeaders.Add("api_key", config.PythagorasApiKey);
 });
 
-builder.Services
+AuthenticationBuilder authenticationBuilder = builder.Services
     .AddAuthentication(options =>
     {
         options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -57,7 +57,6 @@ builder.Services
     {
         options.RequireHttpsMetadata = false;
         options.Authority = config.TokenServiceAddress;
-        options.MapInboundClaims = false; // Keep raw claim types like "idp" and "scope".
         List<string> validAudiences = new();
         if (!string.IsNullOrWhiteSpace(config.ApiName))
         {
@@ -75,15 +74,23 @@ builder.Services
         }
     });
 
+authenticationBuilder.AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(
+    ApiKeyAuthenticationDefaults.AuthenticationScheme,
+    static _ => { });
+
 builder.Services.AddAuthorization(options =>
 {
+    string[] allowedApiKeyNames = ["Default"];
+
     options.AddPolicy(AuthPolicies.EmployeeOrApiKey, policy =>
     {
-        policy.Requirements.Add(new EmployeeOrApiKeyRequirement(new[] { "Default" }));
+        policy.AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, ApiKeyAuthenticationDefaults.AuthenticationScheme);
+        policy.RequireAuthenticatedUser();
+        policy.RequireAssertion(context =>
+            EmployeeClaimEvaluator.IsEmployee(context.User, config)
+            || ApiKeyAuthorizationEvaluator.HasAllowedApiKey(context.User, allowedApiKeyNames));
     });
 });
-
-builder.Services.AddSingleton<IAuthorizationHandler, EmployeeOrApiKeyAuthorizationHandler>();
 
 builder.Logging.UseDefaultLoggers(config);
 
