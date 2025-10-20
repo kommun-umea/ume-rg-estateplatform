@@ -10,12 +10,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Swashbuckle.AspNetCore" />
-    <PackageReference Include="Umea.se.Toolkit" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\..\ume-nuget\src\Umea.se.Toolkit\Umea.se.Toolkit\Umea.se.Toolkit.csproj" />
     <ProjectReference Include="..\Umea.se.EstateService.Logic\Umea.se.EstateService.Logic.csproj" />
   </ItemGroup>
 

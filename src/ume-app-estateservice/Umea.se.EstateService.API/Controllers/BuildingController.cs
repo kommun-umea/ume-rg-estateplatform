@@ -1,19 +1,24 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
+<<<<<<< HEAD
 using Umea.se.EstateService.API.Controllers.Requests;
 using Umea.se.EstateService.API.Authorization;
+=======
+>>>>>>> a8df2ce (Move dual auth to toolkit)
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
+using Umea.se.Toolkit.Auth.Authorization;
 
 namespace Umea.se.EstateService.API.Controllers;
 
 [ApiController]
 [Produces("application/json")]
 [Route(ApiRoutes.Buildings)]
-[Authorize(Policy = AuthPolicies.EmployeeOrApiKey)]
+[Authorize(Policy = ToolkitAuthPolicies.EmployeeOrApiKey)]
+[AllowApiKeys("Default")]
 public class BuildingController(IPythagorasHandler pythagorasService) : ControllerBase
 {
     /// <summary>

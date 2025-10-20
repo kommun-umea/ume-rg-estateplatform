@@ -28,6 +28,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\..\ume-nuget\src\Umea.se.Toolkit\Umea.se.Toolkit\Umea.se.Toolkit.csproj" />
     <ProjectReference Include="..\Umea.se.EstateService.API\Umea.se.EstateService.API.csproj" />
     <ProjectReference Include="..\Umea.se.EstateService.Logic\Umea.se.EstateService.Logic.csproj" />
     <ProjectReference Include="..\Umea.se.EstateService.ServiceAccess\Umea.se.EstateService.ServiceAccess.csproj" />

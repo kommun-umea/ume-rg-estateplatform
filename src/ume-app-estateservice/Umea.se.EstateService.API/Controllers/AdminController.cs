@@ -1,15 +1,16 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
-using Umea.se.EstateService.API.Authorization;
 using Umea.se.EstateService.Logic.HostedServices;
+using Umea.se.Toolkit.Auth.Authorization;
 
 namespace Umea.se.EstateService.API.Controllers;
 
 [ApiController]
 [Produces("application/json")]
 [Route(ApiRoutes.Admin)]
-[Authorize(Policy = AuthPolicies.EmployeeOrApiKey)]
+[Authorize(Policy = ToolkitAuthPolicies.EmployeeOrApiKey)]
+[AllowApiKeys("Default")]
 public sealed class AdminController(SearchIndexRefreshService refreshService) : ControllerBase
 {
     /// <summary>

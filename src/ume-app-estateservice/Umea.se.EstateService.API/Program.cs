@@ -2,13 +2,15 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.OpenApi.Models;
 using Umea.se.EstateService.API;
-using Umea.se.EstateService.API.Authorization;
 using Umea.se.EstateService.Logic;
 using Umea.se.EstateService.ServiceAccess;
 using Umea.se.EstateService.Shared;
 using Umea.se.EstateService.Shared.Infrastructure;
+using Umea.se.Toolkit.Auth;
+using Umea.se.Toolkit.Auth.Authorization;
 using Umea.se.Toolkit.EntryPoints;
 using Umea.se.Toolkit.Filters;
 
@@ -46,6 +48,9 @@ builder.Services.AddDefaultHttpClient(HttpClientNames.Pythagoras, options =>
     options.DefaultRequestHeaders.Add("api_key", config.PythagorasApiKey);
 });
 
+builder.Services.AddEmployeeOrApiKeyAuthorization(config);
+config.ValidateApiKeys();
+
 AuthenticationBuilder authenticationBuilder = builder.Services
     .AddAuthentication(options =>
     {
@@ -74,23 +79,7 @@ AuthenticationBuilder authenticationBuilder = builder.Services
         }
     });
 
-authenticationBuilder.AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(
-    ApiKeyAuthenticationDefaults.AuthenticationScheme,
-    static _ => { });
-
-builder.Services.AddAuthorization(options =>
-{
-    string[] allowedApiKeyNames = ["Default"];
-
-    options.AddPolicy(AuthPolicies.EmployeeOrApiKey, policy =>
-    {
-        policy.AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, ApiKeyAuthenticationDefaults.AuthenticationScheme);
-        policy.RequireAuthenticatedUser();
-        policy.RequireAssertion(context =>
-            EmployeeClaimEvaluator.IsEmployee(context.User, config)
-            || ApiKeyAuthorizationEvaluator.HasAllowedApiKey(context.User, allowedApiKeyNames));
-    });
-});
+authenticationBuilder.AddApiKeyAuthentication();
 
 builder.Logging.UseDefaultLoggers(config);
 
@@ -123,8 +112,6 @@ builder.Services.ConfigureSwaggerGen(options =>
             Type = SecuritySchemeType.ApiKey,
         });
     }
-
-    options.OperationFilter<AuthorizeEmployeeOrApiKeyOperationFilter>();
 });
 
 builder.Services.AddAllowedOriginsCorsPolicy(config.AllowedOrigins);

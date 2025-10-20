@@ -11,4 +11,8 @@
     <PackageReference Include="Umea.se.Toolkit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\ume-nuget\src\Umea.se.Toolkit\Umea.se.Toolkit\Umea.se.Toolkit.csproj" />
+  </ItemGroup>
+
 </Project>
