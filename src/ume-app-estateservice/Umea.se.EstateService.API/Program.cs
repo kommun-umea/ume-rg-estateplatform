@@ -81,8 +81,6 @@ AuthenticationBuilder authenticationBuilder = builder.Services
     })
     .AddApiKeyAuthentication();
 
-builder.Logging.UseDefaultLoggers(config);
-
 // Swagger
 builder.Services.AddDefaultSwagger(config);
 
