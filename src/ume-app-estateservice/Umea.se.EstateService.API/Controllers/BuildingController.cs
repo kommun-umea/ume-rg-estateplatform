@@ -1,10 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
-<<<<<<< HEAD
 using Umea.se.EstateService.API.Controllers.Requests;
-using Umea.se.EstateService.API.Authorization;
-=======
->>>>>>> a8df2ce (Move dual auth to toolkit)
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
