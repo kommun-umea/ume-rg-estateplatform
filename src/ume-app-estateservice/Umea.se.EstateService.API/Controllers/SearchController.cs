@@ -5,7 +5,7 @@ using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Logic.Search;
 using Umea.se.EstateService.Shared.Autocomplete;
 using Umea.se.EstateService.Shared.Search;
-using Umea.se.Toolkit.Auth.Authorization;
+using Umea.se.Toolkit.Auth;
 
 namespace Umea.se.EstateService.API.Controllers;
 
