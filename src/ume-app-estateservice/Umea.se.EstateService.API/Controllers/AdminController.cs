@@ -8,7 +8,7 @@ namespace Umea.se.EstateService.API.Controllers;
 [ApiController]
 [Produces("application/json")]
 [Route(ApiRoutes.Admin)]
-[AuthorizeApiKey("Admin")]
+[AuthorizeApiKey]
 public sealed class AdminController(SearchIndexRefreshService refreshService) : ControllerBase
 {
     /// <summary>
