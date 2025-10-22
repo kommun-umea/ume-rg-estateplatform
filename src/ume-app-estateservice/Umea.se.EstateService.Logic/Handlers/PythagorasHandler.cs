@@ -56,32 +56,37 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         return PythagorasWorkspaceMapper.ToModel(payload);
     }
 
-    public async Task<IReadOnlyList<FloorWithRoomsModel>> GetBuildingFloorsWithRoomsAsync(
+    public async Task<IReadOnlyList<FloorInfoModel>> GetBuildingFloorsAsync(
+        int buildingId,
+        PythagorasQuery<Floor>? floorQuery = null,
+        CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<Floor> floors = await GetBuildingFloorsInternalAsync(buildingId, floorQuery, cancellationToken).ConfigureAwait(false);
+
+        return floors.Count == 0
+            ? []
+            : PythagorasFloorInfoMapper.ToModel(floors);
+    }
+
+    public async Task<IReadOnlyList<FloorInfoModel>> GetBuildingFloorsWithRoomsAsync(
         int buildingId,
         PythagorasQuery<Floor>? floorQuery = null,
         PythagorasQuery<BuildingWorkspace>? workspaceQuery = null,
         CancellationToken cancellationToken = default)
     {
-        if (buildingId <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
-        }
-
-        IReadOnlyList<Floor> floors = await pythagorasClient
-            .GetAsync(BuildingFloorsEndpoint(buildingId), floorQuery, cancellationToken)
-            .ConfigureAwait(false);
+        IReadOnlyList<Floor> floors = await GetBuildingFloorsInternalAsync(buildingId, floorQuery, cancellationToken).ConfigureAwait(false);
 
         if (floors.Count == 0)
         {
             return [];
         }
 
-        List<FloorWithRoomsModel> result = new(floors.Count);
+        List<FloorInfoModel> result = new(floors.Count);
         foreach (Floor floor in floors)
         {
             if (floor.Id <= 0)
             {
-                result.Add(PythagorasFloorMapper.ToModel(floor));
+                result.Add(PythagorasFloorInfoMapper.ToModel(floor, Array.Empty<BuildingRoomModel>()));
                 continue;
             }
 
@@ -90,11 +95,26 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
                 .ConfigureAwait(false);
 
             IReadOnlyList<BuildingRoomModel> rooms = PythagorasWorkspaceMapper.ToModel(workspaceDtos);
-            FloorWithRoomsModel model = PythagorasFloorMapper.ToModel(floor, rooms);
+            FloorInfoModel model = PythagorasFloorInfoMapper.ToModel(floor, rooms);
             result.Add(model);
         }
 
         return result;
+    }
+
+    private async Task<IReadOnlyList<Floor>> GetBuildingFloorsInternalAsync(
+        int buildingId,
+        PythagorasQuery<Floor>? floorQuery,
+        CancellationToken cancellationToken)
+    {
+        if (buildingId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
+        }
+
+        return await pythagorasClient
+            .GetAsync(BuildingFloorsEndpoint(buildingId), floorQuery, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<RoomModel>> GetRoomsAsync(PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
