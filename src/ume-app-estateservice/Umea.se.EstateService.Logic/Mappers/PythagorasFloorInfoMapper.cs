@@ -36,6 +36,6 @@ public static class PythagorasFloorInfoMapper
 
         return dtos.Count == 0
             ? []
-            : dtos.Select(f => ToModel(f, null)).ToArray();
+            : dtos.Select(floor => ToModel(floor, null)).ToArray();
     }
 }

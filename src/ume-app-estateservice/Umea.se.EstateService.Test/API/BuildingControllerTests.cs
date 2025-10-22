@@ -16,7 +16,7 @@ public class BuildingControllerTests
 
         StubPythagorasHandler handler = new()
         {
-            OnGetBuildingsAsync = (_, _) => Task.FromResult<IReadOnlyList<BuildingInfoModel>>(new[] { building })
+            OnGetBuildingsAsync = (_, _) => Task.FromResult<IReadOnlyList<BuildingInfoModel>>([building])
         };
 
         BuildingController controller = new(handler);
@@ -34,7 +34,7 @@ public class BuildingControllerTests
     {
         StubPythagorasHandler handler = new()
         {
-            OnGetBuildingsAsync = (_, _) => Task.FromResult<IReadOnlyList<BuildingInfoModel>>(Array.Empty<BuildingInfoModel>())
+            OnGetBuildingsAsync = (_, _) => Task.FromResult<IReadOnlyList<BuildingInfoModel>>([])
         };
 
         BuildingController controller = new(handler);

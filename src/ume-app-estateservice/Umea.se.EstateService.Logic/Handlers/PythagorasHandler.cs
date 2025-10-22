@@ -86,7 +86,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         {
             if (floor.Id <= 0)
             {
-                result.Add(PythagorasFloorInfoMapper.ToModel(floor, Array.Empty<BuildingRoomModel>()));
+                result.Add(PythagorasFloorInfoMapper.ToModel(floor, []));
                 continue;
             }
 

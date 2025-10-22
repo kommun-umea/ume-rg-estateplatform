@@ -212,16 +212,16 @@ public class PythagorasHandlerTests
         result.Count.ShouldBe(2);
         FloorInfoModel floorZero = result[0];
         floorZero.Id.ShouldBe(3022);
-        floorZero.Rooms.ShouldNotBeNull();
-        floorZero.Rooms!.Count.ShouldBe(1);
-        floorZero.Rooms![0].Name.ShouldBe("9-1033");
+        IReadOnlyList<BuildingRoomModel> floorZeroRooms = floorZero.Rooms.ShouldNotBeNull();
+        floorZeroRooms.Count.ShouldBe(1);
+        floorZeroRooms[0].Name.ShouldBe("9-1033");
 
         FloorInfoModel floorOne = result[1];
         floorOne.Id.ShouldBe(3023);
-        floorOne.Rooms.ShouldNotBeNull();
-        floorOne.Rooms!.Count.ShouldBe(2);
-        floorOne.Rooms![0].Name.ShouldBe("9-1042B");
-        floorOne.Rooms![1].Name.ShouldBe("9-1001");
+        IReadOnlyList<BuildingRoomModel> floorOneRooms = floorOne.Rooms.ShouldNotBeNull();
+        floorOneRooms.Count.ShouldBe(2);
+        floorOneRooms[0].Name.ShouldBe("9-1042B");
+        floorOneRooms[1].Name.ShouldBe("9-1001");
     }
 
     [Fact]

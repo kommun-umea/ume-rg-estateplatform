@@ -42,19 +42,18 @@ public sealed class FloorController(
         CancellationToken cancellationToken)
     {
         PythagorasQuery<Floor> query = new PythagorasQuery<Floor>()
-            .WithQueryParameterValues("floorIds[]", new[] { floorId });
+            .WithQueryParameterValues("floorIds[]", [floorId]);
 
         IReadOnlyList<FloorInfoModel> floors = await _pythagorasHandler
             .GetFloorsAsync(query, cancellationToken)
             .ConfigureAwait(false);
 
-        FloorInfoModel? floor = floors.FirstOrDefault();
-        if (floor is null)
+        if (floors.Count == 0)
         {
             return NotFound();
         }
 
-        return Ok(floor);
+        return Ok(floors[0]);
     }
 
     /// <summary>

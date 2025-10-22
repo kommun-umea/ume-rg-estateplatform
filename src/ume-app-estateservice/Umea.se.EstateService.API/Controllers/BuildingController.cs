@@ -39,13 +39,12 @@ public class BuildingController(IPythagorasHandler pythagorasService) : Controll
             .GetBuildingsAsync(query, cancellationToken)
             .ConfigureAwait(false);
 
-        BuildingInfoModel? building = buildings.FirstOrDefault();
-        if (building is null)
+        if (buildings.Count == 0)
         {
             return NotFound();
         }
 
-        return Ok(building);
+        return Ok(buildings[0]);
     }
 
     /// <summary>
