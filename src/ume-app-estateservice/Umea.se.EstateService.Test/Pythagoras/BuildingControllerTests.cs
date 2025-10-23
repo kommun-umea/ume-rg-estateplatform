@@ -92,15 +92,38 @@ public class BuildingControllerTests : ControllerTestCloud<TestApiFactory, Progr
 
         response.EnsureSuccessStatusCode();
 
-        IReadOnlyList<FloorWithRoomsModel>? floors = await response.Content.ReadFromJsonAsync<IReadOnlyList<FloorWithRoomsModel>>();
+        IReadOnlyList<FloorInfoModel>? floors = await response.Content.ReadFromJsonAsync<IReadOnlyList<FloorInfoModel>>();
         floors.ShouldNotBeNull();
-        floors.ShouldHaveSingleItem().Id.ShouldBe(5);
+        FloorInfoModel floor = floors.ShouldHaveSingleItem();
+        floor.Id.ShouldBe(5);
+        floor.Rooms.ShouldBeNull();
 
         FakePythagorasClient.RequestCapture floorRequest = _fakeClient.GetRequestsFor<Floor>().Single();
         floorRequest.QueryString.ShouldNotBeNull();
         floorRequest.QueryString.ShouldContain("generalSearch=floor");
         floorRequest.QueryString.ShouldContain("firstResult=5");
         floorRequest.QueryString.ShouldContain("maxResults=1");
-        _fakeClient.LastEndpoint.ShouldBe("rest/v1/floor/5/workspace/info");
+        _fakeClient.LastEndpoint.ShouldBe("rest/v1/building/1/floor");
+    }
+
+    [Fact]
+    public async Task GetBuildingFloorsAsync_IncludeRoomsFalse_DoesNotFetchRooms()
+    {
+        _fakeClient.Reset();
+        Guid floorUid = Guid.NewGuid();
+        _fakeClient.SetGetAsyncResult(new Floor { Id = 8, Uid = floorUid, Name = "Floor 2" });
+
+        HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Buildings}/1/floors?includeRooms=false");
+
+        response.EnsureSuccessStatusCode();
+
+        IReadOnlyList<FloorInfoModel>? floors = await response.Content.ReadFromJsonAsync<IReadOnlyList<FloorInfoModel>>();
+        floors.ShouldNotBeNull();
+
+        FloorInfoModel floor = floors.ShouldHaveSingleItem();
+        floor.Id.ShouldBe(8);
+        floor.Rooms.ShouldBeNull();
+
+        _fakeClient.EndpointsCalled.ShouldBe(["rest/v1/building/1/floor"]);
     }
 }

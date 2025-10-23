@@ -200,7 +200,7 @@ public class PythagorasHandlerTests
 
         PythagorasHandler service = new(client);
 
-        IReadOnlyList<FloorWithRoomsModel> result = await service.GetBuildingFloorsWithRoomsAsync(10);
+        IReadOnlyList<FloorInfoModel> result = await service.GetBuildingFloorsWithRoomsAsync(10);
 
         client.EndpointsCalled.ShouldBe(
         [
@@ -210,16 +210,50 @@ public class PythagorasHandlerTests
         ]);
 
         result.Count.ShouldBe(2);
-        FloorWithRoomsModel floorZero = result[0];
+        FloorInfoModel floorZero = result[0];
         floorZero.Id.ShouldBe(3022);
-        floorZero.Rooms.Count.ShouldBe(1);
-        floorZero.Rooms[0].Name.ShouldBe("9-1033");
+        IReadOnlyList<BuildingRoomModel> floorZeroRooms = floorZero.Rooms.ShouldNotBeNull();
+        floorZeroRooms.Count.ShouldBe(1);
+        floorZeroRooms[0].Name.ShouldBe("9-1033");
 
-        FloorWithRoomsModel floorOne = result[1];
+        FloorInfoModel floorOne = result[1];
         floorOne.Id.ShouldBe(3023);
-        floorOne.Rooms.Count.ShouldBe(2);
-        floorOne.Rooms[0].Name.ShouldBe("9-1042B");
-        floorOne.Rooms[1].Name.ShouldBe("9-1001");
+        IReadOnlyList<BuildingRoomModel> floorOneRooms = floorOne.Rooms.ShouldNotBeNull();
+        floorOneRooms.Count.ShouldBe(2);
+        floorOneRooms[0].Name.ShouldBe("9-1042B");
+        floorOneRooms[1].Name.ShouldBe("9-1001");
+    }
+
+    [Fact]
+    public async Task GetBuildingFloorsAsync_ReturnsFloorMetadataOnly()
+    {
+        Guid buildingUid = Guid.NewGuid();
+        Guid floorUid = Guid.NewGuid();
+
+        FakePythagorasClient client = new();
+        client.SetGetAsyncResult(
+            new Floor
+            {
+                Id = 400,
+                Uid = floorUid,
+                BuildingId = 10,
+                BuildingUid = buildingUid,
+                Name = "04",
+                PopularName = "Fourth",
+                GrossFloorarea = 1234.56
+            });
+
+        PythagorasHandler service = new(client);
+
+        IReadOnlyList<FloorInfoModel> result = await service.GetBuildingFloorsAsync(10);
+
+        client.EndpointsCalled.ShouldBe(["rest/v1/building/10/floor"]);
+
+        FloorInfoModel floor = result.ShouldHaveSingleItem();
+        floor.Id.ShouldBe(400);
+        floor.Uid.ShouldBe(floorUid);
+        floor.BuildingId.ShouldBe(10);
+        floor.Rooms.ShouldBeNull();
     }
 
     [Fact]

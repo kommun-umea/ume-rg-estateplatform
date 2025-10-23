@@ -5,7 +5,7 @@ namespace Umea.se.EstateService.Logic.Mappers;
 
 public static class PythagorasFloorInfoMapper
 {
-    public static FloorInfoModel ToModel(Floor dto)
+    public static FloorInfoModel ToModel(Floor dto, IReadOnlyList<BuildingRoomModel>? rooms = null)
     {
         ArgumentNullException.ThrowIfNull(dto);
 
@@ -25,7 +25,8 @@ public static class PythagorasFloorInfoMapper
             BuildingName = dto.BuildingName,
             BuildingPopularName = dto.BuildingPopularName,
             BuildingOrigin = dto.BuildingOrigin,
-            NumPlacedPersons = dto.NumPlacedPersons
+            NumPlacedPersons = dto.NumPlacedPersons,
+            Rooms = rooms
         };
     }
 
@@ -35,6 +36,6 @@ public static class PythagorasFloorInfoMapper
 
         return dtos.Count == 0
             ? []
-            : dtos.Select(ToModel).ToArray();
+            : dtos.Select(floor => ToModel(floor, null)).ToArray();
     }
 }
