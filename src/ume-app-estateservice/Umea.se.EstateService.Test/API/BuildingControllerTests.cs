@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging.Abstractions;
 using Umea.se.EstateService.API.Controllers;
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
@@ -10,23 +11,27 @@ namespace Umea.se.EstateService.Test.API;
 public class BuildingControllerTests
 {
     [Fact]
-    public async Task GetBuildingAsync_WhenFound_ReturnsBuilding()
+    public async Task GetBuildingAsync_WhenFound_ReturnsBuildingWithAscendants()
     {
-        BuildingInfoModel building = new() { Id = 42 };
+        BuildingInfoModel building = new() { Id = 42, Name = "Test" };
+        BuildingAscendantModel ascendant = new() { Id = 7, Name = "Estate", Type = BuildingAscendantType.Estate };
 
         StubPythagorasHandler handler = new()
         {
-            OnGetBuildingsAsync = (_, _) => Task.FromResult<IReadOnlyList<BuildingInfoModel>>([building])
+            OnGetBuildingsAsync = (_, _) => Task.FromResult<IReadOnlyList<BuildingInfoModel>>([building]),
+            OnGetBuildingAscendantsAsync = (_, _) => Task.FromResult<IReadOnlyList<BuildingAscendantModel>>([ascendant])
         };
 
-        BuildingController controller = new(handler);
+        BuildingController controller = new(handler, NullLogger<BuildingController>.Instance);
 
         ActionResult<BuildingInfoModel> result = await controller.GetBuildingAsync(
             42,
             CancellationToken.None);
 
         BuildingInfoModel response = result.Result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<BuildingInfoModel>();
-        response.ShouldBe(building);
+        response.Id.ShouldBe(42);
+        response.Name.ShouldBe("Test");
+        response.Ascendants.ShouldBe([ascendant]);
     }
 
     [Fact]
@@ -37,7 +42,7 @@ public class BuildingControllerTests
             OnGetBuildingsAsync = (_, _) => Task.FromResult<IReadOnlyList<BuildingInfoModel>>([])
         };
 
-        BuildingController controller = new(handler);
+        BuildingController controller = new(handler, NullLogger<BuildingController>.Instance);
 
         ActionResult<BuildingInfoModel> result = await controller.GetBuildingAsync(
             100,
@@ -49,6 +54,7 @@ public class BuildingControllerTests
     private sealed class StubPythagorasHandler : IPythagorasHandler
     {
         public Func<PythagorasQuery<BuildingInfo>?, CancellationToken, Task<IReadOnlyList<BuildingInfoModel>>>? OnGetBuildingsAsync { get; set; }
+        public Func<int, CancellationToken, Task<IReadOnlyList<BuildingAscendantModel>>>? OnGetBuildingAscendantsAsync { get; set; }
 
         public Task<IReadOnlyList<BuildingInfoModel>> GetBuildingsAsync(PythagorasQuery<BuildingInfo>? query = null, CancellationToken cancellationToken = default)
         {
@@ -65,6 +71,16 @@ public class BuildingControllerTests
 
         public Task<IReadOnlyList<BuildingInfoModel>> GetBuildingInfoAsync(PythagorasQuery<BuildingInfo>? query = null, int? navigationFolderId = null, CancellationToken cancellationToken = default)
             => throw new NotImplementedException();
+
+        public Task<IReadOnlyList<BuildingAscendantModel>> GetBuildingAscendantsAsync(int buildingId, CancellationToken cancellationToken = default)
+        {
+            if (OnGetBuildingAscendantsAsync is null)
+            {
+                return Task.FromResult<IReadOnlyList<BuildingAscendantModel>>([]);
+            }
+
+            return OnGetBuildingAscendantsAsync(buildingId, cancellationToken);
+        }
 
         public Task<IReadOnlyList<BuildingRoomModel>> GetBuildingWorkspacesAsync(int buildingId, PythagorasQuery<BuildingWorkspace>? query = null, CancellationToken cancellationToken = default)
             => throw new NotImplementedException();

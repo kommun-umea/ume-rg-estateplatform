@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using Umea.se.EstateService.Shared.Interfaces;
 using Umea.se.EstateService.Shared.ValueObjects;
 
@@ -15,6 +17,7 @@ public sealed class BuildingInfoModel : ISearchable
     public decimal SumGrossFloorArea { get; init; }
     public int NumPlacedPersons { get; init; }
     public AddressModel? Address { get; init; }
+    public IReadOnlyList<BuildingAscendantModel> Ascendants { get; set; } = Array.Empty<BuildingAscendantModel>();
 
     public DateTimeOffset UpdatedAt => DateTime.Now;
 }

@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Net.Http.Json;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
@@ -60,6 +61,29 @@ public class BuildingControllerTests : ControllerTestCloud<TestApiFactory, Progr
         decodedQuery.ShouldContain("generalSearch=alp");
         decodedQuery.ShouldContain("maxResults=50");
         _fakeClient.LastEndpoint.ShouldBe("rest/v1/building/info");
+    }
+
+    [Fact]
+    public async Task GetBuildingAsync_ReturnsAscendants()
+    {
+        _fakeClient.Reset();
+        _fakeClient.SetGetAsyncResult(new BuildingInfo { Id = 1, Name = "Alpha" });
+        _fakeClient.SetGetAsyncResult(new BuildingAscendant { Id = 10, Name = "Estate", Origin = "SpaceManager" });
+
+        HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Buildings}/1");
+        response.EnsureSuccessStatusCode();
+
+        BuildingInfoModel? building = await response.Content.ReadFromJsonAsync<BuildingInfoModel>();
+        building.ShouldNotBeNull();
+        building.Id.ShouldBe(1);
+        BuildingAscendantModel ascendant = building.Ascendants.ShouldHaveSingleItem();
+        ascendant.Id.ShouldBe(10);
+        ascendant.Type.ShouldBe(BuildingAscendantType.Estate);
+
+        _fakeClient.EndpointsCalled.ShouldBe([
+            "rest/v1/building/info",
+            "rest/v1/building/1/node/ascendant"
+        ]);
     }
 
     [Fact]
