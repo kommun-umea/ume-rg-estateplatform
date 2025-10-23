@@ -30,7 +30,7 @@ public static class PythagorasBuildingAscendantMapper
             BuildingAscendantModel model = new()
             {
                 Id = dto.Id,
-                Name = dto.Name ?? string.Empty,
+                Name = dto.Name,
                 PopularName = dto.PopularName,
                 GeoLocation = CreateGeoPoint(dto.GeoLocation),
                 Type = ResolveType(filteredIndex)
