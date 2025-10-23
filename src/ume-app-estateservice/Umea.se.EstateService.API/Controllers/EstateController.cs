@@ -15,48 +15,48 @@ namespace Umea.se.EstateService.API.Controllers;
 [AuthorizeApiKey]
 public class EstateController(IPythagorasHandler pythagorasService) : ControllerBase
 {
-        /// <summary>
-        /// Gets a specific estate.
-        /// </summary>
-        /// <param name="estateId">The estate identifier.</param>
-        /// <param name="request">Query parameters controlling optional expansions.</param>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>The requested estate or 404 when it does not exist.</returns>
-        [HttpGet("{estateId:int}")]
-        [SwaggerOperation(
-            Summary = "Get estate",
-            Description = "Retrieves a single estate with optional building information."
-        )]
-        [SwaggerResponse(StatusCodes.Status200OK, "The requested estate.", typeof(EstateModel))]
-        [SwaggerResponse(StatusCodes.Status404NotFound, "Estate not found.")]
-        public async Task<ActionResult<EstateModel>> GetEstateAsync(
-            int estateId,
-            [FromQuery] EstateDetailsRequest request,
-            CancellationToken cancellationToken)
+    /// <summary>
+    /// Gets a specific estate.
+    /// </summary>
+    /// <param name="estateId">The estate identifier.</param>
+    /// <param name="request">Query parameters controlling optional expansions.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The requested estate or 404 when it does not exist.</returns>
+    [HttpGet("{estateId:int}")]
+    [SwaggerOperation(
+        Summary = "Get estate",
+        Description = "Retrieves a single estate with optional building information."
+    )]
+    [SwaggerResponse(StatusCodes.Status200OK, "The requested estate.", typeof(EstateModel))]
+    [SwaggerResponse(StatusCodes.Status404NotFound, "Estate not found.")]
+    public async Task<ActionResult<EstateModel>> GetEstateAsync(
+        int estateId,
+        [FromQuery] EstateDetailsRequest request,
+        CancellationToken cancellationToken)
+    {
+        PythagorasQuery<NavigationFolder> query = new PythagorasQuery<NavigationFolder>()
+            .Where(folder => folder.Id, estateId);
+
+        if (request.IncludeBuildings)
         {
-            PythagorasQuery<NavigationFolder> query = new PythagorasQuery<NavigationFolder>()
-                .Where(folder => folder.Id, estateId);
-
-            if (request.IncludeBuildings)
-            {
-                query = query.WithQueryParameter("includeAscendantBuildings", true);
-            }
-
-            IReadOnlyList<EstateModel> estates = await pythagorasService
-                .GetEstatesAsync(query, cancellationToken)
-                .ConfigureAwait(false);
-
-            EstateModel? estate = estates.FirstOrDefault();
-            if (estate is null)
-            {
-                return NotFound();
-            }
-
-            return Ok(estate);
+            query = query.WithQueryParameter("includeAscendantBuildings", true);
         }
 
-        /// <summary>
-        /// Gets a list of estates.
+        IReadOnlyList<EstateModel> estates = await pythagorasService
+            .GetEstatesAsync(query, cancellationToken)
+            .ConfigureAwait(false);
+
+        EstateModel? estate = estates.FirstOrDefault();
+        if (estate is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(estate);
+    }
+
+    /// <summary>
+    /// Gets a list of estates.
     /// </summary>
     /// <param name="request">Query parameters for filtering and searching estates.</param>
     /// <param name="cancellationToken">Cancellation token.</param>

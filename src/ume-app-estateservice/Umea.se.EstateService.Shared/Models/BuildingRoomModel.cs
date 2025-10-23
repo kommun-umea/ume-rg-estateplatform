@@ -22,5 +22,5 @@ public sealed class BuildingRoomModel
     public Guid BuildingUid { get; init; }
     public string BuildingName { get; init; } = string.Empty;
     public string? BuildingPopularName { get; init; }
-    
+
 }
