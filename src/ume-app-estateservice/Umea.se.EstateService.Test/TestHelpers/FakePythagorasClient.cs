@@ -126,4 +126,14 @@ public sealed class FakePythagorasClient : IPythagorasClient
 
         return OnGetFloorBlueprintAsync(floorId, format, includeWorkspaceTexts, cancellationToken);
     }
+
+    public Task<IReadOnlyDictionary<int, TValue>> GetDictionaryAsync<TValue>(string endpoint, PythagorasQuery<TValue>? query, CancellationToken cancellationToken = default) where TValue : class
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<IReadOnlyDictionary<int, CalculatedPropertyValueDto>> GetBuildingCalculatedPropertyValuesAsync(int buildingId, CalculatedPropertyValueRequest? request = null, CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
+    }
 }

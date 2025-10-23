@@ -1,84 +1,129 @@
-using Microsoft.AspNetCore.Mvc;
-using Umea.se.EstateService.API.Controllers;
-using Umea.se.EstateService.Logic.Interfaces;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
+using System.Net.Http.Json;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
+using Umea.se.EstateService.API;
+using Umea.se.EstateService.ServiceAccess;
+using Umea.se.EstateService.Test.TestHelpers;
+using Umea.se.TestToolkit.TestInfrastructure;
 
 namespace Umea.se.EstateService.Test.API;
 
-public class BuildingControllerTests
+public class BuildingControllerTests : ControllerTestCloud<TestApiFactory, Program, HttpClientNames>
 {
-    [Fact]
-    public async Task GetBuildingAsync_WhenFound_ReturnsBuilding()
+    private readonly HttpClient _client;
+    private readonly FakePythagorasClient _fakeClient;
+
+    public BuildingControllerTests()
     {
-        BuildingInfoModel building = new() { Id = 42 };
+        _client = Client;
+        _client.DefaultRequestHeaders.Add("X-Api-Key", TestApiFactory.ApiKey);
+        _fakeClient = WebAppFactory.FakeClient;
 
-        StubPythagorasHandler handler = new()
-        {
-            OnGetBuildingsAsync = (_, _) => Task.FromResult<IReadOnlyList<BuildingInfoModel>>([building])
-        };
-
-        BuildingController controller = new(handler);
-
-        ActionResult<BuildingInfoModel> result = await controller.GetBuildingAsync(
-            42,
-            CancellationToken.None);
-
-        BuildingInfoModel response = result.Result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<BuildingInfoModel>();
-        response.ShouldBe(building);
+        MockManager.SetupUser(user => user.WithActualAuthorization());
     }
 
     [Fact]
-    public async Task GetBuildingAsync_WhenMissing_Returns404()
+    public async Task GetBuildingsAsync_ReturnsFirst50Buildings()
     {
-        StubPythagorasHandler handler = new()
-        {
-            OnGetBuildingsAsync = (_, _) => Task.FromResult<IReadOnlyList<BuildingInfoModel>>([])
-        };
+        _fakeClient.Reset();
+        _fakeClient.SetGetAsyncResult(
+            new BuildingInfo { Id = 1, Name = "One" },
+            new BuildingInfo { Id = 2, Name = "Two" });
 
-        BuildingController controller = new(handler);
+        HttpResponseMessage response = await _client.GetAsync(ApiRoutes.Buildings);
+        response.EnsureSuccessStatusCode();
 
-        ActionResult<BuildingInfoModel> result = await controller.GetBuildingAsync(
-            100,
-            CancellationToken.None);
+        IReadOnlyList<BuildingInfoModel>? buildings = await response.Content.ReadFromJsonAsync<IReadOnlyList<BuildingInfoModel>>();
+        buildings.ShouldNotBeNull();
 
-        result.Result.ShouldBeOfType<NotFoundResult>();
+        buildings.Select(b => b.Id).ShouldBe([1, 2]);
+        _fakeClient.LastQueryString.ShouldBe("maxResults=50");
+        _fakeClient.LastEndpoint.ShouldBe("rest/v1/building/info");
     }
 
-    private sealed class StubPythagorasHandler : IPythagorasHandler
+    [Fact]
+    public async Task GetBuildingsAsync_WithSearchTerm_FiltersByNameContains()
     {
-        public Func<PythagorasQuery<BuildingInfo>?, CancellationToken, Task<IReadOnlyList<BuildingInfoModel>>>? OnGetBuildingsAsync { get; set; }
+        _fakeClient.Reset();
+        _fakeClient.SetGetAsyncResult(new BuildingInfo { Id = 3, Name = "Alpha" });
 
-        public Task<IReadOnlyList<BuildingInfoModel>> GetBuildingsAsync(PythagorasQuery<BuildingInfo>? query = null, CancellationToken cancellationToken = default)
-        {
-            if (OnGetBuildingsAsync is null)
-            {
-                throw new InvalidOperationException("OnGetBuildingsAsync must be set.");
-            }
+        HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Buildings}?searchTerm=alp");
+        response.EnsureSuccessStatusCode();
 
-            return OnGetBuildingsAsync(query, cancellationToken);
-        }
+        IReadOnlyList<BuildingInfoModel>? buildings = await response.Content.ReadFromJsonAsync<IReadOnlyList<BuildingInfoModel>>();
+        buildings.ShouldNotBeNull();
 
-        public Task<IReadOnlyList<EstateModel>> GetEstatesAsync(PythagorasQuery<NavigationFolder>? query = null, CancellationToken cancellationToken = default)
-            => throw new NotImplementedException();
+        BuildingInfoModel building = buildings.ShouldHaveSingleItem();
+        building.Name.ShouldBe("Alpha");
 
-        public Task<IReadOnlyList<BuildingInfoModel>> GetBuildingInfoAsync(PythagorasQuery<BuildingInfo>? query = null, int? navigationFolderId = null, CancellationToken cancellationToken = default)
-            => throw new NotImplementedException();
+        string decodedQuery = Uri.UnescapeDataString(_fakeClient.LastQueryString ?? string.Empty);
+        decodedQuery.ShouldContain("generalSearch=alp");
+        decodedQuery.ShouldContain("maxResults=50");
+        _fakeClient.LastEndpoint.ShouldBe("rest/v1/building/info");
+    }
 
-        public Task<IReadOnlyList<BuildingRoomModel>> GetBuildingWorkspacesAsync(int buildingId, PythagorasQuery<BuildingWorkspace>? query = null, CancellationToken cancellationToken = default)
-            => throw new NotImplementedException();
+    [Fact]
+    public async Task GetBuildingRoomsAsync_ReturnsMappedRooms()
+    {
+        _fakeClient.Reset();
+        _fakeClient.SetGetAsyncResult(
+            new BuildingWorkspace { Id = 10, BuildingId = 1, BuildingName = "B" });
 
-        public Task<IReadOnlyList<FloorInfoModel>> GetBuildingFloorsAsync(int buildingId, PythagorasQuery<Floor>? floorQuery = null, CancellationToken cancellationToken = default)
-            => throw new NotImplementedException();
+        HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Buildings}/1/rooms");
+        response.EnsureSuccessStatusCode();
 
-        public Task<IReadOnlyList<FloorInfoModel>> GetBuildingFloorsWithRoomsAsync(int buildingId, PythagorasQuery<Floor>? floorQuery = null, PythagorasQuery<BuildingWorkspace>? workspaceQuery = null, CancellationToken cancellationToken = default)
-            => throw new NotImplementedException();
+        IReadOnlyList<BuildingRoomModel>? result = await response.Content.ReadFromJsonAsync<IReadOnlyList<BuildingRoomModel>>();
+        result.ShouldNotBeNull();
 
-        public Task<IReadOnlyList<RoomModel>> GetRoomsAsync(PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
-            => throw new NotImplementedException();
+        BuildingRoomModel room = result.ShouldHaveSingleItem();
+        room.Id.ShouldBe(10);
+        _fakeClient.LastQueryString.ShouldBe("maxResults=50");
+        _fakeClient.LastEndpoint.ShouldBe("rest/v1/building/1/workspace/info");
+    }
 
-        public Task<IReadOnlyList<FloorInfoModel>> GetFloorsAsync(PythagorasQuery<Floor>? query = null, CancellationToken cancellationToken = default)
-            => throw new NotImplementedException();
+    [Fact]
+    public async Task GetBuildingFloorsAsync_AppliesQueryParameters()
+    {
+        _fakeClient.Reset();
+        _fakeClient.SetGetAsyncResult(new Floor { Id = 5, Uid = Guid.NewGuid(), Name = "Floor 1" });
+        _fakeClient.EnqueueGetAsyncResult(Array.Empty<BuildingWorkspace>());
+
+        HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Buildings}/1/floors?limit=1&offset=5&searchTerm=floor");
+
+        response.EnsureSuccessStatusCode();
+
+        IReadOnlyList<FloorInfoModel>? floors = await response.Content.ReadFromJsonAsync<IReadOnlyList<FloorInfoModel>>();
+        floors.ShouldNotBeNull();
+        FloorInfoModel floor = floors.ShouldHaveSingleItem();
+        floor.Id.ShouldBe(5);
+        floor.Rooms.ShouldBeNull();
+
+        FakePythagorasClient.RequestCapture floorRequest = _fakeClient.GetRequestsFor<Floor>().Single();
+        floorRequest.QueryString.ShouldNotBeNull();
+        floorRequest.QueryString.ShouldContain("generalSearch=floor");
+        floorRequest.QueryString.ShouldContain("firstResult=5");
+        floorRequest.QueryString.ShouldContain("maxResults=1");
+        _fakeClient.LastEndpoint.ShouldBe("rest/v1/building/1/floor");
+    }
+
+    [Fact]
+    public async Task GetBuildingFloorsAsync_IncludeRoomsFalse_DoesNotFetchRooms()
+    {
+        _fakeClient.Reset();
+        Guid floorUid = Guid.NewGuid();
+        _fakeClient.SetGetAsyncResult(new Floor { Id = 8, Uid = floorUid, Name = "Floor 2" });
+
+        HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Buildings}/1/floors?includeRooms=false");
+
+        response.EnsureSuccessStatusCode();
+
+        IReadOnlyList<FloorInfoModel>? floors = await response.Content.ReadFromJsonAsync<IReadOnlyList<FloorInfoModel>>();
+        floors.ShouldNotBeNull();
+
+        FloorInfoModel floor = floors.ShouldHaveSingleItem();
+        floor.Id.ShouldBe(8);
+        floor.Rooms.ShouldBeNull();
+
+        _fakeClient.EndpointsCalled.ShouldBe(["rest/v1/building/1/floor"]);
     }
 }

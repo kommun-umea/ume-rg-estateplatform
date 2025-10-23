@@ -15,6 +15,7 @@ public sealed class BuildingInfoModel : ISearchable
     public decimal SumGrossFloorArea { get; init; }
     public int NumPlacedPersons { get; init; }
     public AddressModel? Address { get; init; }
+    public BuildingExtendedPropertiesModel? ExtendedProperties { get; init; }
 
     public DateTimeOffset UpdatedAt => DateTime.Now;
 }

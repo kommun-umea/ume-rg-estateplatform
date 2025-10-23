@@ -4,6 +4,7 @@ using Umea.se.EstateService.API.Controllers.Requests;
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
+using Umea.se.EstateService.Shared.Enums;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.Toolkit.Auth;
 
@@ -15,38 +16,6 @@ namespace Umea.se.EstateService.API.Controllers;
 [AuthorizeApiKey]
 public class BuildingController(IPythagorasHandler pythagorasService) : ControllerBase
 {
-    /// <summary>
-    /// Gets a specific building.
-    /// </summary>
-    /// <param name="buildingId">The building identifier.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The requested building or 404 when it does not exist.</returns>
-    [HttpGet("{buildingId:int}")]
-    [SwaggerOperation(
-        Summary = "Get building",
-        Description = "Retrieves a single building."
-    )]
-    [SwaggerResponse(StatusCodes.Status200OK, "The requested building.", typeof(BuildingInfoModel))]
-    [SwaggerResponse(StatusCodes.Status404NotFound, "Building not found.")]
-    public async Task<ActionResult<BuildingInfoModel>> GetBuildingAsync(
-        int buildingId,
-        CancellationToken cancellationToken)
-    {
-        PythagorasQuery<BuildingInfo> query = new PythagorasQuery<BuildingInfo>()
-            .Where(info => info.Id, buildingId);
-
-        IReadOnlyList<BuildingInfoModel> buildings = await pythagorasService
-            .GetBuildingsAsync(query, cancellationToken)
-            .ConfigureAwait(false);
-
-        if (buildings.Count == 0)
-        {
-            return NotFound();
-        }
-
-        return Ok(buildings[0]);
-    }
-
     /// <summary>
     /// Gets a list of buildings.
     /// </summary>
@@ -68,6 +37,45 @@ public class BuildingController(IPythagorasHandler pythagorasService) : Controll
     {
         IReadOnlyList<BuildingInfoModel> buildings = await QueryBuildingsAsync(request, cancellationToken).ConfigureAwait(false);
         return Ok(buildings);
+    }
+
+    /// <summary>
+    /// Gets details for a specific building.
+    /// </summary>
+    /// <param name="buildingId">The ID of the building.</param>
+    /// <param name="include">Specifies which related data to include in the result.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <response code="200">Returns the requested building.</response>
+    /// <response code="400">If the buildingId is not valid.</response>
+    /// <response code="404">If the building does not exist.</response>
+    [HttpGet("{buildingId:int}")]
+    [SwaggerOperation(
+        Summary = "Get a building",
+        Description = "Retrieves a single building with optional related data."
+    )]
+    [SwaggerResponse(StatusCodes.Status200OK, "The building", typeof(BuildingInfoModel))]
+    [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid buildingId")]
+    [SwaggerResponse(StatusCodes.Status404NotFound, "Building not found")]
+    public async Task<ActionResult<BuildingInfoModel>> GetBuildingByIdAsync(
+        int buildingId,
+        [FromQuery] BuildingIncludeOptions include = BuildingIncludeOptions.None,
+        CancellationToken cancellationToken = default)
+    {
+        if (buildingId <= 0)
+        {
+            return BadRequest("Building id must be positive.");
+        }
+
+        BuildingInfoModel? building = await pythagorasService
+            .GetBuildingByIdAsync(buildingId, include, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (building is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(building);
     }
 
     /// <summary>
