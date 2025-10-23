@@ -17,7 +17,7 @@ public class RoomControllerTests
 
         StubPythagorasHandler handler = new()
         {
-            OnGetRoomsAsync = (_, _) => Task.FromResult<IReadOnlyList<RoomModel>>(new[] { room })
+            OnGetRoomsAsync = (_, _) => Task.FromResult<IReadOnlyList<RoomModel>>([room])
         };
 
         RoomController controller = new(handler);
@@ -37,7 +37,7 @@ public class RoomControllerTests
     {
         StubPythagorasHandler handler = new()
         {
-            OnGetRoomsAsync = (_, _) => Task.FromResult<IReadOnlyList<RoomModel>>(Array.Empty<RoomModel>())
+            OnGetRoomsAsync = (_, _) => Task.FromResult<IReadOnlyList<RoomModel>>([])
         };
 
         RoomController controller = new(handler);
@@ -64,12 +64,12 @@ public class RoomControllerTests
             OnGetRoomsAsync = (query, _) =>
             {
                 capturedRoomQuery = query;
-                return Task.FromResult<IReadOnlyList<RoomModel>>(new[] { room });
+                return Task.FromResult<IReadOnlyList<RoomModel>>([room]);
             },
             OnGetBuildingsAsync = (query, _) =>
             {
                 capturedBuildingQuery = query;
-                return Task.FromResult<IReadOnlyList<BuildingInfoModel>>(new[] { building });
+                return Task.FromResult<IReadOnlyList<BuildingInfoModel>>([building]);
             }
         };
 

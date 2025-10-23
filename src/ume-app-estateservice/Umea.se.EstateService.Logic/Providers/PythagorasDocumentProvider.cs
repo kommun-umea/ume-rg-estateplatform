@@ -55,8 +55,7 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
             {
                 estateDoc.NumChildren++;
 
-                BuildingInfoModel? buildingInfo = null;
-                if (buildingInfos.TryGetValue(building.Id, out buildingInfo))
+                if (buildingInfos.TryGetValue(building.Id, out BuildingInfoModel? buildingInfo))
                 {
                     building.Address = buildingInfo.Address;
                 }

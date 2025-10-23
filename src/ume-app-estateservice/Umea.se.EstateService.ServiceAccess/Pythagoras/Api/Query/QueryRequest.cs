@@ -1,6 +1,7 @@
-namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Api.Query;
 
 using System.Collections.Immutable;
+
+namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Api.Query;
 
 public sealed record QueryRequest
 {
@@ -9,5 +10,5 @@ public sealed record QueryRequest
     public ImmutableList<Filter> Filters { get; init; } = [];
     public Order? OrderBy { get; init; }
     public Paging? Page { get; init; }
-    public ImmutableList<KeyValuePair<string, string>> AdditionalParameters { get; init; } = ImmutableList<KeyValuePair<string, string>>.Empty;
+    public ImmutableList<KeyValuePair<string, string>> AdditionalParameters { get; init; } = [];
 }

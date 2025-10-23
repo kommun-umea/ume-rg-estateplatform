@@ -16,7 +16,7 @@ public class EstateControllerTests
         EstateModel estate = new() { Id = 10, Name = "Central" };
         StubPythagorasHandler handler = new()
         {
-            OnGetEstatesAsync = (_, _) => Task.FromResult<IReadOnlyList<EstateModel>>(new[] { estate })
+            OnGetEstatesAsync = (_, _) => Task.FromResult<IReadOnlyList<EstateModel>>([estate])
         };
 
         EstateController controller = new(handler);
@@ -35,7 +35,7 @@ public class EstateControllerTests
     {
         StubPythagorasHandler handler = new()
         {
-            OnGetEstatesAsync = (_, _) => Task.FromResult<IReadOnlyList<EstateModel>>(Array.Empty<EstateModel>())
+            OnGetEstatesAsync = (_, _) => Task.FromResult<IReadOnlyList<EstateModel>>([])
         };
 
         EstateController controller = new(handler);
@@ -58,7 +58,7 @@ public class EstateControllerTests
             OnGetEstatesAsync = (query, _) =>
             {
                 capturedQuery = query;
-                return Task.FromResult<IReadOnlyList<EstateModel>>(new[] { new EstateModel { Id = 5 } });
+                return Task.FromResult<IReadOnlyList<EstateModel>>([new EstateModel { Id = 5 }]);
             }
         };
 

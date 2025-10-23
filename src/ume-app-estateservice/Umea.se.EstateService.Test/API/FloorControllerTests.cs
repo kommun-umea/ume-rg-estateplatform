@@ -6,9 +6,9 @@ using Umea.se.EstateService.API.Controllers.Requests;
 using Umea.se.EstateService.Logic.Exceptions;
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.Logic.Models;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.Shared.Models;
 
 namespace Umea.se.EstateService.Test.API;
@@ -26,7 +26,7 @@ public class FloorControllerTests
             OnGetFloorsAsync = (query, _) =>
             {
                 capturedQuery = query;
-                return Task.FromResult<IReadOnlyList<FloorInfoModel>>(new[] { floor });
+                return Task.FromResult<IReadOnlyList<FloorInfoModel>>([floor]);
             }
         };
 
@@ -47,7 +47,7 @@ public class FloorControllerTests
     {
         StubPythagorasHandler handler = new()
         {
-            OnGetFloorsAsync = (_, _) => Task.FromResult<IReadOnlyList<FloorInfoModel>>(Array.Empty<FloorInfoModel>())
+            OnGetFloorsAsync = (_, _) => Task.FromResult<IReadOnlyList<FloorInfoModel>>([])
         };
 
         FloorController controller = new(new StubFloorBlueprintService(), handler, NullLogger<FloorController>.Instance);
@@ -141,7 +141,7 @@ public class FloorControllerTests
         {
             if (OnGetFloorsAsync is null)
             {
-                return Task.FromResult<IReadOnlyList<FloorInfoModel>>(Array.Empty<FloorInfoModel>());
+                return Task.FromResult<IReadOnlyList<FloorInfoModel>>([]);
             }
 
             return OnGetFloorsAsync(query, cancellationToken);
