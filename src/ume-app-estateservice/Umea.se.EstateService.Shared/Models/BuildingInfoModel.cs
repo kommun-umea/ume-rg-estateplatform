@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using Umea.se.EstateService.Shared.Interfaces;
 using Umea.se.EstateService.Shared.ValueObjects;
 

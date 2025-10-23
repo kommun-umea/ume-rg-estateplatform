@@ -6,7 +6,6 @@ using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.Toolkit.Auth;
-using Microsoft.Extensions.Logging;
 
 namespace Umea.se.EstateService.API.Controllers;
 

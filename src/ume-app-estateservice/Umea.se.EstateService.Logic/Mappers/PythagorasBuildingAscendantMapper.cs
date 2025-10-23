@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.EstateService.Shared.ValueObjects;

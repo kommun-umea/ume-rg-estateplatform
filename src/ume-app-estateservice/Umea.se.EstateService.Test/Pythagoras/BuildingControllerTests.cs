@@ -1,4 +1,3 @@
-using System.Linq;
 using System.Net.Http.Json;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
