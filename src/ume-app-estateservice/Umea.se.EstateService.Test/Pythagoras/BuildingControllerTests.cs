@@ -63,7 +63,7 @@ public class BuildingControllerTests : ControllerTestCloud<TestApiFactory, Progr
     }
 
     [Fact]
-    public async Task GetBuildingAsync_ReturnsAscendants()
+    public async Task GetBuildingAsync_ReturnsAscendantFields()
     {
         _fakeClient.Reset();
         _fakeClient.SetGetAsyncResult(new BuildingInfo { Id = 1, Name = "Alpha" });
@@ -75,9 +75,11 @@ public class BuildingControllerTests : ControllerTestCloud<TestApiFactory, Progr
         BuildingInfoModel? building = await response.Content.ReadFromJsonAsync<BuildingInfoModel>();
         building.ShouldNotBeNull();
         building.Id.ShouldBe(1);
-        BuildingAscendantModel ascendant = building.Ascendants.ShouldHaveSingleItem();
-        ascendant.Id.ShouldBe(10);
-        ascendant.Type.ShouldBe(BuildingAscendantType.Estate);
+        building.Estate.ShouldNotBeNull();
+        building.Estate!.Id.ShouldBe(10);
+        building.Estate.Type.ShouldBe(BuildingAscendantType.Estate);
+        building.Region.ShouldBeNull();
+        building.Organization.ShouldBeNull();
 
         _fakeClient.EndpointsCalled.ShouldBe([
             "rest/v1/building/info",

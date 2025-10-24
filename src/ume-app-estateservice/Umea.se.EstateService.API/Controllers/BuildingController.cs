@@ -61,7 +61,21 @@ public class BuildingController(IPythagorasHandler pythagorasService, ILogger<Bu
 
         if (ascendants.Count > 0)
         {
-            building.Ascendants = ascendants;
+            foreach (BuildingAscendantModel ascendant in ascendants)
+            {
+                switch (ascendant.Type)
+                {
+                    case BuildingAscendantType.Estate:
+                        building.Estate ??= ascendant;
+                        break;
+                    case BuildingAscendantType.Area:
+                        building.Region ??= ascendant;
+                        break;
+                    case BuildingAscendantType.Organization:
+                        building.Organization ??= ascendant;
+                        break;
+                }
+            }
         }
 
         return Ok(building);

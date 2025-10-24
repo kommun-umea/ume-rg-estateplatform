@@ -11,7 +11,7 @@ namespace Umea.se.EstateService.Test.API;
 public class BuildingControllerTests
 {
     [Fact]
-    public async Task GetBuildingAsync_WhenFound_ReturnsBuildingWithAscendants()
+    public async Task GetBuildingAsync_WhenFound_ReturnsBuildingWithAscendantFields()
     {
         BuildingInfoModel building = new() { Id = 42, Name = "Test" };
         BuildingAscendantModel ascendant = new() { Id = 7, Name = "Estate", Type = BuildingAscendantType.Estate };
@@ -31,7 +31,9 @@ public class BuildingControllerTests
         BuildingInfoModel response = result.Result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<BuildingInfoModel>();
         response.Id.ShouldBe(42);
         response.Name.ShouldBe("Test");
-        response.Ascendants.ShouldBe([ascendant]);
+        response.Estate.ShouldBe(ascendant);
+        response.Region.ShouldBeNull();
+        response.Organization.ShouldBeNull();
     }
 
     [Fact]
