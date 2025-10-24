@@ -6,11 +6,13 @@ using Umea.se.EstateService.Logic.Models;
 using Umea.se.EstateService.Logic.Exceptions;
 using Umea.se.EstateService.Logic.Helpers;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
+using Umea.se.EstateService.Shared.Models;
 
 namespace Umea.se.EstateService.Logic.Handlers;
 
-public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, ILogger<FloorBlueprintHandler> logger) : IFloorBlueprintService
+public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IPythagorasHandler pythagorasHandler, ILogger<FloorBlueprintHandler> logger) : IFloorBlueprintService
 {
     private static readonly string[] _nodesToRemove =
     [
@@ -20,25 +22,50 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IL
     ];
 
     private readonly IPythagorasClient _pythagorasClient = pythagorasClient;
+    private readonly IPythagorasHandler _pythagorasHandler = pythagorasHandler;
     private readonly ILogger<FloorBlueprintHandler> _logger = logger;
 
     public async Task<FloorBlueprint> GetBlueprintAsync(int floorId, BlueprintFormat format, bool includeWorkspaceTexts, CancellationToken cancellationToken = default)
     {
+        includeWorkspaceTexts = true;
+
         if (floorId <= 0)
         {
             throw new FloorBlueprintValidationException("Floor id must be positive.");
         }
 
+        IDictionary<int, IReadOnlyList<string>>? workspaceTexts = null;
+
         if (includeWorkspaceTexts)
         {
-            _logger.LogDebug("Workspace text enrichment requested for floor {FloorId}, but feature is not yet implemented.", floorId);
+            _logger.LogInformation("Workspace text enrichment requested for floor {FloorId}. Fetching room data.", floorId);
+
+            PythagorasQuery<Workspace> query = new PythagorasQuery<Workspace>()
+                .Where(workspace => workspace.FloorId, (int?)floorId);
+
+            IReadOnlyList<RoomModel> rooms = await _pythagorasHandler
+                .GetRoomsAsync(query, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (rooms.Count > 0)
+            {
+                workspaceTexts = rooms.ToDictionary(
+                    static room => room.Id,
+                    static room => (IReadOnlyList<string>)[room.Name ?? string.Empty]);
+
+                _logger.LogInformation("Found {Count} rooms to include in blueprint for floor {FloorId}.", rooms.Count, floorId);
+            }
+            else
+            {
+                _logger.LogWarning("Workspace text enrichment requested, but no rooms found for floor {FloorId}.", floorId);
+            }
         }
 
         HttpResponseMessage response;
         try
         {
             response = await _pythagorasClient
-                .GetFloorBlueprintAsync(floorId, format, includeWorkspaceTexts, cancellationToken)
+                .GetFloorBlueprintAsync(floorId, format, workspaceTexts, cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (HttpRequestException ex)
