@@ -63,6 +63,31 @@ public class BuildingControllerTests : ControllerTestCloud<TestApiFactory, Progr
     }
 
     [Fact]
+    public async Task GetBuildingAsync_ReturnsAscendantFields()
+    {
+        _fakeClient.Reset();
+        _fakeClient.SetGetAsyncResult(new BuildingInfo { Id = 1, Name = "Alpha" });
+        _fakeClient.SetGetAsyncResult(new BuildingAscendant { Id = 10, Name = "Estate", Origin = "SpaceManager" });
+
+        HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Buildings}/1");
+        response.EnsureSuccessStatusCode();
+
+        BuildingInfoModel? building = await response.Content.ReadFromJsonAsync<BuildingInfoModel>();
+        building.ShouldNotBeNull();
+        building.Id.ShouldBe(1);
+        building.Estate.ShouldNotBeNull();
+        building.Estate!.Id.ShouldBe(10);
+        building.Estate.Type.ShouldBe(BuildingAscendantType.Estate);
+        building.Region.ShouldBeNull();
+        building.Organization.ShouldBeNull();
+
+        _fakeClient.EndpointsCalled.ShouldBe([
+            "rest/v1/building/info",
+            "rest/v1/building/1/node/ascendant"
+        ]);
+    }
+
+    [Fact]
     public async Task GetBuildingRoomsAsync_ReturnsMappedRooms()
     {
         _fakeClient.Reset();

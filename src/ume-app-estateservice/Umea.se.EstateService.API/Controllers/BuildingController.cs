@@ -13,7 +13,7 @@ namespace Umea.se.EstateService.API.Controllers;
 [Produces("application/json")]
 [Route(ApiRoutes.Buildings)]
 [AuthorizeApiKey]
-public class BuildingController(IPythagorasHandler pythagorasService) : ControllerBase
+public class BuildingController(IPythagorasHandler pythagorasService, ILogger<BuildingController> logger) : ControllerBase
 {
     /// <summary>
     /// Gets a specific building.
@@ -44,7 +44,41 @@ public class BuildingController(IPythagorasHandler pythagorasService) : Controll
             return NotFound();
         }
 
-        return Ok(buildings[0]);
+        BuildingInfoModel building = buildings[0];
+
+        IReadOnlyList<BuildingAscendantModel> ascendants;
+        try
+        {
+            ascendants = await pythagorasService
+                .GetBuildingAscendantsAsync(buildingId, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to load ascendants for building {BuildingId}", buildingId);
+            ascendants = Array.Empty<BuildingAscendantModel>();
+        }
+
+        if (ascendants.Count > 0)
+        {
+            foreach (BuildingAscendantModel ascendant in ascendants)
+            {
+                switch (ascendant.Type)
+                {
+                    case BuildingAscendantType.Estate:
+                        building.Estate ??= ascendant;
+                        break;
+                    case BuildingAscendantType.Area:
+                        building.Region ??= ascendant;
+                        break;
+                    case BuildingAscendantType.Organization:
+                        building.Organization ??= ascendant;
+                        break;
+                }
+            }
+        }
+
+        return Ok(building);
     }
 
     /// <summary>

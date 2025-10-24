@@ -17,6 +17,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
     private static string FloorWorkspacesEndpoint(int floorId) => $"rest/v1/floor/{floorId}/workspace/info";
 
     private static string BuildingWorkspacesEndpoint(int buildingId) => $"rest/v1/building/{buildingId}/workspace/info";
+    private static string BuildingAscendantsEndpoint(int buildingId) => $"rest/v1/building/{buildingId}/node/ascendant";
 
     public async Task<IReadOnlyList<BuildingInfoModel>> GetBuildingsAsync(PythagorasQuery<BuildingInfo>? query = null, CancellationToken cancellationToken = default)
     {
@@ -54,6 +55,26 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         string endpoint = BuildingWorkspacesEndpoint(buildingId);
         IReadOnlyList<BuildingWorkspace> payload = await pythagorasClient.GetAsync(endpoint, query, cancellationToken).ConfigureAwait(false);
         return PythagorasWorkspaceMapper.ToModel(payload);
+    }
+
+    public async Task<IReadOnlyList<BuildingAscendantModel>> GetBuildingAscendantsAsync(
+        int buildingId,
+        CancellationToken cancellationToken = default)
+    {
+        if (buildingId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
+        }
+
+        PythagorasQuery<BuildingAscendant> query = new PythagorasQuery<BuildingAscendant>()
+            .WithQueryParameter("navigationId", 2)
+            .WithQueryParameter("includeSelf", false);
+
+        IReadOnlyList<BuildingAscendant> payload = await pythagorasClient
+            .GetAsync(BuildingAscendantsEndpoint(buildingId), query, cancellationToken)
+            .ConfigureAwait(false);
+
+        return PythagorasBuildingAscendantMapper.ToModel(payload);
     }
 
     public async Task<IReadOnlyList<FloorInfoModel>> GetBuildingFloorsAsync(
