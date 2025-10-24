@@ -88,16 +88,6 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
         return QueryAsync("rest/v1/floor/info", query, cancellationToken);
     }
 
-    public Task<IReadOnlyDictionary<int, TValue>> GetDictionaryAsync<TValue>(string endpoint, PythagorasQuery<TValue>? query, CancellationToken cancellationToken = default)
-where TValue : class
-    {
-        ArgumentNullException.ThrowIfNull(endpoint);
-        query ??= new PythagorasQuery<TValue>();
-        string requestPath = NormalizeEndpoint(endpoint);
-        string queryString = query.BuildAsQueryString();
-        return QueryDictionaryAsync<TValue>(requestPath, queryString, cancellationToken);
-    }
-
     public Task<IReadOnlyDictionary<int, CalculatedPropertyValueDto>> GetBuildingCalculatedPropertyValuesAsync(int buildingId, CalculatedPropertyValueRequest? request = null, CancellationToken cancellationToken = default)
     {
         if (buildingId <= 0)
