@@ -28,8 +28,8 @@ public record PagedQueryRequest
     /// Maximum number of records to return.
     /// </summary>
     [FromQuery(Name = "limit")]
-    [Range(1, MaxLimit, ErrorMessage = "Limit must be between {1} and {2}.")]
-    [SwaggerParameter("Maximum number of items to return.", Required = false)]
+    [Range(-1, MaxLimit, ErrorMessage = "Limit must be -1 (no limit), 0, or between 1 and {2}.")]
+    [SwaggerParameter("Maximum number of items to return. Use -1 to disable the limit", Required = false)]
     public int Limit { get; init; } = DefaultLimit;
 
     /// <summary>
@@ -47,4 +47,5 @@ public record PagedQueryRequest
     [StringLength(MaxSearchTermLength, ErrorMessage = "SearchTerm cannot exceed {1} characters.")]
     [SwaggerParameter("Optional search term used to filter results.", Required = false)]
     public string? SearchTerm { get; init; }
+
 }

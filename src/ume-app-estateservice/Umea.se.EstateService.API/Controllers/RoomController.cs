@@ -42,7 +42,7 @@ public class RoomController(IPythagorasHandler pythagorasHandler) : ControllerBa
             .GetRoomsAsync(query, cancellationToken)
             .ConfigureAwait(false);
 
-        RoomModel? room = rooms.FirstOrDefault();
+        RoomModel? room = rooms.Count > 0 ? rooms[0] : null;
         if (room is null)
         {
             return NotFound();
