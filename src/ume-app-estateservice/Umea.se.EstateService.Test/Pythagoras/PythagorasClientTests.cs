@@ -10,7 +10,7 @@ namespace Umea.se.EstateService.Test.Pythagoras;
 public class PythagorasClientTests
 {
     [Fact]
-    public async Task GetAsync_BuildsExpectedRequest_AndDeserializesResponse()
+    public async Task GetBuildingsAsync_BuildsExpectedRequest_AndDeserializesResponse()
     {
         string jsonResponse = TestDataLoader.Load("Pythagoras/building_response.json");
 
@@ -22,24 +22,22 @@ public class PythagorasClientTests
         FakeHttpClientFactory factory = new(httpClient);
         PythagorasClient client = new(factory);
 
-        PythagorasQuery<Building> query = new PythagorasQuery<Building>()
+        IReadOnlyList<BuildingInfo> result = await client.GetBuildingsAsync(new PythagorasQuery<BuildingInfo>()
             .WithIds(1)
-            .Contains(x => x.Name, "SYSTEM", caseSensitive: false);
+            .Contains(x => x.Name, "SYSTEM", caseSensitive: false));
 
-        IReadOnlyList<Building> result = await client.GetAsync("rest/v1/building", query);
-
-        Building building = result.ShouldHaveSingleItem();
+        BuildingInfo building = result.ShouldHaveSingleItem();
         building.Id.ShouldBe(1);
         building.Name.ShouldBe("SYSTEMBYGGNAD");
 
         HttpRequestMessage request = handler.LastRequest.ShouldNotBeNull();
         request.Method.ShouldBe(HttpMethod.Get);
-        request.RequestUri!.ToString().ShouldBe("https://example.org/rest/v1/building?id%5B%5D=1&pN%5B%5D=ILIKEAW%3Aname&pV%5B%5D=SYSTEM");
+        request.RequestUri!.ToString().ShouldBe("https://example.org/rest/v1/building/info?id%5B%5D=1&pN%5B%5D=ILIKEAW%3Aname&pV%5B%5D=SYSTEM");
         factory.LastRequestedClientName.ShouldBe(HttpClientNames.Pythagoras);
     }
 
     [Fact]
-    public async Task GetAsync_WithNullConfigure_UsesDefaults()
+    public async Task GetBuildingsAsync_WithNullQuery_UsesDefaults()
     {
         const string jsonResponse = "[]";
         CapturingHandler handler = new(jsonResponse);
@@ -50,16 +48,16 @@ public class PythagorasClientTests
         FakeHttpClientFactory factory = new(httpClient);
         PythagorasClient client = new(factory);
 
-        IReadOnlyList<Building> result = await client.GetAsync<Building>("rest/v1/building", query: null);
+        IReadOnlyList<BuildingInfo> result = await client.GetBuildingsAsync();
 
         result.ShouldBeEmpty();
         HttpRequestMessage request = handler.LastRequest.ShouldNotBeNull();
-        request.RequestUri!.ToString().ShouldBe("https://example.org/rest/v1/building");
+        request.RequestUri!.ToString().ShouldBe("https://example.org/rest/v1/building/info");
         factory.LastRequestedClientName.ShouldBe(HttpClientNames.Pythagoras);
     }
 
     [Fact]
-    public async Task GetAsync_WithLeadingSlash_NormalizesEndpoint()
+    public async Task GetBuildingWorkspacesAsync_BuildsExpectedEndpoint()
     {
         const string jsonResponse = "[]";
         CapturingHandler handler = new(jsonResponse);
@@ -70,9 +68,9 @@ public class PythagorasClientTests
         FakeHttpClientFactory factory = new(httpClient);
         PythagorasClient client = new(factory);
 
-        await client.GetAsync<Building>("/rest/v1/building", query: null);
+        await client.GetBuildingWorkspacesAsync(25, query: null);
 
-        handler.LastRequest.ShouldNotBeNull().RequestUri!.ToString().ShouldBe("https://example.org/rest/v1/building");
+        handler.LastRequest.ShouldNotBeNull().RequestUri!.ToString().ShouldBe("https://example.org/rest/v1/building/25/workspace/info");
     }
 
     private sealed class FakeHttpClientFactory(HttpClient client) : IHttpClientFactory

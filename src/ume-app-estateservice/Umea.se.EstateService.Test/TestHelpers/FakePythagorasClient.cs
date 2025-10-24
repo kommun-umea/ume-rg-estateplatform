@@ -71,10 +71,64 @@ public sealed class FakePythagorasClient : IPythagorasClient
     public IEnumerable<RequestCapture> GetRequestsFor<T>() where T : class, IPythagorasDto
         => Requests.Where(r => r.DtoType == typeof(T));
 
-    public Task<IReadOnlyList<T>> GetAsync<T>(string endpoint, PythagorasQuery<T>? query, CancellationToken cancellationToken) where T : class, IPythagorasDto
+    public Task<IReadOnlyList<BuildingInfo>> GetBuildingsAsync(PythagorasQuery<BuildingInfo>? query = null, CancellationToken cancellationToken = default)
+        => CaptureAsync("rest/v1/building/info", query, cancellationToken);
+
+    public Task<IReadOnlyList<BuildingWorkspace>> GetBuildingWorkspacesAsync(int buildingId, PythagorasQuery<BuildingWorkspace>? query = null, CancellationToken cancellationToken = default)
     {
-        string? queryString = query?.BuildAsQueryString();
-        Requests.Add(new RequestCapture(typeof(T), endpoint, query, queryString, cancellationToken));
+        if (buildingId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
+        }
+
+        return CaptureAsync($"rest/v1/building/{buildingId}/workspace/info", query, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<BuildingAscendant>> GetBuildingAscendantsAsync(int buildingId, PythagorasQuery<BuildingAscendant>? query = null, CancellationToken cancellationToken = default)
+    {
+        if (buildingId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
+        }
+
+        return CaptureAsync($"rest/v1/building/{buildingId}/node/ascendant", query, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<Floor>> GetBuildingFloorsAsync(int buildingId, PythagorasQuery<Floor>? query = null, CancellationToken cancellationToken = default)
+    {
+        if (buildingId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
+        }
+
+        return CaptureAsync($"rest/v1/building/{buildingId}/floor", query, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<BuildingWorkspace>> GetFloorWorkspacesAsync(int floorId, PythagorasQuery<BuildingWorkspace>? query = null, CancellationToken cancellationToken = default)
+    {
+        if (floorId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(floorId), "Floor id must be positive.");
+        }
+
+        return CaptureAsync($"rest/v1/floor/{floorId}/workspace/info", query, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<Workspace>> GetWorkspacesAsync(PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
+        => CaptureAsync("rest/v1/workspace/info", query, cancellationToken);
+
+    public Task<IReadOnlyList<NavigationFolder>> GetNavigationFoldersAsync(PythagorasQuery<NavigationFolder>? query = null, CancellationToken cancellationToken = default)
+        => CaptureAsync("rest/v1/navigationfolder/info", query, cancellationToken);
+
+    public Task<IReadOnlyList<Floor>> GetFloorsAsync(PythagorasQuery<Floor>? query = null, CancellationToken cancellationToken = default)
+        => CaptureAsync("rest/v1/floor/info", query, cancellationToken);
+
+    private Task<IReadOnlyList<T>> CaptureAsync<T>(string endpoint, PythagorasQuery<T>? query, CancellationToken cancellationToken) where T : class, IPythagorasDto
+    {
+        PythagorasQuery<T>? originalQuery = query;
+        PythagorasQuery<T> effectiveQuery = originalQuery ?? new PythagorasQuery<T>();
+        string queryString = effectiveQuery.BuildAsQueryString();
+        Requests.Add(new RequestCapture(typeof(T), endpoint, originalQuery, queryString, cancellationToken));
 
         if (_results.TryGetValue(typeof(T), out Queue<object>? queue) && queue.Count > 0)
         {
@@ -83,9 +137,6 @@ public sealed class FakePythagorasClient : IPythagorasClient
 
         return Task.FromResult<IReadOnlyList<T>>([]);
     }
-
-    public IAsyncEnumerable<T> GetPaginatedAsync<T>(string endpoint, PythagorasQuery<T>? query, int pageSize, CancellationToken cancellationToken) where T : class, IPythagorasDto
-        => throw new NotSupportedException();
 
     private Queue<object> GetQueue(Type dtoType)
     {
