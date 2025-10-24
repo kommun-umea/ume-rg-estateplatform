@@ -95,7 +95,7 @@ public class BuildingController(IPythagorasHandler pythagorasService) : Controll
 
         if (request.FloorId is int floorId)
         {
-            query = query.Where(workspace => workspace.FloorId, (int?)floorId);
+            query = query.Where(workspace => workspace.FloorId, floorId);
         }
 
         IReadOnlyList<BuildingRoomModel> rooms = await pythagorasService

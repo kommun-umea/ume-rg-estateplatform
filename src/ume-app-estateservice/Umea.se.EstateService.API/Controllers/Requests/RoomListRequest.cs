@@ -8,7 +8,7 @@ namespace Umea.se.EstateService.API.Controllers.Requests;
 /// <summary>
 /// Query parameters for retrieving rooms.
 /// </summary>
-public sealed record RoomListRequest : PagedQueryRequest
+public sealed record RoomListRequest : PagedQueryRequest, IValidatableObject
 {
     /// <summary>
     /// Explicit room identifiers to include in the response.
@@ -34,13 +34,8 @@ public sealed record RoomListRequest : PagedQueryRequest
     /// <summary>
     /// Runs custom validation logic for combination rules.
     /// </summary>
-    public override IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        foreach (ValidationResult validationResult in base.Validate(validationContext))
-        {
-            yield return validationResult;
-        }
-
         if (Ids is { Length: > 0 })
         {
             if (!string.IsNullOrWhiteSpace(SearchTerm))

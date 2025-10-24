@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
@@ -8,7 +7,7 @@ namespace Umea.se.EstateService.API.Controllers.Requests;
 /// <summary>
 /// Provides shared paging and search query parameters for list endpoints.
 /// </summary>
-public record PagedQueryRequest : IValidatableObject
+public record PagedQueryRequest
 {
     /// <summary>
     /// The default number of items returned when no limit is provided.
@@ -29,8 +28,8 @@ public record PagedQueryRequest : IValidatableObject
     /// Maximum number of records to return.
     /// </summary>
     [FromQuery(Name = "limit")]
-    [Range(-1, MaxLimit, ErrorMessage = "Limit must be -1 (no limit) or between 1 and {2}.")]
-    [SwaggerParameter("Maximum number of items to return. Use -1 to disable the limit.", Required = false)]
+    [Range(-1, MaxLimit, ErrorMessage = "Limit must be -1 (no limit), 0, or between 1 and {2}.")]
+    [SwaggerParameter("Maximum number of items to return. Use -1 to disable the limit", Required = false)]
     public int Limit { get; init; } = DefaultLimit;
 
     /// <summary>
@@ -49,14 +48,4 @@ public record PagedQueryRequest : IValidatableObject
     [SwaggerParameter("Optional search term used to filter results.", Required = false)]
     public string? SearchTerm { get; init; }
 
-    /// <inheritdoc />
-    public virtual IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
-    {
-        if (Limit == 0 || Limit < -1)
-        {
-            yield return new ValidationResult(
-                $"Limit must be -1 (no limit) or between 1 and {MaxLimit}.",
-                new[] { nameof(Limit) });
-        }
-    }
 }
