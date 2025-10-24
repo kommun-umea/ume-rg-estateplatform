@@ -16,11 +16,76 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
 
     protected override string PingUrl => "";
 
-    public Task<IReadOnlyList<TDto>> GetAsync<TDto>(string endpoint, PythagorasQuery<TDto>? query, CancellationToken cancellationToken = default) where TDto : class, IPythagorasDto
+    public Task<IReadOnlyList<BuildingInfo>> GetBuildingsAsync(PythagorasQuery<BuildingInfo>? query = null, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(endpoint);
-        query ??= new PythagorasQuery<TDto>();
+        query ??= new PythagorasQuery<BuildingInfo>();
+        return QueryAsync("rest/v1/building/info", query, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<BuildingWorkspace>> GetBuildingWorkspacesAsync(int buildingId, PythagorasQuery<BuildingWorkspace>? query = null, CancellationToken cancellationToken = default)
+    {
+        if (buildingId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
+        }
+
+        string endpoint = $"rest/v1/building/{buildingId}/workspace/info";
+        query ??= new PythagorasQuery<BuildingWorkspace>();
         return QueryAsync(endpoint, query, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<BuildingAscendant>> GetBuildingAscendantsAsync(int buildingId, PythagorasQuery<BuildingAscendant>? query = null, CancellationToken cancellationToken = default)
+    {
+        if (buildingId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
+        }
+
+        string endpoint = $"rest/v1/building/{buildingId}/node/ascendant";
+        query ??= new PythagorasQuery<BuildingAscendant>();
+        return QueryAsync(endpoint, query, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<Floor>> GetBuildingFloorsAsync(int buildingId, PythagorasQuery<Floor>? query = null, CancellationToken cancellationToken = default)
+    {
+        if (buildingId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
+        }
+
+        string endpoint = $"rest/v1/building/{buildingId}/floor";
+        query ??= new PythagorasQuery<Floor>();
+        return QueryAsync(endpoint, query, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<BuildingWorkspace>> GetFloorWorkspacesAsync(int floorId, PythagorasQuery<BuildingWorkspace>? query = null, CancellationToken cancellationToken = default)
+    {
+        if (floorId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(floorId), "Floor id must be positive.");
+        }
+
+        string endpoint = $"rest/v1/floor/{floorId}/workspace/info";
+        query ??= new PythagorasQuery<BuildingWorkspace>();
+        return QueryAsync(endpoint, query, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<Workspace>> GetWorkspacesAsync(PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
+    {
+        query ??= new PythagorasQuery<Workspace>();
+        return QueryAsync("rest/v1/workspace/info", query, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<NavigationFolder>> GetNavigationFoldersAsync(PythagorasQuery<NavigationFolder>? query = null, CancellationToken cancellationToken = default)
+    {
+        query ??= new PythagorasQuery<NavigationFolder>();
+        return QueryAsync("rest/v1/navigationfolder/info", query, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<Floor>> GetFloorsAsync(PythagorasQuery<Floor>? query = null, CancellationToken cancellationToken = default)
+    {
+        query ??= new PythagorasQuery<Floor>();
+        return QueryAsync("rest/v1/floor/info", query, cancellationToken);
     }
 
     public Task<IReadOnlyDictionary<int, TValue>> GetDictionaryAsync<TValue>(string endpoint, PythagorasQuery<TValue>? query, CancellationToken cancellationToken = default)
