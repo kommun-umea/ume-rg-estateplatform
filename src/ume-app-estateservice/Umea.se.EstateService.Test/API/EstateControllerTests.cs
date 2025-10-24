@@ -1,118 +1,64 @@
-using Microsoft.AspNetCore.Mvc;
-using Umea.se.EstateService.API.Controllers;
-using Umea.se.EstateService.API.Controllers.Requests;
-using Umea.se.EstateService.Logic.Interfaces;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
+using System.Net.Http.Json;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
+using Umea.se.EstateService.API;
+using Umea.se.EstateService.ServiceAccess;
+using Umea.se.EstateService.Test.TestHelpers;
+using Umea.se.TestToolkit.TestInfrastructure;
 
 namespace Umea.se.EstateService.Test.API;
 
-public class EstateControllerTests
+public class EstateControllerTests : ControllerTestCloud<TestApiFactory, Program, HttpClientNames>
 {
-    [Fact]
-    public async Task GetEstateAsync_WhenFound_ReturnsEstate()
+    private readonly HttpClient _client;
+    private readonly FakePythagorasClient _fakeClient;
+
+    public EstateControllerTests()
     {
-        EstateModel estate = new() { Id = 10, Name = "Central" };
-        StubPythagorasHandler handler = new()
-        {
-            OnGetEstatesAsync = (_, _) => Task.FromResult<IReadOnlyList<EstateModel>>([estate])
-        };
+        _client = Client;
+        _client.DefaultRequestHeaders.Add("X-Api-Key", TestApiFactory.ApiKey);
+        _fakeClient = WebAppFactory.FakeClient;
 
-        EstateController controller = new(handler);
-
-        ActionResult<EstateModel> response = await controller.GetEstateAsync(
-            10,
-            new EstateDetailsRequest(),
-            CancellationToken.None);
-
-        OkObjectResult ok = response.Result.ShouldBeOfType<OkObjectResult>();
-        ok.Value.ShouldBe(estate);
+        MockManager.SetupUser(user => user.WithSsNo("1234567890"));
     }
 
     [Fact]
-    public async Task GetEstateAsync_WhenMissing_Returns404()
+    public async Task GetEstateBuildingsAsync_ReturnsFilteredBuildingsByEstateId()
     {
-        StubPythagorasHandler handler = new()
-        {
-            OnGetEstatesAsync = (_, _) => Task.FromResult<IReadOnlyList<EstateModel>>([])
-        };
+        _fakeClient.Reset();
+        _fakeClient.SetGetAsyncResult(
+            new BuildingInfo { Id = 10, Name = "Building A" },
+            new BuildingInfo { Id = 11, Name = "Building B" });
 
-        EstateController controller = new(handler);
+        HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Estates}/123/buildings");
+        response.EnsureSuccessStatusCode();
 
-        ActionResult<EstateModel> response = await controller.GetEstateAsync(
-            99,
-            new EstateDetailsRequest(),
-            CancellationToken.None);
+        IReadOnlyList<BuildingInfoModel>? buildings = await response.Content.ReadFromJsonAsync<IReadOnlyList<BuildingInfoModel>>();
+        buildings.ShouldNotBeNull();
 
-        response.Result.ShouldBeOfType<NotFoundResult>();
+        buildings.Count.ShouldBe(2);
+        buildings.Select(b => b.Id).ShouldBe([10, 11]);
+        string decodedQuery = Uri.UnescapeDataString(_fakeClient.LastQueryString ?? string.Empty);
+        decodedQuery.ShouldContain("navigationFolderId=123");
+        _fakeClient.LastEndpoint.ShouldBe("rest/v1/building/info");
     }
 
     [Fact]
-    public async Task GetEstateAsync_WithIncludeBuildings_AddsQueryParameter()
+    public async Task GetEstateBuildingsAsync_WithZeroResults_ReturnsEmptyList()
     {
-        PythagorasQuery<NavigationFolder>? capturedQuery = null;
+        _fakeClient.Reset();
+        _fakeClient.SetGetAsyncResult(Array.Empty<BuildingInfo>());
 
-        StubPythagorasHandler handler = new()
-        {
-            OnGetEstatesAsync = (query, _) =>
-            {
-                capturedQuery = query;
-                return Task.FromResult<IReadOnlyList<EstateModel>>([new EstateModel { Id = 5 }]);
-            }
-        };
+        HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Estates}/456/buildings");
+        response.EnsureSuccessStatusCode();
 
-        EstateController controller = new(handler);
+        IReadOnlyList<BuildingInfoModel>? buildings = await response.Content.ReadFromJsonAsync<IReadOnlyList<BuildingInfoModel>>();
+        buildings.ShouldNotBeNull();
 
-        ActionResult<EstateModel> action = await controller.GetEstateAsync(
-            5,
-            new EstateDetailsRequest { IncludeBuildings = true },
-            CancellationToken.None);
-
-        action.Result.ShouldBeOfType<OkObjectResult>();
-        capturedQuery.ShouldNotBeNull();
-        string queryString = capturedQuery!.BuildAsQueryString();
-        queryString.ShouldContain("includeAscendantBuildings=true");
-        queryString.ShouldContain("pN%5B%5D=EQ%3Aid");
-        queryString.ShouldContain("pV%5B%5D=5");
+        buildings.ShouldBeEmpty();
+        string decodedQuery = Uri.UnescapeDataString(_fakeClient.LastQueryString ?? string.Empty);
+        decodedQuery.ShouldContain("navigationFolderId=456");
+        _fakeClient.LastEndpoint.ShouldBe("rest/v1/building/info");
     }
 
-    private sealed class StubPythagorasHandler : IPythagorasHandler
-    {
-        public Func<PythagorasQuery<NavigationFolder>?, CancellationToken, Task<IReadOnlyList<EstateModel>>>? OnGetEstatesAsync { get; set; }
-
-        public Task<IReadOnlyList<EstateModel>> GetEstatesAsync(PythagorasQuery<NavigationFolder>? query = null, CancellationToken cancellationToken = default)
-        {
-            if (OnGetEstatesAsync is null)
-            {
-                throw new InvalidOperationException("OnGetEstatesAsync must be assigned for this test.");
-            }
-
-            return OnGetEstatesAsync(query, cancellationToken);
-        }
-
-        public Task<IReadOnlyList<BuildingInfoModel>> GetBuildingsAsync(PythagorasQuery<BuildingInfo>? query = null, CancellationToken cancellationToken = default)
-            => throw new NotImplementedException();
-
-        public Task<IReadOnlyList<BuildingInfoModel>> GetBuildingInfoAsync(PythagorasQuery<BuildingInfo>? query = null, int? navigationFolderId = null, CancellationToken cancellationToken = default)
-            => throw new NotImplementedException();
-
-        public Task<IReadOnlyList<BuildingRoomModel>> GetBuildingWorkspacesAsync(int buildingId, PythagorasQuery<BuildingWorkspace>? query = null, CancellationToken cancellationToken = default)
-            => throw new NotImplementedException();
-
-        public Task<IReadOnlyList<FloorInfoModel>> GetBuildingFloorsAsync(int buildingId, PythagorasQuery<Floor>? floorQuery = null, CancellationToken cancellationToken = default)
-            => throw new NotImplementedException();
-
-        public Task<IReadOnlyList<FloorInfoModel>> GetBuildingFloorsWithRoomsAsync(int buildingId, PythagorasQuery<Floor>? floorQuery = null, PythagorasQuery<BuildingWorkspace>? workspaceQuery = null, CancellationToken cancellationToken = default)
-            => throw new NotImplementedException();
-
-        public Task<IReadOnlyList<BuildingAscendantModel>> GetBuildingAscendantsAsync(int buildingId, CancellationToken cancellationToken = default)
-            => Task.FromResult<IReadOnlyList<BuildingAscendantModel>>([]);
-
-        public Task<IReadOnlyList<RoomModel>> GetRoomsAsync(PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
-            => throw new NotImplementedException();
-
-        public Task<IReadOnlyList<FloorInfoModel>> GetFloorsAsync(PythagorasQuery<Floor>? query = null, CancellationToken cancellationToken = default)
-            => throw new NotImplementedException();
-    }
 }

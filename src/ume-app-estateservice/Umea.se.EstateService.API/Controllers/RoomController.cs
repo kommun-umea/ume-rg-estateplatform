@@ -110,6 +110,11 @@ public class RoomController(IPythagorasHandler pythagorasHandler) : ControllerBa
             .GetBuildingsAsync(query, cancellationToken)
             .ConfigureAwait(false);
 
-        return buildings.FirstOrDefault();
+        if (buildings.Count == 0)
+        {
+            return null;
+        }
+
+        return buildings[0];
     }
 }

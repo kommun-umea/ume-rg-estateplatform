@@ -1,4 +1,5 @@
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.EstateService.Shared.ValueObjects;
 
@@ -6,7 +7,7 @@ namespace Umea.se.EstateService.Logic.Mappers;
 
 public static class PythagorasBuildingInfoMapper
 {
-    public static BuildingInfoModel ToModel(BuildingInfo dto)
+    public static BuildingInfoModel ToModel(BuildingInfo dto, BuildingExtendedPropertiesModel? extendedProperties = null)
     {
         ArgumentNullException.ThrowIfNull(dto);
 
@@ -21,7 +22,8 @@ public static class PythagorasBuildingInfoMapper
             NetArea = dto.Netarea ?? 0m,
             SumGrossFloorArea = dto.SumGrossFloorarea ?? 0m,
             NumPlacedPersons = dto.NumPlacedPersons,
-            Address = CreateAddress(dto)
+            Address = CreateAddress(dto),
+            ExtendedProperties = extendedProperties
         };
     }
 
@@ -31,7 +33,7 @@ public static class PythagorasBuildingInfoMapper
 
         return dtos.Count == 0
             ? []
-            : dtos.Select(ToModel).ToArray();
+            : dtos.Select(b => ToModel(b, null)).ToArray();
     }
 
     private static GeoPointModel? CreateGeoPoint(BuildingInfo dto)
@@ -66,5 +68,57 @@ public static class PythagorasBuildingInfoMapper
             dto.AddressCity ?? string.Empty,
             dto.AddressCountry ?? string.Empty,
             dto.AddressExtra ?? string.Empty);
+    }
+
+    public static BuildingExtendedPropertiesModel? ToExtendedPropertiesModel(IReadOnlyDictionary<BuildingPropertyCategoryId, CalculatedPropertyValueDto> properties)
+    {
+        ArgumentNullException.ThrowIfNull(properties);
+
+        if (properties.Count == 0)
+        {
+            return null;
+        }
+
+        string? externalOwner = TryGetOutputValue(properties, BuildingPropertyCategoryId.ExternalOwner);
+        string? propertyDesignation = TryGetOutputValue(properties, BuildingPropertyCategoryId.PropertyDesignation);
+
+        string? noticeBoardText = TryGetOutputValue(properties, BuildingPropertyCategoryId.NoticeBoardText);
+        BuildingNoticeBoardModel? noticeBoard = null;
+
+        if (!string.IsNullOrEmpty(noticeBoardText))
+        {
+            noticeBoard = new BuildingNoticeBoardModel
+            {
+                Text = noticeBoardText,
+                StartDate = DateTime.TryParse(TryGetOutputValue(properties, BuildingPropertyCategoryId.NoticeBoardStartDate), out DateTime startDate) ? startDate : null,
+                EndDate = DateTime.TryParse(TryGetOutputValue(properties, BuildingPropertyCategoryId.NoticeBoardEndDate), out DateTime endDate) ? endDate : null
+            };
+        }
+
+        bool hasData = externalOwner is not null
+            || propertyDesignation is not null
+            || noticeBoard is not null;
+
+        if (!hasData)
+        {
+            return null;
+        }
+
+        return new BuildingExtendedPropertiesModel
+        {
+            ExternalOwner = externalOwner,
+            PropertyDesignation = propertyDesignation,
+            NoticeBoard = noticeBoard
+        };
+    }
+
+    private static string? TryGetOutputValue(IReadOnlyDictionary<BuildingPropertyCategoryId, CalculatedPropertyValueDto> properties, BuildingPropertyCategoryId key)
+    {
+        if (!properties.TryGetValue(key, out CalculatedPropertyValueDto? value) || value is null)
+        {
+            return null;
+        }
+
+        return value.OutputValue;
     }
 }

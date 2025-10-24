@@ -5,6 +5,7 @@ using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.EstateService.Shared.Search;
 using Umea.se.EstateService.Shared.ValueObjects;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 
 namespace Umea.se.EstateService.Test.Search;
 
@@ -107,5 +108,10 @@ public class PythagorasDocumentProviderTests
 
         public Task<IReadOnlyList<FloorInfoModel>> GetFloorsAsync(PythagorasQuery<Floor>? query = null, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
+
+        public Task<BuildingInfoModel?> GetBuildingByIdAsync(int buildingId, BuildingIncludeOptions includeOptions = BuildingIncludeOptions.None, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

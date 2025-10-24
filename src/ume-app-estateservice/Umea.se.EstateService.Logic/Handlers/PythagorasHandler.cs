@@ -25,6 +25,40 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         return PythagorasBuildingInfoMapper.ToModel(payload);
     }
 
+    public async Task<BuildingInfoModel?> GetBuildingByIdAsync(int buildingId, BuildingIncludeOptions includeOptions = BuildingIncludeOptions.None, CancellationToken cancellationToken = default)
+    {
+        if (buildingId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
+        }
+
+        PythagorasQuery<BuildingInfo> query = new PythagorasQuery<BuildingInfo>()
+            .Where(b => b.Id, buildingId);
+
+        IReadOnlyList<BuildingInfo> payload = await pythagorasClient
+            .GetAsync(BuildingsInfoEndpoint, query, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (payload.Count == 0)
+        {
+            return null;
+        }
+
+        BuildingExtendedPropertiesModel? extendedProperties = null;
+        if (includeOptions.HasFlag(BuildingIncludeOptions.ExtendedProperties))
+        {
+            IReadOnlyDictionary<BuildingPropertyCategoryId, CalculatedPropertyValueDto> properties = await GetBuildingCalculatedPropertyValuesInternalAsync(
+                    buildingId,
+                    request: null,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            extendedProperties = PythagorasBuildingInfoMapper.ToExtendedPropertiesModel(properties);
+        }
+
+        return PythagorasBuildingInfoMapper.ToModel(payload[0], extendedProperties);
+    }
+
     public async Task<IReadOnlyList<BuildingInfoModel>> GetBuildingInfoAsync(PythagorasQuery<BuildingInfo>? query = null, int? navigationFolderId = null, CancellationToken cancellationToken = default)
     {
         query ??= new PythagorasQuery<BuildingInfo>();
@@ -165,5 +199,31 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
             .ConfigureAwait(false);
 
         return PythagorasFloorInfoMapper.ToModel(payload);
+    }
+
+    private async Task<IReadOnlyDictionary<BuildingPropertyCategoryId, CalculatedPropertyValueDto>> GetBuildingCalculatedPropertyValuesInternalAsync(int buildingId, CalculatedPropertyValueRequest? request = null, CancellationToken cancellationToken = default)
+    {
+        if (buildingId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
+        }
+
+        IReadOnlyDictionary<int, CalculatedPropertyValueDto> rawValues = await pythagorasClient
+            .GetBuildingCalculatedPropertyValuesAsync(buildingId, request, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (rawValues.Count == 0)
+        {
+            return new Dictionary<BuildingPropertyCategoryId, CalculatedPropertyValueDto>();
+        }
+
+        Dictionary<BuildingPropertyCategoryId, CalculatedPropertyValueDto> mapped = new(rawValues.Count);
+        foreach (KeyValuePair<int, CalculatedPropertyValueDto> entry in rawValues)
+        {
+            BuildingPropertyCategoryId categoryId = (BuildingPropertyCategoryId)entry.Key;
+            mapped[categoryId] = entry.Value;
+        }
+
+        return mapped;
     }
 }

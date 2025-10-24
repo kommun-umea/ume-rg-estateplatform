@@ -18,6 +18,6 @@ public sealed class BuildingInfoModel : ISearchable
     public BuildingAscendantModel? Estate { get; set; }
     public BuildingAscendantModel? Region { get; set; }
     public BuildingAscendantModel? Organization { get; set; }
-
+    public BuildingExtendedPropertiesModel? ExtendedProperties { get; init; }
     public DateTimeOffset UpdatedAt => DateTime.Now;
 }
