@@ -82,6 +82,26 @@ public class BuildingControllerTests : ControllerTestCloud<TestApiFactory, Progr
     }
 
     [Fact]
+    public async Task GetBuildingRoomsAsync_WithFloorId_FiltersByFloor()
+    {
+        _fakeClient.Reset();
+        _fakeClient.SetGetAsyncResult(
+            new BuildingWorkspace { Id = 42, BuildingId = 1, BuildingName = "B", FloorId = 8 });
+
+        HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Buildings}/1/rooms?floorId=8&limit=-1");
+        response.EnsureSuccessStatusCode();
+
+        IReadOnlyList<BuildingRoomModel>? rooms = await response.Content.ReadFromJsonAsync<IReadOnlyList<BuildingRoomModel>>();
+        rooms.ShouldNotBeNull();
+        rooms.ShouldHaveSingleItem().FloorId.ShouldBe(8);
+
+        string decodedQuery = Uri.UnescapeDataString(_fakeClient.LastQueryString ?? string.Empty);
+        decodedQuery.ShouldContain("floorId=8");
+        decodedQuery.ShouldNotContain("maxResults");
+        _fakeClient.LastEndpoint.ShouldBe("rest/v1/building/1/workspace/info");
+    }
+
+    [Fact]
     public async Task GetBuildingFloorsAsync_AppliesQueryParameters()
     {
         _fakeClient.Reset();

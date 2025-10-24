@@ -93,6 +93,11 @@ public class BuildingController(IPythagorasHandler pythagorasService) : Controll
             .ApplyGeneralSearch(request)
             .ApplyPaging(request);
 
+        if (request.FloorId is int floorId)
+        {
+            query = query.Where(workspace => workspace.FloorId, (int?)floorId);
+        }
+
         IReadOnlyList<BuildingRoomModel> rooms = await pythagorasService
             .GetBuildingWorkspacesAsync(buildingId, query, cancellationToken)
             .ConfigureAwait(false);
