@@ -1,5 +1,4 @@
-﻿
-using System.Net;
+﻿using System.Net;
 
 namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 

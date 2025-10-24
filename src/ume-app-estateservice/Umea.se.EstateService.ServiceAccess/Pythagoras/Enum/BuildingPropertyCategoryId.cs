@@ -1,4 +1,6 @@
-﻿public enum BuildingPropertyCategoryId
+﻿namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
+
+public enum BuildingPropertyCategoryId
 {
     PropertyDesignation = 56,
     YearOfConstruction = 226,
