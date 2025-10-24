@@ -96,7 +96,8 @@ public class BuildingControllerTests : ControllerTestCloud<TestApiFactory, Progr
         rooms.ShouldHaveSingleItem().FloorId.ShouldBe(8);
 
         string decodedQuery = Uri.UnescapeDataString(_fakeClient.LastQueryString ?? string.Empty);
-        decodedQuery.ShouldContain("floorId=8");
+        decodedQuery.ShouldContain("pN[]=EQ:floorId");
+        decodedQuery.ShouldContain("pV[]=8");
         decodedQuery.ShouldNotContain("maxResults");
         _fakeClient.LastEndpoint.ShouldBe("rest/v1/building/1/workspace/info");
     }
