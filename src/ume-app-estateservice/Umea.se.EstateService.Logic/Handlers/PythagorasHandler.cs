@@ -251,7 +251,6 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         IReadOnlyCollection<int>? estateIds = null,
         IReadOnlyCollection<int>? propertyIds = null,
         int? navigationId = null,
-        bool includeBuildings = true,
         CancellationToken cancellationToken = default)
     {
         IReadOnlyCollection<int> effectivePropertyIds;
@@ -301,7 +300,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         foreach (NavigationFolder estate in response.Data)
         {
             EstateExtendedPropertiesModel? extendedProperties = PythagorasEstatePropertyMapper.ToExtendedPropertiesModel(estate.PropertyValues);
-            models.Add(PythagorasEstateMapper.ToModel(estate, extendedProperties, includeBuildings));
+            models.Add(PythagorasEstateMapper.ToModel(estate, extendedProperties));
         }
 
         return models;
@@ -346,7 +345,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
 
         EstateExtendedPropertiesModel? extendedProperties = PythagorasEstatePropertyMapper.ToExtendedPropertiesModel(properties);
 
-        return PythagorasEstateMapper.ToModel(estateDto, extendedProperties, includeBuildings);
+        return PythagorasEstateMapper.ToModel(estateDto, extendedProperties);
     }
     public async Task<IReadOnlyList<FloorInfoModel>> GetFloorsAsync(PythagorasQuery<Floor>? query = null, CancellationToken cancellationToken = default)
     {

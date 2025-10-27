@@ -19,7 +19,7 @@ public class PythagorasEstateMapperTests
             ]
         };
 
-        EstateModel model = PythagorasEstateMapper.ToModel(dto, includeBuildings: true);
+        EstateModel model = PythagorasEstateMapper.ToModel(dto);
 
         model.BuildingCount.ShouldBe(2);
         model.Buildings.ShouldNotBeNull();
@@ -40,7 +40,7 @@ public class PythagorasEstateMapperTests
             ]
         };
 
-        EstateModel model = PythagorasEstateMapper.ToModel(dto, includeBuildings: false);
+        EstateModel model = PythagorasEstateMapper.ToModel(dto);
 
         model.BuildingCount.ShouldBe(3);
         model.Buildings.ShouldBeNull();

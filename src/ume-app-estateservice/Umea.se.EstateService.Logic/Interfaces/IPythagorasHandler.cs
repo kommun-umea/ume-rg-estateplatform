@@ -18,15 +18,6 @@ public interface IPythagorasHandler
     Task<IReadOnlyList<FloorInfoModel>> GetFloorsAsync(PythagorasQuery<Floor>? query = null, CancellationToken cancellationToken = default);
     Task<BuildingInfoModel?> GetBuildingByIdAsync(int buildingId, BuildingIncludeOptions includeOptions = BuildingIncludeOptions.None, CancellationToken cancellationToken = default);
     Task<EstateModel?> GetEstateByIdAsync(int estateId, bool includeBuildings = false, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<BuildingInfoModel>> GetBuildingsWithPropertiesAsync(
-        IReadOnlyCollection<int>? buildingIds = null,
-        IReadOnlyCollection<int>? propertyIds = null,
-        int? navigationId = null,
-        CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<EstateModel>> GetEstatesWithPropertiesAsync(
-        IReadOnlyCollection<int>? estateIds = null,
-        IReadOnlyCollection<int>? propertyIds = null,
-        int? navigationId = null,
-        bool includeBuildings = true,
-        CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<BuildingInfoModel>> GetBuildingsWithPropertiesAsync(IReadOnlyCollection<int>? buildingIds = null, IReadOnlyCollection<int>? propertyIds = null, int? navigationId = null, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<EstateModel>> GetEstatesWithPropertiesAsync(IReadOnlyCollection<int>? estateIds = null, IReadOnlyCollection<int>? propertyIds = null, int? navigationId = null, CancellationToken cancellationToken = default);
 }

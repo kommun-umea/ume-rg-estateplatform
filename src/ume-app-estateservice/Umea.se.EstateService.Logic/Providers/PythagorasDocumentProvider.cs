@@ -43,7 +43,7 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
         IReadOnlyDictionary<int, BuildingInfoModel> buildingInfos)
     {
         IReadOnlyList<EstateModel> estates = await pythagorasHandler
-            .GetEstatesWithPropertiesAsync(includeBuildings: true)
+            .GetEstatesWithPropertiesAsync()
             .ConfigureAwait(false);
 
         foreach (EstateModel estate in estates)
@@ -173,7 +173,7 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
         };
     }
 
-    private static IReadOnlyDictionary<string, string>? CreateBuildingExtendedProperties(BuildingExtendedPropertiesModel? source)
+    private static Dictionary<string, string>? CreateBuildingExtendedProperties(BuildingExtendedPropertiesModel? source)
     {
         if (source is null)
         {
@@ -195,7 +195,7 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
         return result.Count == 0 ? null : result;
     }
 
-    private static IReadOnlyDictionary<string, string>? CreateEstateExtendedProperties(EstateExtendedPropertiesModel? source)
+    private static Dictionary<string, string>? CreateEstateExtendedProperties(EstateExtendedPropertiesModel? source)
     {
         if (source is null)
         {
