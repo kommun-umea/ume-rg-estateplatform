@@ -233,12 +233,13 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         return PythagorasWorkspaceMapper.ToModel(payload);
     }
 
-    public async Task<IReadOnlyList<EstateModel>> GetEstatesAsync(PythagorasQuery<NavigationFolder>? query = null, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<EstateModel>> GetEstatesWithBuildingsAsync(PythagorasQuery<NavigationFolder>? query = null, CancellationToken cancellationToken = default)
     {
         query ??= new PythagorasQuery<NavigationFolder>();
         query = query
             .Where(f => f.TypeId, NavigationFolderType.Estate)
-            .WithQueryParameter("navigationId", NavigationType.UmeaKommun);
+            .WithQueryParameter("navigationId", NavigationType.UmeaKommun)
+            .WithQueryParameter("includeAscendantBuildings", true);
 
         IReadOnlyList<NavigationFolder> payload = await pythagorasClient
             .GetNavigationFoldersAsync(query, cancellationToken)
@@ -247,11 +248,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         return PythagorasEstateMapper.ToModel(payload);
     }
 
-    public async Task<IReadOnlyList<EstateModel>> GetEstatesWithPropertiesAsync(
-        IReadOnlyCollection<int>? estateIds = null,
-        IReadOnlyCollection<int>? propertyIds = null,
-        int? navigationId = null,
-        CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<EstateModel>> GetEstatesWithPropertiesAsync(IReadOnlyCollection<int>? estateIds = null, IReadOnlyCollection<int>? propertyIds = null, int? navigationId = null, CancellationToken cancellationToken = default)
     {
         IReadOnlyCollection<int> effectivePropertyIds;
         if (propertyIds?.Any() == true)

@@ -215,13 +215,8 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
         response.EnsureSuccessStatusCode();
 
         await using Stream contentStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        MemoryStream mem = new MemoryStream();
-        contentStream.CopyTo(mem);
-        string json = Encoding.UTF8.GetString(mem.ToArray());
-        File.WriteAllText(@"C:\temp\data.json", json);
-        mem.Position = 0;
         UiListDataResponse<NavigationFolder>? payload = await JsonSerializer
-            .DeserializeAsync<UiListDataResponse<NavigationFolder>>(mem, _serializerOptions, cancellationToken)
+            .DeserializeAsync<UiListDataResponse<NavigationFolder>>(contentStream, _serializerOptions, cancellationToken)
             .ConfigureAwait(false);
 
         return payload ?? new UiListDataResponse<NavigationFolder>();

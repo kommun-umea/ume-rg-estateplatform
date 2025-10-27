@@ -49,7 +49,7 @@ public class PythagorasDocumentProviderTests
         internal const int EstateId = 7;
         internal const int RoomId = 99;
 
-        public Task<IReadOnlyList<EstateModel>> GetEstatesAsync(PythagorasQuery<NavigationFolder>? query = null, CancellationToken cancellationToken = default)
+        public Task<IReadOnlyList<EstateModel>> GetEstatesWithBuildingsAsync(PythagorasQuery<NavigationFolder>? query = null, CancellationToken cancellationToken = default)
         {
             EstateModel estate = new()
             {
