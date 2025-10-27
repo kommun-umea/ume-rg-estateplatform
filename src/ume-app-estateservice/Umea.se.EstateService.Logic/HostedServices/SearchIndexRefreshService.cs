@@ -6,10 +6,7 @@ using Umea.se.EstateService.Logic.Options;
 
 namespace Umea.se.EstateService.Logic.HostedServices;
 
-public sealed class SearchIndexRefreshService(
-    SearchHandler searchHandler,
-    IOptions<SearchIndexRefreshOptions> options,
-    ILogger<SearchIndexRefreshService> logger) : BackgroundService
+public sealed class SearchIndexRefreshService(SearchHandler searchHandler, IOptions<SearchIndexRefreshOptions> options, ILogger<SearchIndexRefreshService> logger) : BackgroundService
 {
     private readonly SearchIndexRefreshOptions _options = options.Value;
     private readonly SemaphoreSlim _refreshLock = new(1, 1);

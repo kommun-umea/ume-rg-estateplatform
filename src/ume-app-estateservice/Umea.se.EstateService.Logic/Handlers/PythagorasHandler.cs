@@ -1,4 +1,3 @@
-using System.Linq;
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.Logic.Mappers;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;

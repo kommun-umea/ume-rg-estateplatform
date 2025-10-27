@@ -110,9 +110,7 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
         return GetCalculatedPropertyValuesAsync("navigationfolder", estateId, request, cancellationToken);
     }
 
-    public async Task<UiListDataResponse<BuildingInfo>> PostBuildingUiListDataAsync(
-        BuildingUiListDataRequest request,
-        CancellationToken cancellationToken = default)
+    public async Task<UiListDataResponse<BuildingInfo>> PostBuildingUiListDataAsync(BuildingUiListDataRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -139,12 +137,7 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
         }
 
         string endpoint = "rest/v1/building/info/uilistdata";
-        string queryString = BuildUiListDataQuery(
-            request.NavigationId,
-            request.IncludePropertyValues,
-            request.PropertyIds,
-            request.BuildingIds,
-            "buildingIds[]");
+        string queryString = BuildUiListDataQuery(request.NavigationId, request.IncludePropertyValues, request.PropertyIds, request.BuildingIds, "buildingIds[]");
         return await PostAsync<UiListDataResponse<BuildingInfo>>(endpoint, queryString, cancellationToken).ConfigureAwait(false);
     }
 
@@ -290,8 +283,7 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
         return string.Join('&', parts);
     }
 
-    private static string FormQueryParameter(string name, string value)
-        => $"{Uri.EscapeDataString(name)}={Uri.EscapeDataString(value)}";
+    private static string FormQueryParameter(string name, string value) => $"{Uri.EscapeDataString(name)}={Uri.EscapeDataString(value)}";
 
     public Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken = default)
     {
@@ -368,17 +360,10 @@ where TValue : class
         }
         catch (Exception readException)
         {
-            throw new PythagorasApiException(
-                $"Pythagoras API request failed with status code {response.StatusCode}.",
-                response.StatusCode,
-                errorBody,
-                readException);
+            throw new PythagorasApiException($"Pythagoras API request failed with status code {response.StatusCode}.", response.StatusCode, errorBody, readException);
         }
 
-        throw new PythagorasApiException(
-            $"Pythagoras API request failed with status code {response.StatusCode}.",
-            response.StatusCode,
-            errorBody);
+        throw new PythagorasApiException($"Pythagoras API request failed with status code {response.StatusCode}.", response.StatusCode, errorBody);
     }
 
     private Task<IReadOnlyDictionary<int, CalculatedPropertyValueDto>> GetCalculatedPropertyValuesAsync(string entityType, long entityId, CalculatedPropertyValueRequest? request, CancellationToken cancellationToken)
