@@ -32,6 +32,39 @@ public static class PythagorasEstatePropertyMapper
         };
     }
 
+    public static EstateExtendedPropertiesModel? ToExtendedPropertiesModel(IReadOnlyDictionary<int, PropertyValueDto> properties)
+    {
+        if (properties == null || properties.Count == 0)
+        {
+            return null;
+        }
+
+        Dictionary<PropertyCategoryId, CalculatedPropertyValueDto> normalized = new(properties.Count);
+
+        foreach ((int key, PropertyValueDto value) in properties)
+        {
+            if (value?.Value is null)
+            {
+                continue;
+            }
+
+            if (!Enum.IsDefined(typeof(PropertyCategoryId), key))
+            {
+                continue;
+            }
+
+            normalized[(PropertyCategoryId)key] = new CalculatedPropertyValueDto
+            {
+                OutputValue = value.Value,
+                Valid = true
+            };
+        }
+
+        return normalized.Count == 0
+            ? null
+            : ToExtendedPropertiesModel(normalized);
+    }
+
     private static string? TryGetOutputValue(IReadOnlyDictionary<PropertyCategoryId, CalculatedPropertyValueDto> properties, PropertyCategoryId key)
     {
         if (!properties.TryGetValue(key, out CalculatedPropertyValueDto? value) || value is null)

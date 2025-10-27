@@ -13,8 +13,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
     [
         (int)PropertyCategoryId.OperationalArea,
         (int)PropertyCategoryId.MunicipalityArea,
-        (int)PropertyCategoryId.PropertyDesignation,
-        
+        (int)PropertyCategoryId.PropertyDesignation
     ]);
     private static readonly IReadOnlyCollection<int> _buildingExtendedPropertyIds = Array.AsReadOnly(
     [
@@ -40,20 +39,14 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         CancellationToken cancellationToken = default)
     {
         IReadOnlyCollection<int> effectivePropertyIds;
-        if (propertyIds is { Count: > 0 })
+        if (propertyIds?.Any() == true)
         {
-            List<int> validatedPropertyIds = new(propertyIds.Count);
-            foreach (int propertyId in propertyIds)
+            if (propertyIds.Any(id => id <= 0))
             {
-                if (propertyId <= 0)
-                {
-                    throw new ArgumentOutOfRangeException(nameof(propertyIds), "Property ids must be positive.");
-                }
-
-                validatedPropertyIds.Add(propertyId);
+                throw new ArgumentOutOfRangeException(nameof(propertyIds), "Property ids must be positive.");
             }
 
-            effectivePropertyIds = validatedPropertyIds;
+            effectivePropertyIds = [.. propertyIds];
         }
         else
         {
@@ -61,20 +54,14 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         }
 
         IReadOnlyCollection<int>? validatedBuildingIds = null;
-        if (buildingIds is { Count: > 0 })
+        if (buildingIds?.Any() == true)
         {
-            List<int> ids = new(buildingIds.Count);
-            foreach (int buildingId in buildingIds)
+            if (buildingIds.Any(id => id <= 0))
             {
-                if (buildingId <= 0)
-                {
-                    throw new ArgumentOutOfRangeException(nameof(buildingIds), "Building ids must be positive.");
-                }
-
-                ids.Add(buildingId);
+                throw new ArgumentOutOfRangeException(nameof(buildingIds), "Building ids must be positive.");
             }
 
-            validatedBuildingIds = ids;
+            validatedBuildingIds = [.. buildingIds];
         }
 
         BuildingUiListDataRequest request = new()
@@ -258,6 +245,66 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
             .ConfigureAwait(false);
 
         return PythagorasEstateMapper.ToModel(payload);
+    }
+
+    public async Task<IReadOnlyList<EstateModel>> GetEstatesWithPropertiesAsync(
+        IReadOnlyCollection<int>? estateIds = null,
+        IReadOnlyCollection<int>? propertyIds = null,
+        int? navigationId = null,
+        bool includeBuildings = true,
+        CancellationToken cancellationToken = default)
+    {
+        IReadOnlyCollection<int> effectivePropertyIds;
+        if (propertyIds?.Any() == true)
+        {
+            if (propertyIds.Any(id => id <= 0))
+            {
+                throw new ArgumentOutOfRangeException(nameof(propertyIds), "Property ids must be positive.");
+            }
+
+            effectivePropertyIds = [.. propertyIds];
+        }
+        else
+        {
+            effectivePropertyIds = _estateCalculatedPropertyIds;
+        }
+
+        IReadOnlyCollection<int>? validatedEstateIds = null;
+        if (estateIds?.Any() == true)
+        {
+            if (estateIds.Any(id => id <= 0))
+            {
+                throw new ArgumentOutOfRangeException(nameof(estateIds), "Estate ids must be positive.");
+            }
+
+            validatedEstateIds = [.. estateIds];
+        }
+
+        NavigationFolderUiListDataRequest request = new()
+        {
+            NavigationFolderIds = validatedEstateIds,
+            PropertyIds = effectivePropertyIds,
+            NavigationId = navigationId ?? NavigationType.UmeaKommun,
+            IncludePropertyValues = true
+        };
+
+        UiListDataResponse<NavigationFolder> response = await pythagorasClient
+            .PostNavigationFolderUiListDataAsync(request, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (response.Data.Count == 0)
+        {
+            return [];
+        }
+
+        List<EstateModel> models = new(response.Data.Count);
+        foreach (NavigationFolder estate in response.Data)
+        {
+            EstateExtendedPropertiesModel? extendedProperties = PythagorasEstatePropertyMapper.ToExtendedPropertiesModel(estate.PropertyValues);
+            models.Add(PythagorasEstateMapper.ToModel(estate, extendedProperties, includeBuildings));
+        }
+
+        return models;
     }
 
     public async Task<EstateModel?> GetEstateByIdAsync(int estateId, bool includeBuildings = false, CancellationToken cancellationToken = default)

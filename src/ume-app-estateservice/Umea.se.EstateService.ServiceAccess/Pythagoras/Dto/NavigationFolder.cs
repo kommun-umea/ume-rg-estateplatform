@@ -38,6 +38,6 @@ public sealed class NavigationFolder : IPythagorasDto
     public int? InheritedTrusteeId { get; init; }
     public string? InheritedTrusteeEmail { get; init; }
     public string? InheritedTrusteeFullname { get; init; }
-    public Dictionary<string, string?> PropertyValues { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<int, PropertyValueDto> PropertyValues { get; init; } = [];
     public Building[]? Buildings { get; init; }
 }

@@ -43,9 +43,9 @@ public class PythagorasHandlerTests
                 {
                     Id = 1551,
                     Name = "Building",
-                    PropertyValues = new Dictionary<int, BuildingPropertyValueDto>
+                    PropertyValues = new Dictionary<int, PropertyValueDto>
                     {
-                        { (int)PropertyCategoryId.YearOfConstruction, new BuildingPropertyValueDto { Value = "1982" } }
+                        { (int)PropertyCategoryId.YearOfConstruction, new PropertyValueDto { Value = "1982" } }
                     }
                 }
             ],
@@ -102,6 +102,57 @@ public class PythagorasHandlerTests
 
         FakePythagorasClient.BuildingUiListDataRequestCapture request = client.BuildingUiListDataRequests.ShouldHaveSingleItem();
         request.Request.BuildingIds.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task GetEstatesWithPropertiesAsync_LoadsExtendedPropertiesViaUiListData()
+    {
+        Guid estateUid = Guid.NewGuid();
+        FakePythagorasClient client = new();
+
+        client.SetNavigationFolderUiListDataResponse(new UiListDataResponse<NavigationFolder>
+        {
+            Data =
+            [
+                new NavigationFolder
+                {
+                    Id = 7,
+                    Uid = estateUid,
+                    Name = "Estate",
+                    PopularName = "Estate Popular",
+                    Grossarea = 123.45m,
+                    Netarea = 100m,
+                    GeoX = 63.0,
+                    GeoY = 20.0,
+                    PropertyValues = new Dictionary<int, PropertyValueDto>
+                    {
+                        { (int)PropertyCategoryId.OperationalArea, new PropertyValueDto { Value = "Area 1" } },
+                        { (int)PropertyCategoryId.MunicipalityArea, new PropertyValueDto { Value = "Municipality 1" } },
+                        { (int)PropertyCategoryId.PropertyDesignation, new PropertyValueDto { Value = "Estate 7" } }
+                    }
+                }
+            ],
+            TotalSize = 1
+        });
+
+        PythagorasHandler service = new(client);
+
+        IReadOnlyList<EstateModel> result = await service.GetEstatesWithPropertiesAsync();
+
+        EstateModel estate = result.ShouldHaveSingleItem();
+        estate.Id.ShouldBe(7);
+        estate.Uid.ShouldBe(estateUid);
+        estate.ExtendedProperties.ShouldNotBeNull();
+        estate.ExtendedProperties!.OperationalArea.ShouldBe("Area 1");
+        estate.ExtendedProperties!.MunicipalityArea.ShouldBe("Municipality 1");
+        estate.ExtendedProperties!.PropertyDesignation.ShouldBe("Estate 7");
+
+        FakePythagorasClient.NavigationFolderUiListDataRequestCapture request = client.NavigationFolderUiListDataRequests.ShouldHaveSingleItem();
+        request.Request.NavigationId.ShouldBe(NavigationType.UmeaKommun);
+        request.Request.NavigationFolderIds.ShouldNotBeNull();
+        request.Request.NavigationFolderIds!.ShouldContain(7);
+        request.Request.PropertyIds.ShouldNotBeNull();
+        request.Request.PropertyIds!.ShouldContain((int)PropertyCategoryId.PropertyDesignation);
     }
 
     [Fact]

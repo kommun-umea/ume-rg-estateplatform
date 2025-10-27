@@ -42,10 +42,9 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
         Dictionary<PythagorasDocument.DocumentKey, PythagorasDocument> docs,
         IReadOnlyDictionary<int, BuildingInfoModel> buildingInfos)
     {
-        PythagorasQuery<NavigationFolder> query = new PythagorasQuery<NavigationFolder>()
-            .WithQueryParameter("includeAscendantBuildings", true);
-
-        IReadOnlyList<EstateModel> estates = await pythagorasHandler.GetEstatesAsync(query).ConfigureAwait(false);
+        IReadOnlyList<EstateModel> estates = await pythagorasHandler
+            .GetEstatesWithPropertiesAsync(includeBuildings: true)
+            .ConfigureAwait(false);
 
         foreach (EstateModel estate in estates)
         {

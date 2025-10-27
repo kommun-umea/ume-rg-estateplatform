@@ -108,6 +108,41 @@ public class PythagorasClientTests
         factory.LastRequestedClientName.ShouldBe(HttpClientNames.Pythagoras);
     }
 
+    [Fact]
+    public async Task PostNavigationFolderUiListDataAsync_BuildsExpectedRequest_AndDeserializesResponse()
+    {
+        string jsonResponse = "{ \"data\": [{ \"id\": 7, \"name\": \"Estate\", \"propertyValues\": { \"208\": { \"value\": \"Area 1\" } } }], \"totalSize\": 1 }";
+
+        CapturingHandler handler = new(jsonResponse);
+        HttpClient httpClient = new(handler)
+        {
+            BaseAddress = new Uri("https://example.org/")
+        };
+        FakeHttpClientFactory factory = new(httpClient);
+        PythagorasClient client = new(factory);
+
+        NavigationFolderUiListDataRequest request = new()
+        {
+            NavigationId = 2,
+            PropertyIds = [208],
+            NavigationFolderIds = [7]
+        };
+
+        UiListDataResponse<NavigationFolder> result = await client.PostNavigationFolderUiListDataAsync(request);
+
+        result.TotalSize.ShouldBe(1);
+        NavigationFolder estate = result.Data.ShouldHaveSingleItem();
+        estate.Id.ShouldBe(7);
+        estate.PropertyValues.ShouldContainKey(208);
+        estate.PropertyValues[208].Value.ShouldBe("Area 1");
+
+        HttpRequestMessage captured = handler.LastRequest.ShouldNotBeNull();
+        captured.Method.ShouldBe(HttpMethod.Post);
+        captured.RequestUri!.ToString().ShouldBe("https://example.org/rest/v1/navigationfolder/info/uilistdata?navigationId=2&includePropertyValues=true&propertyIds%5B%5D=208&navigationFolderIds%5B%5D=7");
+        handler.LastRequestContent.ShouldBe("{}");
+        factory.LastRequestedClientName.ShouldBe(HttpClientNames.Pythagoras);
+    }
+
     private sealed class FakeHttpClientFactory(HttpClient client) : IHttpClientFactory
     {
         public string? LastRequestedClientName { get; private set; }

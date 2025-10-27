@@ -139,7 +139,12 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
         }
 
         string endpoint = "rest/v1/building/info/uilistdata";
-        string queryString = BuildUiListDataQuery(request);
+        string queryString = BuildUiListDataQuery(
+            request.NavigationId,
+            request.IncludePropertyValues,
+            request.PropertyIds,
+            request.BuildingIds,
+            "buildingIds[]");
         string requestUri = BuildRequestUri(NormalizeEndpoint(endpoint), queryString);
 
         using HttpRequestMessage message = new(HttpMethod.Post, requestUri)
@@ -159,6 +164,67 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
             .ConfigureAwait(false);
 
         return payload ?? new UiListDataResponse<BuildingInfo>();
+    }
+
+    public async Task<UiListDataResponse<NavigationFolder>> PostNavigationFolderUiListDataAsync(
+        NavigationFolderUiListDataRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (request.NavigationFolderIds is { Count: > 0 })
+        {
+            foreach (int navigationFolderId in request.NavigationFolderIds)
+            {
+                if (navigationFolderId <= 0)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(request), "Navigation folder ids must be positive.");
+                }
+            }
+        }
+
+        if (request.PropertyIds is not null)
+        {
+            foreach (int propertyId in request.PropertyIds)
+            {
+                if (propertyId <= 0)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(request), "Property ids must be positive.");
+                }
+            }
+        }
+
+        string endpoint = "rest/v1/navigationfolder/info/uilistdata";
+        string queryString = BuildUiListDataQuery(
+            request.NavigationId,
+            request.IncludePropertyValues,
+            request.PropertyIds,
+            request.NavigationFolderIds,
+            "navigationFolderIds[]");
+        string requestUri = BuildRequestUri(NormalizeEndpoint(endpoint), queryString);
+
+        using HttpRequestMessage message = new(HttpMethod.Post, requestUri)
+        {
+            Content = new StringContent("{}", Encoding.UTF8, "application/json")
+        };
+
+        using HttpResponseMessage response = await HttpClient
+            .SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+            .ConfigureAwait(false);
+
+        response.EnsureSuccessStatusCode();
+
+        await using Stream contentStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        MemoryStream mem = new MemoryStream();
+        contentStream.CopyTo(mem);
+        string json = Encoding.UTF8.GetString(mem.ToArray());
+        File.WriteAllText(@"C:\temp\data.json", json);
+        mem.Position = 0;
+        UiListDataResponse<NavigationFolder>? payload = await JsonSerializer
+            .DeserializeAsync<UiListDataResponse<NavigationFolder>>(mem, _serializerOptions, cancellationToken)
+            .ConfigureAwait(false);
+
+        return payload ?? new UiListDataResponse<NavigationFolder>();
     }
 
     private async Task<IReadOnlyList<TDto>> QueryAsync<TDto>(string endpoint, PythagorasQuery<TDto> query, CancellationToken cancellationToken)
@@ -203,30 +269,35 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
         return normalized;
     }
 
-    private static string BuildUiListDataQuery(BuildingUiListDataRequest request)
+    private static string BuildUiListDataQuery(
+        int? navigationId,
+        bool includePropertyValues,
+        IReadOnlyCollection<int>? propertyIds,
+        IReadOnlyCollection<int>? entityIds,
+        string entityIdParameterName)
     {
         List<string> parts = [];
 
-        if (request.NavigationId is int navigationId)
+        if (navigationId is int value)
         {
-            parts.Add(FormQueryParameter("navigationId", navigationId.ToString(CultureInfo.InvariantCulture)));
+            parts.Add(FormQueryParameter("navigationId", value.ToString(CultureInfo.InvariantCulture)));
         }
 
-        parts.Add(FormQueryParameter("includePropertyValues", request.IncludePropertyValues ? "true" : "false"));
+        parts.Add(FormQueryParameter("includePropertyValues", includePropertyValues ? "true" : "false"));
 
-        if (request.PropertyIds is { Count: > 0 })
+        if (propertyIds is { Count: > 0 })
         {
-            foreach (int propertyId in request.PropertyIds)
+            foreach (int propertyId in propertyIds)
             {
                 parts.Add(FormQueryParameter("propertyIds[]", propertyId.ToString(CultureInfo.InvariantCulture)));
             }
         }
 
-        if (request.BuildingIds is { Count: > 0 })
+        if (entityIds is { Count: > 0 })
         {
-            foreach (int buildingId in request.BuildingIds)
+            foreach (int entityId in entityIds)
             {
-                parts.Add(FormQueryParameter("buildingIds[]", buildingId.ToString(CultureInfo.InvariantCulture)));
+                parts.Add(FormQueryParameter(entityIdParameterName, entityId.ToString(CultureInfo.InvariantCulture)));
             }
         }
 

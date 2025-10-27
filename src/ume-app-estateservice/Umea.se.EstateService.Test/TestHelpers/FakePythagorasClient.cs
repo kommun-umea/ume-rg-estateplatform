@@ -13,6 +13,7 @@ public sealed class FakePythagorasClient : IPythagorasClient
     private readonly ConcurrentDictionary<Type, Queue<object>> _results = new();
     private readonly Queue<IReadOnlyDictionary<int, CalculatedPropertyValueDto>> _calculatedPropertyResults = new();
     private readonly Queue<UiListDataResponse<BuildingInfo>> _buildingUiListDataResults = new();
+    private readonly Queue<UiListDataResponse<NavigationFolder>> _navigationFolderUiListDataResults = new();
 
     /// <summary>
     /// Captured requests in invocation order.
@@ -21,6 +22,7 @@ public sealed class FakePythagorasClient : IPythagorasClient
 
     public List<CalculatedPropertyRequestCapture> CalculatedPropertyRequests { get; } = [];
     public List<BuildingUiListDataRequestCapture> BuildingUiListDataRequests { get; } = [];
+    public List<NavigationFolderUiListDataRequestCapture> NavigationFolderUiListDataRequests { get; } = [];
 
     public string? LastEndpoint => Requests.LastOrDefault().Endpoint;
 
@@ -159,6 +161,8 @@ public sealed class FakePythagorasClient : IPythagorasClient
         CalculatedPropertyRequests.Clear();
         BuildingUiListDataRequests.Clear();
         _buildingUiListDataResults.Clear();
+        NavigationFolderUiListDataRequests.Clear();
+        _navigationFolderUiListDataResults.Clear();
     }
 
     /// <summary>
@@ -181,6 +185,10 @@ public sealed class FakePythagorasClient : IPythagorasClient
         BuildingUiListDataRequest Request,
         CancellationToken CancellationToken);
 
+    public readonly record struct NavigationFolderUiListDataRequestCapture(
+        NavigationFolderUiListDataRequest Request,
+        CancellationToken CancellationToken);
+
     public void SetCalculatedPropertyValuesResult(IReadOnlyDictionary<int, CalculatedPropertyValueDto> result)
     {
         ArgumentNullException.ThrowIfNull(result);
@@ -199,6 +207,19 @@ public sealed class FakePythagorasClient : IPythagorasClient
     {
         ArgumentNullException.ThrowIfNull(response);
         _buildingUiListDataResults.Enqueue(response);
+    }
+
+    public void SetNavigationFolderUiListDataResponse(UiListDataResponse<NavigationFolder> response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        _navigationFolderUiListDataResults.Clear();
+        _navigationFolderUiListDataResults.Enqueue(response);
+    }
+
+    public void EnqueueNavigationFolderUiListDataResponse(UiListDataResponse<NavigationFolder> response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        _navigationFolderUiListDataResults.Enqueue(response);
     }
 
     public void EnqueueCalculatedPropertyValuesResult(IReadOnlyDictionary<int, CalculatedPropertyValueDto> result)
@@ -254,6 +275,19 @@ public sealed class FakePythagorasClient : IPythagorasClient
         }
 
         return Task.FromResult(new UiListDataResponse<BuildingInfo>());
+    }
+
+    public Task<UiListDataResponse<NavigationFolder>> PostNavigationFolderUiListDataAsync(NavigationFolderUiListDataRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        NavigationFolderUiListDataRequests.Add(new NavigationFolderUiListDataRequestCapture(request, cancellationToken));
+
+        if (_navigationFolderUiListDataResults.Count > 0)
+        {
+            return Task.FromResult(_navigationFolderUiListDataResults.Dequeue());
+        }
+
+        return Task.FromResult(new UiListDataResponse<NavigationFolder>());
     }
 
     private Task<IReadOnlyDictionary<int, CalculatedPropertyValueDto>> CaptureCalculatedPropertyValuesAsync(string endpoint, int entityId, CalculatedPropertyValueRequest? request, CancellationToken cancellationToken)

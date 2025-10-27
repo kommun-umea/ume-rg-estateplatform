@@ -10,6 +10,14 @@ public sealed class BuildingUiListDataRequest
     public bool IncludePropertyValues { get; init; } = true;
 }
 
+public sealed class NavigationFolderUiListDataRequest
+{
+    public IReadOnlyCollection<int>? NavigationFolderIds { get; init; }
+    public IReadOnlyCollection<int>? PropertyIds { get; init; }
+    public int? NavigationId { get; init; }
+    public bool IncludePropertyValues { get; init; } = true;
+}
+
 public sealed class UiListDataResponse<TItem>
 {
     [JsonPropertyName("data")]

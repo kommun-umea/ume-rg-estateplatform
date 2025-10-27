@@ -187,5 +187,15 @@ public class FloorControllerTests
         {
             throw new NotImplementedException();
         }
+
+        public Task<IReadOnlyList<EstateModel>> GetEstatesWithPropertiesAsync(
+            IReadOnlyCollection<int>? estateIds = null,
+            IReadOnlyCollection<int>? propertyIds = null,
+            int? navigationId = null,
+            bool includeBuildings = true,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

@@ -77,6 +77,14 @@ public class PythagorasDocumentProviderTests
             return Task.FromResult<IReadOnlyList<EstateModel>>([estate]);
         }
 
+        public Task<IReadOnlyList<EstateModel>> GetEstatesWithPropertiesAsync(
+            IReadOnlyCollection<int>? estateIds = null,
+            IReadOnlyCollection<int>? propertyIds = null,
+            int? navigationId = null,
+            bool includeBuildings = true,
+            CancellationToken cancellationToken = default)
+            => GetEstatesAsync(null, cancellationToken);
+
         public Task<IReadOnlyList<BuildingInfoModel>> GetBuildingsAsync(PythagorasQuery<BuildingInfo>? query = null, CancellationToken cancellationToken = default)
         {
             AddressModel address = new("Skolgatan 31A", "901 84", "Umeå", "Sverige", string.Empty);

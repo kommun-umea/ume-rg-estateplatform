@@ -125,7 +125,7 @@ public static class PythagorasBuildingInfoMapper
         return value.OutputValue;
     }
 
-    public static BuildingExtendedPropertiesModel? ToExtendedPropertiesModel(IReadOnlyDictionary<int, BuildingPropertyValueDto> properties)
+    public static BuildingExtendedPropertiesModel? ToExtendedPropertiesModel(IReadOnlyDictionary<int, PropertyValueDto> properties)
     {
         if (properties == null || properties.Count == 0)
         {
@@ -134,14 +134,14 @@ public static class PythagorasBuildingInfoMapper
 
         Dictionary<PropertyCategoryId, CalculatedPropertyValueDto> normalized = new(properties.Count);
 
-        foreach (KeyValuePair<int, BuildingPropertyValueDto> entry in properties)
+        foreach (KeyValuePair<int, PropertyValueDto> entry in properties)
         {
             if (!Enum.IsDefined(typeof(PropertyCategoryId), entry.Key))
             {
                 continue;
             }
 
-            BuildingPropertyValueDto property = entry.Value;
+            PropertyValueDto property = entry.Value;
 
             if (property.Value is null)
             {

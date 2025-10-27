@@ -23,4 +23,10 @@ public interface IPythagorasHandler
         IReadOnlyCollection<int>? propertyIds = null,
         int? navigationId = null,
         CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<EstateModel>> GetEstatesWithPropertiesAsync(
+        IReadOnlyCollection<int>? estateIds = null,
+        IReadOnlyCollection<int>? propertyIds = null,
+        int? navigationId = null,
+        bool includeBuildings = true,
+        CancellationToken cancellationToken = default);
 }
