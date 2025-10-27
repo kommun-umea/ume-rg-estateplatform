@@ -37,7 +37,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         BuildingExtendedPropertiesModel? extendedProperties = null;
         if (includeOptions.HasFlag(BuildingIncludeOptions.ExtendedProperties))
         {
-            IReadOnlyDictionary<BuildingPropertyCategoryId, CalculatedPropertyValueDto> properties = await GetBuildingCalculatedPropertyValuesInternalAsync(
+            IReadOnlyDictionary<PropertyCategoryId, CalculatedPropertyValueDto> properties = await GetBuildingCalculatedPropertyValuesInternalAsync(
                     buildingId,
                     request: null,
                     cancellationToken)
@@ -180,7 +180,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         return PythagorasFloorInfoMapper.ToModel(payload);
     }
 
-    private async Task<IReadOnlyDictionary<BuildingPropertyCategoryId, CalculatedPropertyValueDto>> GetBuildingCalculatedPropertyValuesInternalAsync(int buildingId, CalculatedPropertyValueRequest? request = null, CancellationToken cancellationToken = default)
+    private async Task<IReadOnlyDictionary<PropertyCategoryId, CalculatedPropertyValueDto>> GetBuildingCalculatedPropertyValuesInternalAsync(int buildingId, CalculatedPropertyValueRequest? request = null, CancellationToken cancellationToken = default)
     {
         if (buildingId <= 0)
         {
@@ -193,13 +193,13 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
 
         if (rawValues.Count == 0)
         {
-            return new Dictionary<BuildingPropertyCategoryId, CalculatedPropertyValueDto>();
+            return new Dictionary<PropertyCategoryId, CalculatedPropertyValueDto>();
         }
 
-        Dictionary<BuildingPropertyCategoryId, CalculatedPropertyValueDto> mapped = new(rawValues.Count);
+        Dictionary<PropertyCategoryId, CalculatedPropertyValueDto> mapped = new(rawValues.Count);
         foreach (KeyValuePair<int, CalculatedPropertyValueDto> entry in rawValues)
         {
-            BuildingPropertyCategoryId categoryId = (BuildingPropertyCategoryId)entry.Key;
+            PropertyCategoryId categoryId = (PropertyCategoryId)entry.Key;
             mapped[categoryId] = entry.Value;
         }
 

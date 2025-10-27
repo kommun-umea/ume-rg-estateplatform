@@ -70,7 +70,7 @@ public static class PythagorasBuildingInfoMapper
             dto.AddressExtra ?? string.Empty);
     }
 
-    public static BuildingExtendedPropertiesModel? ToExtendedPropertiesModel(IReadOnlyDictionary<BuildingPropertyCategoryId, CalculatedPropertyValueDto> properties)
+    public static BuildingExtendedPropertiesModel? ToExtendedPropertiesModel(IReadOnlyDictionary<PropertyCategoryId, CalculatedPropertyValueDto> properties)
     {
         ArgumentNullException.ThrowIfNull(properties);
 
@@ -79,10 +79,10 @@ public static class PythagorasBuildingInfoMapper
             return null;
         }
 
-        string? externalOwner = TryGetOutputValue(properties, BuildingPropertyCategoryId.ExternalOwner);
-        string? propertyDesignation = TryGetOutputValue(properties, BuildingPropertyCategoryId.PropertyDesignation);
+        string? externalOwner = TryGetOutputValue(properties, PropertyCategoryId.ExternalOwner);
+        string? propertyDesignation = TryGetOutputValue(properties, PropertyCategoryId.PropertyDesignation);
 
-        string? noticeBoardText = TryGetOutputValue(properties, BuildingPropertyCategoryId.NoticeBoardText);
+        string? noticeBoardText = TryGetOutputValue(properties, PropertyCategoryId.NoticeBoardText);
         BuildingNoticeBoardModel? noticeBoard = null;
 
         if (!string.IsNullOrEmpty(noticeBoardText))
@@ -90,8 +90,8 @@ public static class PythagorasBuildingInfoMapper
             noticeBoard = new BuildingNoticeBoardModel
             {
                 Text = noticeBoardText,
-                StartDate = DateTime.TryParse(TryGetOutputValue(properties, BuildingPropertyCategoryId.NoticeBoardStartDate), out DateTime startDate) ? startDate : null,
-                EndDate = DateTime.TryParse(TryGetOutputValue(properties, BuildingPropertyCategoryId.NoticeBoardEndDate), out DateTime endDate) ? endDate : null
+                StartDate = DateTime.TryParse(TryGetOutputValue(properties, PropertyCategoryId.NoticeBoardStartDate), out DateTime startDate) ? startDate : null,
+                EndDate = DateTime.TryParse(TryGetOutputValue(properties, PropertyCategoryId.NoticeBoardEndDate), out DateTime endDate) ? endDate : null
             };
         }
 
@@ -112,7 +112,7 @@ public static class PythagorasBuildingInfoMapper
         };
     }
 
-    private static string? TryGetOutputValue(IReadOnlyDictionary<BuildingPropertyCategoryId, CalculatedPropertyValueDto> properties, BuildingPropertyCategoryId key)
+    private static string? TryGetOutputValue(IReadOnlyDictionary<PropertyCategoryId, CalculatedPropertyValueDto> properties, PropertyCategoryId key)
     {
         if (!properties.TryGetValue(key, out CalculatedPropertyValueDto? value) || value is null)
         {

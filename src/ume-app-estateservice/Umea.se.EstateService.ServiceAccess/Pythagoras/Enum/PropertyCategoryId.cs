@@ -1,8 +1,10 @@
 ﻿namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 
-public enum BuildingPropertyCategoryId
+public enum PropertyCategoryId
 {
     PropertyDesignation = 56,
+    MunicipalityArea = 209,
+    OperatingArea = 208,
     YearOfConstruction = 226,
     ExternalOwner = 234,
     Note = 236,
