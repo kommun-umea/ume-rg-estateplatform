@@ -175,5 +175,8 @@ public class FloorControllerTests
         {
             throw new NotImplementedException();
         }
+
+        public Task<EstateModel?> GetEstateByIdAsync(int estateId, bool includeBuildings = false, CancellationToken cancellationToken = default)
+            => Task.FromResult<EstateModel?>(null);
     }
 }

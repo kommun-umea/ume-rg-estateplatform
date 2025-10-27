@@ -9,6 +9,13 @@ namespace Umea.se.EstateService.Logic.Handlers;
 
 public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagorasHandler
 {
+    private static readonly IReadOnlyCollection<int> EstateCalculatedPropertyIds = Array.AsReadOnly(
+    [
+        (int)PropertyCategoryId.OperatingArea,
+        (int)PropertyCategoryId.MunicipalityArea,
+        (int)PropertyCategoryId.PropertyDesignation
+    ]);
+
     public async Task<IReadOnlyList<BuildingInfoModel>> GetBuildingsAsync(PythagorasQuery<BuildingInfo>? query = null, CancellationToken cancellationToken = default)
     {
         IReadOnlyList<BuildingInfo> payload = await pythagorasClient.GetBuildingsAsync(query, cancellationToken).ConfigureAwait(false);
@@ -171,6 +178,50 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         return PythagorasEstateMapper.ToModel(payload);
     }
 
+    public async Task<EstateModel?> GetEstateByIdAsync(int estateId, bool includeBuildings = false, CancellationToken cancellationToken = default)
+    {
+        if (estateId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(estateId), "Estate id must be positive.");
+        }
+
+        PythagorasQuery<NavigationFolder> query = new PythagorasQuery<NavigationFolder>()
+            .Where(folder => folder.Id, estateId)
+            .Where(folder => folder.TypeId, NavigationFolderType.Estate)
+            .WithQueryParameter("navigationId", NavigationType.UmeaKommun);
+
+        if (includeBuildings)
+        {
+            query = query.WithQueryParameter("includeAscendantBuildings", true);
+        }
+
+        IReadOnlyList<NavigationFolder> payload = await pythagorasClient
+            .GetNavigationFoldersAsync(query, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (payload.Count == 0)
+        {
+            return null;
+        }
+
+        NavigationFolder estateDto = payload[0];
+
+        CalculatedPropertyValueRequest propertyRequest = new()
+        {
+            PropertyIds = EstateCalculatedPropertyIds,
+            NavigationId = NavigationType.UmeaKommun
+        };
+
+        IReadOnlyDictionary<PropertyCategoryId, CalculatedPropertyValueDto> properties = await GetEstateCalculatedPropertyValuesInternalAsync(
+                estateId,
+                propertyRequest,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        EstateExtendedPropertiesModel? extendedProperties = PythagorasEstatePropertyMapper.ToExtendedPropertiesModel(properties);
+
+        return PythagorasEstateMapper.ToModel(estateDto, extendedProperties);
+    }
     public async Task<IReadOnlyList<FloorInfoModel>> GetFloorsAsync(PythagorasQuery<Floor>? query = null, CancellationToken cancellationToken = default)
     {
         IReadOnlyList<Floor> payload = await pythagorasClient
@@ -187,9 +238,30 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
             throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
         }
 
-        IReadOnlyDictionary<int, CalculatedPropertyValueDto> rawValues = await pythagorasClient
-            .GetBuildingCalculatedPropertyValuesAsync(buildingId, request, cancellationToken)
-            .ConfigureAwait(false);
+        return await GetCalculatedPropertyValuesInternalAsync(
+            ct => pythagorasClient.GetBuildingCalculatedPropertyValuesAsync(buildingId, request, ct),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<IReadOnlyDictionary<PropertyCategoryId, CalculatedPropertyValueDto>> GetEstateCalculatedPropertyValuesInternalAsync(int estateId, CalculatedPropertyValueRequest? request = null, CancellationToken cancellationToken = default)
+    {
+        if (estateId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(estateId), "Estate id must be positive.");
+        }
+
+        return await GetCalculatedPropertyValuesInternalAsync(
+            ct => pythagorasClient.GetCalculatedPropertyValuesForEstateAsync(estateId, request, ct),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<IReadOnlyDictionary<PropertyCategoryId, CalculatedPropertyValueDto>> GetCalculatedPropertyValuesInternalAsync(
+        Func<CancellationToken, Task<IReadOnlyDictionary<int, CalculatedPropertyValueDto>>> fetchAsync,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(fetchAsync);
+
+        IReadOnlyDictionary<int, CalculatedPropertyValueDto> rawValues = await fetchAsync(cancellationToken).ConfigureAwait(false);
 
         if (rawValues.Count == 0)
         {

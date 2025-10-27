@@ -14,5 +14,6 @@ public sealed class EstateModel : ISearchable
     public GeoPointModel? GeoLocation { get; init; }
     public AddressModel? Address { get; init; }
     public BuildingModel[]? Buildings { get; init; }
+    public EstateExtendedPropertiesModel? ExtendedProperties { get; init; }
     public DateTimeOffset UpdatedAt => DateTime.Now;
 }

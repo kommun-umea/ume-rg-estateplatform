@@ -11,11 +11,14 @@ namespace Umea.se.EstateService.Test.TestHelpers;
 public sealed class FakePythagorasClient : IPythagorasClient
 {
     private readonly ConcurrentDictionary<Type, Queue<object>> _results = new();
+    private readonly Queue<IReadOnlyDictionary<int, CalculatedPropertyValueDto>> _calculatedPropertyResults = new();
 
     /// <summary>
     /// Captured requests in invocation order.
     /// </summary>
     public List<RequestCapture> Requests { get; } = [];
+
+    public List<CalculatedPropertyRequestCapture> CalculatedPropertyRequests { get; } = [];
 
     public string? LastEndpoint => Requests.LastOrDefault().Endpoint;
 
@@ -150,6 +153,8 @@ public sealed class FakePythagorasClient : IPythagorasClient
     {
         _results.Clear();
         Requests.Clear();
+        _calculatedPropertyResults.Clear();
+        CalculatedPropertyRequests.Clear();
     }
 
     /// <summary>
@@ -161,6 +166,25 @@ public sealed class FakePythagorasClient : IPythagorasClient
         object? Query,
         string? QueryString,
         CancellationToken CancellationToken);
+
+    public readonly record struct CalculatedPropertyRequestCapture(
+        string Endpoint,
+        int EntityId,
+        CalculatedPropertyValueRequest? Request,
+        CancellationToken CancellationToken);
+
+    public void SetCalculatedPropertyValuesResult(IReadOnlyDictionary<int, CalculatedPropertyValueDto> result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        _calculatedPropertyResults.Clear();
+        _calculatedPropertyResults.Enqueue(result);
+    }
+
+    public void EnqueueCalculatedPropertyValuesResult(IReadOnlyDictionary<int, CalculatedPropertyValueDto> result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        _calculatedPropertyResults.Enqueue(result);
+    }
     public Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken = default)
     {
         throw new NotSupportedException("SendAsync is not supported by FakePythagorasClient. Use a dedicated fake for blueprint tests.");
@@ -178,13 +202,35 @@ public sealed class FakePythagorasClient : IPythagorasClient
         return OnGetFloorBlueprintAsync(floorId, format, includeWorkspaceTexts, cancellationToken);
     }
 
-    public Task<IReadOnlyDictionary<int, TValue>> GetDictionaryAsync<TValue>(string endpoint, PythagorasQuery<TValue>? query, CancellationToken cancellationToken = default) where TValue : class
-    {
-        throw new NotImplementedException();
-    }
-
     public Task<IReadOnlyDictionary<int, CalculatedPropertyValueDto>> GetBuildingCalculatedPropertyValuesAsync(int buildingId, CalculatedPropertyValueRequest? request = null, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        if (buildingId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
+        }
+
+        return CaptureCalculatedPropertyValuesAsync($"rest/v1/building/{buildingId}/property/calculatedvalue", buildingId, request, cancellationToken);
+    }
+
+    public Task<IReadOnlyDictionary<int, CalculatedPropertyValueDto>> GetCalculatedPropertyValuesForEstateAsync(int estateId, CalculatedPropertyValueRequest? request = null, CancellationToken cancellationToken = default)
+    {
+        if (estateId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(estateId), "Estate id must be positive.");
+        }
+
+        return CaptureCalculatedPropertyValuesAsync($"rest/v1/navigationfolder/{estateId}/property/calculatedvalue", estateId, request, cancellationToken);
+    }
+
+    private Task<IReadOnlyDictionary<int, CalculatedPropertyValueDto>> CaptureCalculatedPropertyValuesAsync(string endpoint, int entityId, CalculatedPropertyValueRequest? request, CancellationToken cancellationToken)
+    {
+        CalculatedPropertyRequests.Add(new CalculatedPropertyRequestCapture(endpoint, entityId, request, cancellationToken));
+
+        if (_calculatedPropertyResults.Count > 0)
+        {
+            return Task.FromResult(_calculatedPropertyResults.Dequeue());
+        }
+
+        return Task.FromResult<IReadOnlyDictionary<int, CalculatedPropertyValueDto>>(new Dictionary<int, CalculatedPropertyValueDto>());
     }
 }

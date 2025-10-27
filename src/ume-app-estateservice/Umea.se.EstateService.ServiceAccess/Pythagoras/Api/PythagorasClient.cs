@@ -95,10 +95,17 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
             throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
         }
 
-        string endpoint = $"rest/v1/building/{buildingId}/property/calculatedvalue";
-        string requestPath = NormalizeEndpoint(endpoint);
-        string queryString = request?.BuildQueryString() ?? string.Empty;
-        return QueryDictionaryAsync<CalculatedPropertyValueDto>(requestPath, queryString, cancellationToken);
+        return GetCalculatedPropertyValuesAsync("building", buildingId, request, cancellationToken);
+    }
+
+    public Task<IReadOnlyDictionary<int, CalculatedPropertyValueDto>> GetCalculatedPropertyValuesForEstateAsync(int estateId, CalculatedPropertyValueRequest? request = null, CancellationToken cancellationToken = default)
+    {
+        if (estateId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(estateId), "Estate id must be positive.");
+        }
+
+        return GetCalculatedPropertyValuesAsync("navigationfolder", estateId, request, cancellationToken);
     }
 
     private async Task<IReadOnlyList<TDto>> QueryAsync<TDto>(string endpoint, PythagorasQuery<TDto> query, CancellationToken cancellationToken)
@@ -229,5 +236,24 @@ where TValue : class
             $"Pythagoras API request failed with status code {response.StatusCode}.",
             response.StatusCode,
             errorBody);
+    }
+
+    private Task<IReadOnlyDictionary<int, CalculatedPropertyValueDto>> GetCalculatedPropertyValuesAsync(string entityType, long entityId, CalculatedPropertyValueRequest? request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(entityType))
+        {
+            throw new ArgumentException("Entity type must be non-empty.", nameof(entityType));
+        }
+
+        if (entityId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(entityId), "Entity id must be positive.");
+        }
+
+        string endpoint = $"rest/v1/{entityType}/{entityId}/property/calculatedvalue";
+        string requestPath = NormalizeEndpoint(endpoint);
+        string queryString = request?.BuildQueryString() ?? string.Empty;
+
+        return QueryDictionaryAsync<CalculatedPropertyValueDto>(requestPath, queryString, cancellationToken);
     }
 }

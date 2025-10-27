@@ -43,7 +43,7 @@ public sealed class CalculatedPropertyValueRequest
         {
             foreach (int propertyId in PropertyIds)
             {
-                parameters.Add($"propertyIds[]={propertyId}");
+                parameters.Add($"{Uri.EscapeDataString("propertyIds[]")}={propertyId}");
             }
         }
 

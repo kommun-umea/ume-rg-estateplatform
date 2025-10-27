@@ -34,19 +34,10 @@ public class EstateController(IPythagorasHandler pythagorasService) : Controller
         [FromQuery] EstateDetailsRequest request,
         CancellationToken cancellationToken)
     {
-        PythagorasQuery<NavigationFolder> query = new PythagorasQuery<NavigationFolder>()
-            .Where(folder => folder.Id, estateId);
-
-        if (request.IncludeBuildings)
-        {
-            query = query.WithQueryParameter("includeAscendantBuildings", true);
-        }
-
-        IReadOnlyList<EstateModel> estates = await pythagorasService
-            .GetEstatesAsync(query, cancellationToken)
+        EstateModel? estate = await pythagorasService
+            .GetEstateByIdAsync(estateId, request.IncludeBuildings, cancellationToken)
             .ConfigureAwait(false);
 
-        EstateModel? estate = estates.FirstOrDefault();
         if (estate is null)
         {
             return NotFound();

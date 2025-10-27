@@ -113,5 +113,20 @@ public class PythagorasDocumentProviderTests
         {
             throw new NotImplementedException();
         }
+
+        public Task<EstateModel?> GetEstateByIdAsync(int estateId, bool includeBuildings = false, CancellationToken cancellationToken = default)
+        {
+            EstateModel? estate = estateId == EstateId
+                ? new EstateModel
+                {
+                    Id = EstateId,
+                    Name = "Estate",
+                    PopularName = "Estate Popular",
+                    GrossArea = 123.45m
+                }
+                : null;
+
+            return Task.FromResult<EstateModel?>(estate);
+        }
     }
 }
