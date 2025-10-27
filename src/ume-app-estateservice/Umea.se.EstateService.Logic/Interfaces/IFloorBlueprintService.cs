@@ -5,9 +5,5 @@ namespace Umea.se.EstateService.Logic.Interfaces;
 
 public interface IFloorBlueprintService
 {
-    Task<FloorBlueprint> GetBlueprintAsync(
-        int floorId,
-        BlueprintFormat format,
-        bool includeWorkspaceTexts,
-        CancellationToken cancellationToken = default);
+    Task<FloorBlueprint> GetBlueprintAsync(int floorId, BlueprintFormat format, bool includeWorkspaceTexts, CancellationToken cancellationToken = default);
 }

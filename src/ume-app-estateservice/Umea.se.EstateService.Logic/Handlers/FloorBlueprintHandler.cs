@@ -10,9 +10,7 @@ using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 
 namespace Umea.se.EstateService.Logic.Handlers;
 
-public sealed class FloorBlueprintHandler(
-    IPythagorasClient pythagorasClient,
-    ILogger<FloorBlueprintHandler> logger) : IFloorBlueprintService
+public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, ILogger<FloorBlueprintHandler> logger) : IFloorBlueprintService
 {
     private static readonly string[] _nodesToRemove =
     [
@@ -24,11 +22,7 @@ public sealed class FloorBlueprintHandler(
     private readonly IPythagorasClient _pythagorasClient = pythagorasClient;
     private readonly ILogger<FloorBlueprintHandler> _logger = logger;
 
-    public async Task<FloorBlueprint> GetBlueprintAsync(
-        int floorId,
-        BlueprintFormat format,
-        bool includeWorkspaceTexts,
-        CancellationToken cancellationToken = default)
+    public async Task<FloorBlueprint> GetBlueprintAsync(int floorId, BlueprintFormat format, bool includeWorkspaceTexts, CancellationToken cancellationToken = default)
     {
         if (floorId <= 0)
         {

@@ -15,8 +15,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         (int)PropertyCategoryId.MunicipalityArea,
         (int)PropertyCategoryId.PropertyDesignation
     ]);
-    
-    // Corrected duplicate YearOfConstruction entry
+
     private static readonly IReadOnlyCollection<int> _buildingExtendedPropertyIds = Array.AsReadOnly(
     [
         (int)PropertyCategoryId.ExternalOwner,
@@ -36,11 +35,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         return PythagorasBuildingInfoMapper.ToModel(payload);
     }
 
-    public async Task<IReadOnlyList<BuildingInfoModel>> GetBuildingsWithPropertiesAsync(
-        IReadOnlyCollection<int>? buildingIds = null,
-        IReadOnlyCollection<int>? propertyIds = null,
-        int? navigationId = null,
-        CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<BuildingInfoModel>> GetBuildingsWithPropertiesAsync(IReadOnlyCollection<int>? buildingIds = null, IReadOnlyCollection<int>? propertyIds = null, int? navigationId = null, CancellationToken cancellationToken = default)
     {
         BuildingUiListDataRequest request = new()
         {
@@ -107,9 +102,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         return PythagorasWorkspaceMapper.ToModel(payload);
     }
 
-    public async Task<IReadOnlyList<BuildingAscendantModel>> GetBuildingAscendantsAsync(
-        int buildingId,
-        CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<BuildingAscendantModel>> GetBuildingAscendantsAsync(int buildingId, CancellationToken cancellationToken = default)
     {
         ValidatePositiveId(buildingId, nameof(buildingId));
         PythagorasQuery<BuildingAscendant> query = new PythagorasQuery<BuildingAscendant>()
@@ -123,10 +116,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         return PythagorasBuildingAscendantMapper.ToModel(payload);
     }
 
-    public async Task<IReadOnlyList<FloorInfoModel>> GetBuildingFloorsAsync(
-        int buildingId,
-        PythagorasQuery<Floor>? floorQuery = null,
-        CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<FloorInfoModel>> GetBuildingFloorsAsync(int buildingId, PythagorasQuery<Floor>? floorQuery = null, CancellationToken cancellationToken = default)
     {
         ValidatePositiveId(buildingId, nameof(buildingId));
         IReadOnlyList<Floor> floors = await GetBuildingFloorsInternalAsync(buildingId, floorQuery, cancellationToken).ConfigureAwait(false);
@@ -136,11 +126,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
             : PythagorasFloorInfoMapper.ToModel(floors);
     }
 
-    public async Task<IReadOnlyList<FloorInfoModel>> GetBuildingFloorsWithRoomsAsync(
-        int buildingId,
-        PythagorasQuery<Floor>? floorQuery = null,
-        PythagorasQuery<BuildingWorkspace>? workspaceQuery = null,
-        CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<FloorInfoModel>> GetBuildingFloorsWithRoomsAsync(int buildingId, PythagorasQuery<Floor>? floorQuery = null, PythagorasQuery<BuildingWorkspace>? workspaceQuery = null, CancellationToken cancellationToken = default)
     {
         ValidatePositiveId(buildingId, nameof(buildingId));
         IReadOnlyList<Floor> floors = await GetBuildingFloorsInternalAsync(buildingId, floorQuery, cancellationToken).ConfigureAwait(false);
@@ -168,10 +154,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         return await Task.WhenAll(floorTasks).ConfigureAwait(false);
     }
 
-    private async Task<IReadOnlyList<Floor>> GetBuildingFloorsInternalAsync(
-        int buildingId,
-        PythagorasQuery<Floor>? floorQuery,
-        CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<Floor>> GetBuildingFloorsInternalAsync(int buildingId, PythagorasQuery<Floor>? floorQuery, CancellationToken cancellationToken)
     {
         ValidatePositiveId(buildingId, nameof(buildingId));
 
@@ -294,9 +277,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
             cancellationToken).ConfigureAwait(false);
     }
 
-    private static async Task<IReadOnlyDictionary<PropertyCategoryId, CalculatedPropertyValueDto>> GetCalculatedPropertyValuesInternalAsync(
-        Func<CancellationToken, Task<IReadOnlyDictionary<int, CalculatedPropertyValueDto>>> fetchAsync,
-        CancellationToken cancellationToken)
+    private static async Task<IReadOnlyDictionary<PropertyCategoryId, CalculatedPropertyValueDto>> GetCalculatedPropertyValuesInternalAsync(Func<CancellationToken, Task<IReadOnlyDictionary<int, CalculatedPropertyValueDto>>> fetchAsync, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(fetchAsync);
 

@@ -33,10 +33,7 @@ public class BuildingController(IPythagorasHandler pythagorasService, ILogger<Bu
     [SwaggerResponse(StatusCodes.Status200OK, "The building", typeof(BuildingInfoModel))]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid buildingId")]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Building not found")]
-    public async Task<ActionResult<BuildingInfoModel>> GetBuildingByIdAsync(
-        int buildingId,
-        [FromQuery] BuildingIncludeOptions include = BuildingIncludeOptions.None,
-        CancellationToken cancellationToken = default)
+    public async Task<ActionResult<BuildingInfoModel>> GetBuildingByIdAsync(int buildingId, [FromQuery] BuildingIncludeOptions include = BuildingIncludeOptions.None, CancellationToken cancellationToken = default)
     {
         if (buildingId <= 0)
         {

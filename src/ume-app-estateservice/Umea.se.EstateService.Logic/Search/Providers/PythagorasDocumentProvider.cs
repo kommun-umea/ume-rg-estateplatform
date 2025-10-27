@@ -6,7 +6,7 @@ using Umea.se.EstateService.Shared.Models;
 using Umea.se.EstateService.Shared.Search;
 using Umea.se.EstateService.Shared.ValueObjects;
 
-namespace Umea.se.EstateService.Logic.Providers;
+namespace Umea.se.EstateService.Logic.Search.Providers;
 
 public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : IPythagorasDocumentProvider
 {
@@ -207,10 +207,7 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
         return result.Count > 0 ? result : null;
     }
 
-    private PythagorasDocument GetOrAddBuildingDocument(
-        Dictionary<PythagorasDocument.DocumentKey, PythagorasDocument> docs,
-        BuildingModel building,
-        IReadOnlyDictionary<int, BuildingInfoModel> buildingInfos)
+    private PythagorasDocument GetOrAddBuildingDocument(Dictionary<PythagorasDocument.DocumentKey, PythagorasDocument> docs, BuildingModel building, IReadOnlyDictionary<int, BuildingInfoModel> buildingInfos)
     {
         ArgumentNullException.ThrowIfNull(docs);
         ArgumentNullException.ThrowIfNull(building);
