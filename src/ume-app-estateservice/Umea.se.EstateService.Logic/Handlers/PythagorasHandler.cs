@@ -1,3 +1,4 @@
+using System.Linq;
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.Logic.Mappers;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
@@ -15,11 +16,12 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         (int)PropertyCategoryId.MunicipalityArea,
         (int)PropertyCategoryId.PropertyDesignation
     ]);
+    
+    // Corrected duplicate YearOfConstruction entry
     private static readonly IReadOnlyCollection<int> _buildingExtendedPropertyIds = Array.AsReadOnly(
     [
         (int)PropertyCategoryId.ExternalOwner,
         (int)PropertyCategoryId.PropertyDesignation,
-        (int)PropertyCategoryId.YearOfConstruction,
         (int)PropertyCategoryId.NoticeBoardText,
         (int)PropertyCategoryId.NoticeBoardStartDate,
         (int)PropertyCategoryId.NoticeBoardEndDate,
@@ -41,36 +43,10 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         int? navigationId = null,
         CancellationToken cancellationToken = default)
     {
-        IReadOnlyCollection<int> effectivePropertyIds;
-        if (propertyIds?.Any() == true)
-        {
-            if (propertyIds.Any(id => id <= 0))
-            {
-                throw new ArgumentOutOfRangeException(nameof(propertyIds), "Property ids must be positive.");
-            }
-
-            effectivePropertyIds = [.. propertyIds];
-        }
-        else
-        {
-            effectivePropertyIds = _buildingExtendedPropertyIds;
-        }
-
-        IReadOnlyCollection<int>? validatedBuildingIds = null;
-        if (buildingIds?.Any() == true)
-        {
-            if (buildingIds.Any(id => id <= 0))
-            {
-                throw new ArgumentOutOfRangeException(nameof(buildingIds), "Building ids must be positive.");
-            }
-
-            validatedBuildingIds = [.. buildingIds];
-        }
-
         BuildingUiListDataRequest request = new()
         {
-            BuildingIds = validatedBuildingIds,
-            PropertyIds = effectivePropertyIds,
+            BuildingIds = ValidateAndCloneIds(buildingIds, nameof(buildingIds)),
+            PropertyIds = GetEffectivePropertyIds(propertyIds, _buildingExtendedPropertyIds, nameof(propertyIds)),
             NavigationId = navigationId ?? NavigationType.UmeaKommun,
             IncludePropertyValues = true
         };
@@ -96,10 +72,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
 
     public async Task<BuildingInfoModel?> GetBuildingByIdAsync(int buildingId, BuildingIncludeOptions includeOptions = BuildingIncludeOptions.None, CancellationToken cancellationToken = default)
     {
-        if (buildingId <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
-        }
+        ValidatePositiveId(buildingId, nameof(buildingId));
 
         PythagorasQuery<BuildingInfo> query = new PythagorasQuery<BuildingInfo>()
             .Where(b => b.Id, buildingId);
@@ -130,6 +103,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
 
     public async Task<IReadOnlyList<BuildingRoomModel>> GetBuildingWorkspacesAsync(int buildingId, PythagorasQuery<BuildingWorkspace>? query = null, CancellationToken cancellationToken = default)
     {
+        ValidatePositiveId(buildingId, nameof(buildingId));
         IReadOnlyList<BuildingWorkspace> payload = await pythagorasClient.GetBuildingWorkspacesAsync(buildingId, query, cancellationToken).ConfigureAwait(false);
         return PythagorasWorkspaceMapper.ToModel(payload);
     }
@@ -138,6 +112,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         int buildingId,
         CancellationToken cancellationToken = default)
     {
+        ValidatePositiveId(buildingId, nameof(buildingId));
         PythagorasQuery<BuildingAscendant> query = new PythagorasQuery<BuildingAscendant>()
             .WithQueryParameter("navigationId", 2)
             .WithQueryParameter("includeSelf", false);
@@ -154,6 +129,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         PythagorasQuery<Floor>? floorQuery = null,
         CancellationToken cancellationToken = default)
     {
+        ValidatePositiveId(buildingId, nameof(buildingId));
         IReadOnlyList<Floor> floors = await GetBuildingFloorsInternalAsync(buildingId, floorQuery, cancellationToken).ConfigureAwait(false);
 
         return floors.Count == 0
@@ -167,6 +143,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         PythagorasQuery<BuildingWorkspace>? workspaceQuery = null,
         CancellationToken cancellationToken = default)
     {
+        ValidatePositiveId(buildingId, nameof(buildingId));
         IReadOnlyList<Floor> floors = await GetBuildingFloorsInternalAsync(buildingId, floorQuery, cancellationToken).ConfigureAwait(false);
 
         if (floors.Count == 0)
@@ -174,13 +151,11 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
             return [];
         }
 
-        List<FloorInfoModel> result = new(floors.Count);
-        foreach (Floor floor in floors)
+        IEnumerable<Task<FloorInfoModel>> floorTasks = floors.Select(async floor =>
         {
             if (floor.Id <= 0)
             {
-                result.Add(PythagorasFloorInfoMapper.ToModel(floor, []));
-                continue;
+                return PythagorasFloorInfoMapper.ToModel(floor, []);
             }
 
             IReadOnlyList<BuildingWorkspace> workspaceDtos = await pythagorasClient
@@ -188,11 +163,10 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
                 .ConfigureAwait(false);
 
             IReadOnlyList<BuildingRoomModel> rooms = PythagorasWorkspaceMapper.ToModel(workspaceDtos);
-            FloorInfoModel model = PythagorasFloorInfoMapper.ToModel(floor, rooms);
-            result.Add(model);
-        }
+            return PythagorasFloorInfoMapper.ToModel(floor, rooms);
+        });
 
-        return result;
+        return await Task.WhenAll(floorTasks).ConfigureAwait(false);
     }
 
     private async Task<IReadOnlyList<Floor>> GetBuildingFloorsInternalAsync(
@@ -200,10 +174,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         PythagorasQuery<Floor>? floorQuery,
         CancellationToken cancellationToken)
     {
-        if (buildingId <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
-        }
+        ValidatePositiveId(buildingId, nameof(buildingId));
 
         return await pythagorasClient
             .GetBuildingFloorsAsync(buildingId, floorQuery, cancellationToken)
@@ -233,36 +204,10 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
 
     public async Task<IReadOnlyList<EstateModel>> GetEstatesWithPropertiesAsync(IReadOnlyCollection<int>? estateIds = null, IReadOnlyCollection<int>? propertyIds = null, int? navigationId = null, CancellationToken cancellationToken = default)
     {
-        IReadOnlyCollection<int> effectivePropertyIds;
-        if (propertyIds?.Any() == true)
-        {
-            if (propertyIds.Any(id => id <= 0))
-            {
-                throw new ArgumentOutOfRangeException(nameof(propertyIds), "Property ids must be positive.");
-            }
-
-            effectivePropertyIds = [.. propertyIds];
-        }
-        else
-        {
-            effectivePropertyIds = _estateCalculatedPropertyIds;
-        }
-
-        IReadOnlyCollection<int>? validatedEstateIds = null;
-        if (estateIds?.Any() == true)
-        {
-            if (estateIds.Any(id => id <= 0))
-            {
-                throw new ArgumentOutOfRangeException(nameof(estateIds), "Estate ids must be positive.");
-            }
-
-            validatedEstateIds = [.. estateIds];
-        }
-
         NavigationFolderUiListDataRequest request = new()
         {
-            NavigationFolderIds = validatedEstateIds,
-            PropertyIds = effectivePropertyIds,
+            NavigationFolderIds = ValidateAndCloneIds(estateIds, nameof(estateIds)),
+            PropertyIds = GetEffectivePropertyIds(propertyIds, _estateCalculatedPropertyIds, nameof(propertyIds)),
             NavigationId = navigationId ?? NavigationType.UmeaKommun,
             IncludePropertyValues = true
         };
@@ -288,17 +233,13 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
 
     public async Task<EstateModel?> GetEstateByIdAsync(int estateId, bool includeBuildings = false, CancellationToken cancellationToken = default)
     {
-        if (estateId <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(estateId), "Estate id must be positive.");
-        }
+        ValidatePositiveId(estateId, nameof(estateId));
 
         PythagorasQuery<NavigationFolder> query = new PythagorasQuery<NavigationFolder>()
             .Where(folder => folder.Id, estateId)
             .Where(folder => folder.TypeId, NavigationFolderType.Estate)
-            .WithQueryParameter("navigationId", NavigationType.UmeaKommun);
-
-        query = query.WithQueryParameter("includeAscendantBuildings", true);
+            .WithQueryParameter("navigationId", NavigationType.UmeaKommun)
+            .WithQueryParameter("includeAscendantBuildings", includeBuildings);
 
         IReadOnlyList<NavigationFolder> payload = await pythagorasClient
             .GetNavigationFoldersAsync(query, cancellationToken)
@@ -338,10 +279,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
 
     private async Task<IReadOnlyDictionary<PropertyCategoryId, CalculatedPropertyValueDto>> GetBuildingCalculatedPropertyValuesInternalAsync(int buildingId, CalculatedPropertyValueRequest? request = null, CancellationToken cancellationToken = default)
     {
-        if (buildingId <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
-        }
+        ValidatePositiveId(buildingId, nameof(buildingId));
 
         return await GetCalculatedPropertyValuesInternalAsync(
             ct => pythagorasClient.GetBuildingCalculatedPropertyValuesAsync(buildingId, request, ct),
@@ -350,10 +288,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
 
     private async Task<IReadOnlyDictionary<PropertyCategoryId, CalculatedPropertyValueDto>> GetEstateCalculatedPropertyValuesInternalAsync(int estateId, CalculatedPropertyValueRequest? request = null, CancellationToken cancellationToken = default)
     {
-        if (estateId <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(estateId), "Estate id must be positive.");
-        }
+        ValidatePositiveId(estateId, nameof(estateId));
 
         return await GetCalculatedPropertyValuesInternalAsync(
             ct => pythagorasClient.GetCalculatedPropertyValuesForEstateAsync(estateId, request, ct),
@@ -382,4 +317,46 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
 
         return mapped;
     }
+
+    #region Private Helper Methods
+
+    private static void ValidatePositiveId(int id, string paramName)
+    {
+        if (id <= 0)
+        {
+            throw new ArgumentOutOfRangeException(paramName, "ID must be a positive number.");
+        }
+    }
+
+    private static IReadOnlyCollection<int>? ValidateAndCloneIds(IReadOnlyCollection<int>? ids, string paramName)
+    {
+        if (ids is not { Count: > 0 })
+        {
+            return null;
+        }
+
+        if (ids.Any(id => id <= 0))
+        {
+            throw new ArgumentOutOfRangeException(paramName, "All IDs in the collection must be positive.");
+        }
+
+        return [.. ids];
+    }
+
+    private static IReadOnlyCollection<int> GetEffectivePropertyIds(IReadOnlyCollection<int>? providedIds, IReadOnlyCollection<int> defaultIds, string paramName)
+    {
+        if (providedIds is not { Count: > 0 })
+        {
+            return defaultIds;
+        }
+
+        if (providedIds.Any(id => id <= 0))
+        {
+            throw new ArgumentOutOfRangeException(paramName, "All property IDs must be positive.");
+        }
+
+        return [.. providedIds];
+    }
+
+    #endregion
 }
