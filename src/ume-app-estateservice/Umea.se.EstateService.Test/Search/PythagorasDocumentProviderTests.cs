@@ -104,9 +104,6 @@ public class PythagorasDocumentProviderTests
             return Task.FromResult<IReadOnlyList<RoomModel>>([room]);
         }
 
-        public Task<IReadOnlyList<BuildingInfoModel>> GetBuildingInfoAsync(PythagorasQuery<BuildingInfo>? query = null, int? navigationFolderId = null, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
-
         public Task<IReadOnlyList<BuildingRoomModel>> GetBuildingWorkspacesAsync(int buildingId, PythagorasQuery<BuildingWorkspace>? query = null, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
 

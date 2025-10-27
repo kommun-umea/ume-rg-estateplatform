@@ -28,7 +28,10 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
 
     public async Task<IReadOnlyList<BuildingInfoModel>> GetBuildingsAsync(PythagorasQuery<BuildingInfo>? query = null, CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<BuildingInfo> payload = await pythagorasClient.GetBuildingsAsync(query, cancellationToken).ConfigureAwait(false);
+        PythagorasQuery<BuildingInfo> effectiveQuery = (query ?? new PythagorasQuery<BuildingInfo>())
+            .WithQueryParameter("navigationId", NavigationType.UmeaKommun);
+
+        IReadOnlyList<BuildingInfo> payload = await pythagorasClient.GetBuildingsAsync(effectiveQuery, cancellationToken).ConfigureAwait(false);
         return PythagorasBuildingInfoMapper.ToModel(payload);
     }
 
@@ -123,26 +126,6 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         }
 
         return PythagorasBuildingInfoMapper.ToModel(payload[0], extendedProperties);
-    }
-
-    public async Task<IReadOnlyList<BuildingInfoModel>> GetBuildingInfoAsync(PythagorasQuery<BuildingInfo>? query = null, int? navigationFolderId = null, CancellationToken cancellationToken = default)
-    {
-        query ??= new PythagorasQuery<BuildingInfo>();
-
-        if (navigationFolderId is int folderId)
-        {
-            if (folderId <= 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(navigationFolderId), "Navigation folder id must be positive when supplied.");
-            }
-
-            query = query
-                .WithQueryParameter("navigationId", NavigationType.UmeaKommun)
-                .WithQueryParameter("navigationFolderId", folderId);
-        }
-
-        IReadOnlyList<BuildingInfo> payload = await pythagorasClient.GetBuildingsAsync(query, cancellationToken).ConfigureAwait(false);
-        return PythagorasBuildingInfoMapper.ToModel(payload);
     }
 
     public async Task<IReadOnlyList<BuildingRoomModel>> GetBuildingWorkspacesAsync(int buildingId, PythagorasQuery<BuildingWorkspace>? query = null, CancellationToken cancellationToken = default)

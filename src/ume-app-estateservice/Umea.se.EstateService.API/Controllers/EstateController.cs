@@ -90,12 +90,17 @@ public class EstateController(IPythagorasHandler pythagorasService) : Controller
         [FromQuery] PagedQueryRequest request,
         CancellationToken cancellationToken)
     {
+        if (estateId <= 0)
+        {
+            return BadRequest("Estate id must be positive.");
+        }
+
         PythagorasQuery<BuildingInfo> query = new PythagorasQuery<BuildingInfo>()
             .ApplyGeneralSearch(request)
             .ApplyPaging(request);
 
         IReadOnlyList<BuildingInfoModel> buildings = await pythagorasService
-            .GetBuildingInfoAsync(query, estateId, cancellationToken);
+            .GetBuildingsAsync(query.WithQueryParameter("navigationFolderId", estateId), cancellationToken);
 
         return Ok(buildings);
     }

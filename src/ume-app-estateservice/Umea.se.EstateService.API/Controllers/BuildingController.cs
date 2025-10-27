@@ -189,13 +189,12 @@ public class BuildingController(IPythagorasHandler pythagorasService, ILogger<Bu
 
         if (request.EstateId is int estateId)
         {
+            PythagorasQuery<BuildingInfo> scopedQuery = query.WithQueryParameter("navigationFolderId", estateId);
             return await pythagorasService
-                .GetBuildingInfoAsync(query, estateId, cancellationToken)
+                .GetBuildingsAsync(scopedQuery, cancellationToken)
                 .ConfigureAwait(false);
         }
 
-        return await pythagorasService
-            .GetBuildingsAsync(query, cancellationToken)
-            .ConfigureAwait(false);
+        return await pythagorasService.GetBuildingsAsync(query, cancellationToken).ConfigureAwait(false);
     }
 }
