@@ -42,15 +42,36 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
         Dictionary<PythagorasDocument.DocumentKey, PythagorasDocument> docs,
         IReadOnlyDictionary<int, BuildingInfoModel> buildingInfos)
     {
-        IReadOnlyList<EstateModel> estates = await pythagorasHandler
+        // This method is a bit complicated due to Pythagoras API doesn't have an endpoint that both can
+        // return estates with buildings and building extended properties in one call.
+
+        IReadOnlyList<EstateModel> estatesWithBuildings = await pythagorasHandler
+            .GetEstatesWithBuildingsAsync()
+            .ConfigureAwait(false);
+
+        if (estatesWithBuildings.Count == 0)
+        {
+            return;
+        }
+
+        IReadOnlyList<EstateModel> estatesWithProperties = await pythagorasHandler
             .GetEstatesWithPropertiesAsync()
             .ConfigureAwait(false);
 
-        foreach (EstateModel estate in estates)
+        Dictionary<int, EstateExtendedPropertiesModel?> estateExtendedProperties = new(estatesWithProperties.Count);
+        foreach (EstateModel estateProperties in estatesWithProperties)
+        {
+            estateExtendedProperties[estateProperties.Id] = estateProperties.ExtendedProperties;
+        }
+
+        foreach (EstateModel estate in estatesWithBuildings)
         {
             PythagorasDocument estateDoc = CreateDocumentFromSearchable(estate);
             estateDoc.GrossArea = estate.GrossArea;
-            estateDoc.ExtendedProperties = CreateEstateExtendedProperties(estate.ExtendedProperties);
+            estateDoc.ExtendedProperties = CreateEstateExtendedProperties(
+                estateExtendedProperties.TryGetValue(estate.Id, out EstateExtendedPropertiesModel? extendedProperties)
+                    ? extendedProperties
+                    : null);
             docs[estateDoc.Key] = estateDoc;
 
             foreach (BuildingModel building in estate.Buildings ?? [])
