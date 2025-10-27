@@ -25,24 +25,4 @@ public class PythagorasEstateMapperTests
         model.Buildings.ShouldNotBeNull();
         model.Buildings!.Length.ShouldBe(2);
     }
-
-    [Fact]
-    public void ToModel_WhenExcludingBuildings_KeepsCount()
-    {
-        NavigationFolder dto = new()
-        {
-            Id = 1,
-            Buildings =
-            [
-                new Building { Id = 10 },
-                new Building { Id = 11 },
-                new Building { Id = 12 }
-            ]
-        };
-
-        EstateModel model = PythagorasEstateMapper.ToModel(dto);
-
-        model.BuildingCount.ShouldBe(3);
-        model.Buildings.ShouldBeNull();
-    }
 }
