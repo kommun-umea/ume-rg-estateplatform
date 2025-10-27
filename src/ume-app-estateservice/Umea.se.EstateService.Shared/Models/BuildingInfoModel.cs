@@ -12,9 +12,9 @@ public sealed class BuildingInfoModel : ISearchable
     public GeoPointModel? GeoLocation { get; init; }
     public decimal GrossArea { get; init; }
     public decimal NetArea { get; init; }
-   public decimal SumGrossFloorArea { get; init; }
-   public int NumPlacedPersons { get; init; }
-   public AddressModel? Address { get; init; }
+    public decimal SumGrossFloorArea { get; init; }
+    public int NumPlacedPersons { get; init; }
+    public AddressModel? Address { get; init; }
     public BuildingAscendantModel? Estate { get; set; }
     public BuildingAscendantModel? Region { get; set; }
     public BuildingAscendantModel? Organization { get; set; }

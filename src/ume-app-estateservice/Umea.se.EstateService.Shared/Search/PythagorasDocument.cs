@@ -29,6 +29,14 @@ public sealed class PythagorasDocument
     /// Total area for the entity, if available.
     /// </summary>
     public decimal? GrossArea { get; set; }
+    /// <summary>
+    /// Number of distinct floors associated with the entity, if available.
+    /// </summary>
+    public int? NumFloors { get; set; }
+    /// <summary>
+    /// Number of rooms/workspaces associated with the entity, if available.
+    /// </summary>
+    public int? NumRooms { get; set; }
     public IReadOnlyDictionary<string, string>? ExtendedProperties { get; set; }
     [JsonIgnore]
     public DocumentKey Key => new(Type, Id);

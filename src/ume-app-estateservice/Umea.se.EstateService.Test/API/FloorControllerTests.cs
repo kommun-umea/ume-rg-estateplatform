@@ -168,6 +168,9 @@ public class FloorControllerTests
         public Task<IReadOnlyList<RoomModel>> GetRoomsAsync(PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
             => throw new NotImplementedException();
 
+        public Task<IReadOnlyDictionary<int, BuildingWorkspaceStatsModel>> GetBuildingWorkspaceStatsAsync(PythagorasQuery<BuildingWorkspace>? query = null, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyDictionary<int, BuildingWorkspaceStatsModel>>(new Dictionary<int, BuildingWorkspaceStatsModel>());
+
         public Task<BuildingInfoModel?> GetBuildingByIdAsync(int buildingId, BuildingIncludeOptions includeOptions = BuildingIncludeOptions.None, CancellationToken cancellationToken = default)
         {
             throw new NotImplementedException();

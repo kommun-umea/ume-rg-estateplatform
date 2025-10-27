@@ -124,6 +124,9 @@ public sealed class FakePythagorasClient : IPythagorasClient
     public Task<IReadOnlyList<Workspace>> GetWorkspacesAsync(PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
         => CaptureAsync("rest/v1/workspace/info", query, cancellationToken);
 
+    public Task<IReadOnlyList<BuildingWorkspace>> GetWorkspaceInfoAsync(PythagorasQuery<BuildingWorkspace>? query = null, CancellationToken cancellationToken = default)
+        => CaptureAsync("rest/v1/workspace/info", query, cancellationToken);
+
     public Task<IReadOnlyList<NavigationFolder>> GetNavigationFoldersAsync(PythagorasQuery<NavigationFolder>? query = null, CancellationToken cancellationToken = default)
         => CaptureAsync("rest/v1/navigationfolder/info", query, cancellationToken);
 

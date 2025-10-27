@@ -169,6 +169,51 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         return PythagorasWorkspaceMapper.ToModel(payload);
     }
 
+    public async Task<IReadOnlyDictionary<int, BuildingWorkspaceStatsModel>> GetBuildingWorkspaceStatsAsync(PythagorasQuery<BuildingWorkspace>? query = null, CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<BuildingWorkspace> workspaces = await pythagorasClient
+            .GetWorkspaceInfoAsync(query, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (workspaces.Count == 0)
+        {
+            return new Dictionary<int, BuildingWorkspaceStatsModel>();
+        }
+
+        Dictionary<int, WorkspaceStatsAccumulator> accumulators = new(workspaces.Count);
+
+        foreach (BuildingWorkspace workspace in workspaces)
+        {
+            if (!accumulators.TryGetValue(workspace.BuildingId, out WorkspaceStatsAccumulator? accumulator))
+            {
+                accumulator = new WorkspaceStatsAccumulator();
+                accumulators[workspace.BuildingId] = accumulator;
+            }
+
+            accumulator.RoomCount++;
+
+            if (workspace.FloorId is int floorId && floorId > 0)
+            {
+                accumulator.FloorIds.Add(floorId);
+            }
+        }
+
+        Dictionary<int, BuildingWorkspaceStatsModel> result = new(accumulators.Count);
+
+        foreach (KeyValuePair<int, WorkspaceStatsAccumulator> entry in accumulators)
+        {
+            WorkspaceStatsAccumulator accumulator = entry.Value;
+            result[entry.Key] = new BuildingWorkspaceStatsModel
+            {
+                BuildingId = entry.Key,
+                NumberOfRooms = accumulator.RoomCount,
+                NumberOfFloors = accumulator.FloorIds.Count
+            };
+        }
+
+        return result;
+    }
+
     public async Task<IReadOnlyList<EstateModel>> GetEstatesWithBuildingsAsync(PythagorasQuery<NavigationFolder>? query = null, CancellationToken cancellationToken = default)
     {
         query ??= new PythagorasQuery<NavigationFolder>();
@@ -296,6 +341,12 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         }
 
         return mapped;
+    }
+
+    private sealed class WorkspaceStatsAccumulator
+    {
+        public HashSet<int> FloorIds { get; } = [];
+        public int RoomCount { get; set; }
     }
 
     #region Private Helper Methods

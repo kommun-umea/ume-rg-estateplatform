@@ -11,6 +11,7 @@ public interface IPythagorasClient
     Task<IReadOnlyList<Floor>> GetBuildingFloorsAsync(int buildingId, PythagorasQuery<Floor>? query = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<BuildingWorkspace>> GetFloorWorkspacesAsync(int floorId, PythagorasQuery<BuildingWorkspace>? query = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Workspace>> GetWorkspacesAsync(PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<BuildingWorkspace>> GetWorkspaceInfoAsync(PythagorasQuery<BuildingWorkspace>? query = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<NavigationFolder>> GetNavigationFoldersAsync(PythagorasQuery<NavigationFolder>? query = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Floor>> GetFloorsAsync(PythagorasQuery<Floor>? query = null, CancellationToken cancellationToken = default);
     Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken = default);

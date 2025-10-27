@@ -78,6 +78,12 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
         return QueryAsync("rest/v1/workspace/info", query, cancellationToken);
     }
 
+    public Task<IReadOnlyList<BuildingWorkspace>> GetWorkspaceInfoAsync(PythagorasQuery<BuildingWorkspace>? query = null, CancellationToken cancellationToken = default)
+    {
+        query ??= new PythagorasQuery<BuildingWorkspace>();
+        return QueryAsync("rest/v1/workspace/info", query, cancellationToken);
+    }
+
     public Task<IReadOnlyList<NavigationFolder>> GetNavigationFoldersAsync(PythagorasQuery<NavigationFolder>? query = null, CancellationToken cancellationToken = default)
     {
         query ??= new PythagorasQuery<NavigationFolder>();

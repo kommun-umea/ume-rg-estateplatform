@@ -14,8 +14,9 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
     {
         Dictionary<PythagorasDocument.DocumentKey, PythagorasDocument> docs = [];
         IReadOnlyDictionary<int, BuildingInfoModel> buildingInfos = await LoadBuildingInfosAsync().ConfigureAwait(false);
-        await AddEstatesAndBuildings(docs, buildingInfos).ConfigureAwait(false);
-        await AddWorkspaces(docs, buildingInfos).ConfigureAwait(false);
+        IReadOnlyDictionary<int, BuildingWorkspaceStatsModel> workspaceStats = await LoadBuildingWorkspaceStatsAsync().ConfigureAwait(false);
+        await AddEstatesAndBuildings(docs, buildingInfos, workspaceStats).ConfigureAwait(false);
+        await AddWorkspaces(docs, buildingInfos, workspaceStats).ConfigureAwait(false);
         return [.. docs.Values];
     }
 
@@ -32,10 +33,20 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
         return buildings.ToDictionary(static building => building.Id);
     }
 
-    private async Task AddEstatesAndBuildings(Dictionary<PythagorasDocument.DocumentKey, PythagorasDocument> docs, IReadOnlyDictionary<int, BuildingInfoModel> buildingInfos)
+    private async Task<IReadOnlyDictionary<int, BuildingWorkspaceStatsModel>> LoadBuildingWorkspaceStatsAsync()
+    {
+        IReadOnlyDictionary<int, BuildingWorkspaceStatsModel> stats = await pythagorasHandler
+            .GetBuildingWorkspaceStatsAsync(cancellationToken: default)
+            .ConfigureAwait(false);
+
+        return stats.Count == 0 ? new Dictionary<int, BuildingWorkspaceStatsModel>() : stats;
+    }
+
+    private async Task AddEstatesAndBuildings(Dictionary<PythagorasDocument.DocumentKey, PythagorasDocument> docs, IReadOnlyDictionary<int, BuildingInfoModel> buildingInfos, IReadOnlyDictionary<int, BuildingWorkspaceStatsModel> workspaceStats)
     {
         // This method is a bit complicated due to Pythagoras API doesn't have an endpoint that both can
         // return estates with buildings and building extended properties in one call.
+        ArgumentNullException.ThrowIfNull(workspaceStats);
 
         Task<IReadOnlyList<EstateModel>> estatesWithBuildingsTask = pythagorasHandler.GetEstatesWithBuildingsAsync();
         Task<IReadOnlyList<EstateModel>> estatesWithPropertiesTask = pythagorasHandler.GetEstatesWithPropertiesAsync();
@@ -66,14 +77,16 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
 
             foreach (BuildingModel building in estate.Buildings ?? [])
             {
-                PythagorasDocument buildingDoc = GetOrAddBuildingDocument(docs, building, buildingInfos);
+                PythagorasDocument buildingDoc = GetOrAddBuildingDocument(docs, building, buildingInfos, workspaceStats);
                 LinkParent(buildingDoc, estateDoc);
             }
         }
     }
 
-    private async Task AddWorkspaces(Dictionary<PythagorasDocument.DocumentKey, PythagorasDocument> docs, IReadOnlyDictionary<int, BuildingInfoModel> buildingInfos)
+    private async Task AddWorkspaces(Dictionary<PythagorasDocument.DocumentKey, PythagorasDocument> docs, IReadOnlyDictionary<int, BuildingInfoModel> buildingInfos, IReadOnlyDictionary<int, BuildingWorkspaceStatsModel> workspaceStats)
     {
+        ArgumentNullException.ThrowIfNull(workspaceStats);
+
         PythagorasQuery<Workspace> query = new();
 
         IReadOnlyList<RoomModel> workspaces = await pythagorasHandler.GetRoomsAsync(query).ConfigureAwait(false);
@@ -94,6 +107,7 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
 
                 if (docs.TryGetValue(buildingKey, out PythagorasDocument? buildingDoc))
                 {
+                    ApplyWorkspaceStats(buildingDoc, workspaceStats);
                     LinkParent(doc, buildingDoc);
                 }
             }
@@ -207,11 +221,29 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
         return result.Count > 0 ? result : null;
     }
 
-    private PythagorasDocument GetOrAddBuildingDocument(Dictionary<PythagorasDocument.DocumentKey, PythagorasDocument> docs, BuildingModel building, IReadOnlyDictionary<int, BuildingInfoModel> buildingInfos)
+    private static void ApplyWorkspaceStats(PythagorasDocument doc, IReadOnlyDictionary<int, BuildingWorkspaceStatsModel> workspaceStats)
+    {
+        ArgumentNullException.ThrowIfNull(doc);
+        ArgumentNullException.ThrowIfNull(workspaceStats);
+
+        if (workspaceStats.TryGetValue(doc.Id, out BuildingWorkspaceStatsModel? stats) && stats is not null)
+        {
+            doc.NumRooms = stats.NumberOfRooms;
+            doc.NumFloors = stats.NumberOfFloors;
+        }
+        else
+        {
+            doc.NumRooms = null;
+            doc.NumFloors = null;
+        }
+    }
+
+    private PythagorasDocument GetOrAddBuildingDocument(Dictionary<PythagorasDocument.DocumentKey, PythagorasDocument> docs, BuildingModel building, IReadOnlyDictionary<int, BuildingInfoModel> buildingInfos, IReadOnlyDictionary<int, BuildingWorkspaceStatsModel> workspaceStats)
     {
         ArgumentNullException.ThrowIfNull(docs);
         ArgumentNullException.ThrowIfNull(building);
         ArgumentNullException.ThrowIfNull(buildingInfos);
+        ArgumentNullException.ThrowIfNull(workspaceStats);
 
         BuildingInfoModel? buildingInfo = null;
         if (buildingInfos.TryGetValue(building.Id, out BuildingInfoModel? info))
@@ -233,6 +265,8 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
             doc.GrossArea = buildingInfo.GrossArea;
             doc.ExtendedProperties = CreateBuildingExtendedProperties(buildingInfo.ExtendedProperties);
         }
+
+        ApplyWorkspaceStats(doc, workspaceStats);
 
         return doc;
     }
