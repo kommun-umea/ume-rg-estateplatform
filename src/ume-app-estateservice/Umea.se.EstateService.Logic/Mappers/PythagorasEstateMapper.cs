@@ -6,7 +6,7 @@ namespace Umea.se.EstateService.Logic.Mappers;
 
 public static class PythagorasEstateMapper
 {
-    public static EstateModel ToModel(NavigationFolder dto, EstateExtendedPropertiesModel? extendedProperties = null)
+    public static EstateModel ToModel(NavigationFolder dto, EstateExtendedPropertiesModel? extendedProperties = null, bool includeBuildings = true)
     {
         ArgumentNullException.ThrowIfNull(dto);
 
@@ -20,7 +20,8 @@ public static class PythagorasEstateMapper
             NetArea = dto.Netarea ?? 0m,
             GeoLocation = new GeoPointModel(dto.GeoX, dto.GeoY),
             Address = CreateAddress(dto),
-            Buildings = dto.Buildings?.Select(PythagorasBuildingMapper.ToModel).ToArray(),
+            Buildings = includeBuildings ? dto.Buildings?.Select(PythagorasBuildingMapper.ToModel).ToArray() : null,
+            BuildingCount = dto.Buildings?.Length ?? 0,
             ExtendedProperties = extendedProperties
         };
     }
@@ -31,7 +32,7 @@ public static class PythagorasEstateMapper
 
         return dtos.Count == 0
             ? []
-            : dtos.Select(nf => ToModel(nf, null)).ToArray();
+            : dtos.Select(nf => ToModel(nf, null, includeBuildings: false)).ToArray();
     }
 
     private static AddressModel? CreateAddress(NavigationFolder dto)

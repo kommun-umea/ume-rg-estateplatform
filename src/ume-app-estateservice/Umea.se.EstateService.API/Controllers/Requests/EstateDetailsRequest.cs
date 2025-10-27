@@ -13,5 +13,5 @@ public sealed record EstateDetailsRequest
     /// </summary>
     [FromQuery(Name = "includeBuildings")]
     [SwaggerParameter("When true, includes ancestor building information for the estate.", Required = false)]
-    public bool IncludeBuildings { get; init; }
+    public bool IncludeBuildings { get; init; } = true;
 }

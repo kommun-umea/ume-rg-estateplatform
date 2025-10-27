@@ -23,7 +23,7 @@ public static class PythagorasBuildingInfoMapper
             SumGrossFloorArea = dto.SumGrossFloorarea ?? 0m,
             NumPlacedPersons = dto.NumPlacedPersons,
             Address = CreateAddress(dto),
-            ExtendedProperties = extendedProperties
+            ExtendedProperties = extendedProperties,
         };
     }
 
@@ -81,6 +81,7 @@ public static class PythagorasBuildingInfoMapper
 
         string? externalOwner = TryGetOutputValue(properties, PropertyCategoryId.ExternalOwner);
         string? propertyDesignation = TryGetOutputValue(properties, PropertyCategoryId.PropertyDesignation);
+        string? yearOfConstruction = TryGetOutputValue(properties, PropertyCategoryId.YearOfConstruction);
 
         string? noticeBoardText = TryGetOutputValue(properties, PropertyCategoryId.NoticeBoardText);
         BuildingNoticeBoardModel? noticeBoard = null;
@@ -97,6 +98,7 @@ public static class PythagorasBuildingInfoMapper
 
         bool hasData = externalOwner is not null
             || propertyDesignation is not null
+            || yearOfConstruction is not null
             || noticeBoard is not null;
 
         if (!hasData)
@@ -108,7 +110,8 @@ public static class PythagorasBuildingInfoMapper
         {
             ExternalOwner = externalOwner,
             PropertyDesignation = propertyDesignation,
-            NoticeBoard = noticeBoard
+            NoticeBoard = noticeBoard,
+            YearOfConstruction = yearOfConstruction
         };
     }
 
