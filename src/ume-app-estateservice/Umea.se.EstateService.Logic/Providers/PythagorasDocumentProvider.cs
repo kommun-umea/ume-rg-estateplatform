@@ -55,8 +55,6 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
 
             foreach (BuildingModel building in estate.Buildings ?? [])
             {
-                estateDoc.NumChildren++;
-
                 if (buildingInfos.TryGetValue(building.Id, out BuildingInfoModel? buildingInfo))
                 {
                     building.Address = buildingInfo.Address;
@@ -75,7 +73,7 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
                     doc.ExtendedProperties = CreateBuildingExtendedProperties(buildingInfo.ExtendedProperties);
                 }
 
-                doc.Ancestors.Add(CreateAncestorFromDocument(estateDoc));
+                LinkParent(doc, estateDoc);
             }
         }
     }
@@ -104,9 +102,7 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
 
                 if (docs.TryGetValue(buildingKey, out PythagorasDocument? buildingDoc))
                 {
-                    buildingDoc.NumChildren++;
-                    doc.Ancestors.AddRange(buildingDoc.Ancestors);
-                    doc.Ancestors.Add(CreateAncestorFromDocument(buildingDoc));
+                    LinkParent(doc, buildingDoc);
                 }
             }
 
@@ -180,19 +176,9 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
             return null;
         }
 
-        Dictionary<string, string> result = new(2);
-
-        if (!string.IsNullOrWhiteSpace(source.YearOfConstruction))
-        {
-            result["yearOfConstruction"] = source.YearOfConstruction;
-        }
-
-        if (!string.IsNullOrWhiteSpace(source.ExternalOwner))
-        {
-            result["externalOwner"] = source.ExternalOwner;
-        }
-
-        return result.Count == 0 ? null : result;
+        return MapExtendedProperties(
+            ("yearOfConstruction", source.YearOfConstruction),
+            ("externalOwner", source.ExternalOwner));
     }
 
     private static Dictionary<string, string>? CreateEstateExtendedProperties(EstateExtendedPropertiesModel? source)
@@ -202,23 +188,30 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
             return null;
         }
 
-        Dictionary<string, string> result = new(3);
+        return MapExtendedProperties(
+            ("operationalArea", source.OperationalArea),
+            ("municipalityArea", source.MunicipalityArea),
+            ("propertyDesignation", source.PropertyDesignation));
+    }
 
-        if (!string.IsNullOrWhiteSpace(source.OperationalArea))
-        {
-            result["operationalArea"] = source.OperationalArea;
-        }
+    private static void LinkParent(PythagorasDocument child, PythagorasDocument parent)
+    {
+        ArgumentNullException.ThrowIfNull(child);
+        ArgumentNullException.ThrowIfNull(parent);
 
-        if (!string.IsNullOrWhiteSpace(source.MunicipalityArea))
-        {
-            result["municipalityArea"] = source.MunicipalityArea;
-        }
+        parent.NumChildren++;
 
-        if (!string.IsNullOrWhiteSpace(source.PropertyDesignation))
-        {
-            result["propertyDesignation"] = source.PropertyDesignation;
-        }
+        child.Ancestors.Clear();
+        child.Ancestors.AddRange(parent.Ancestors);
+        child.Ancestors.Add(CreateAncestorFromDocument(parent));
+    }
 
-        return result.Count == 0 ? null : result;
+    private static Dictionary<string, string>? MapExtendedProperties(params (string Key, string? Value)[] properties)
+    {
+        Dictionary<string, string> result = properties
+            .Where(static p => !string.IsNullOrWhiteSpace(p.Value))
+            .ToDictionary(static p => p.Key, static p => p.Value!);
+
+        return result.Count > 0 ? result : null;
     }
 }
