@@ -145,25 +145,7 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
             request.PropertyIds,
             request.BuildingIds,
             "buildingIds[]");
-        string requestUri = BuildRequestUri(NormalizeEndpoint(endpoint), queryString);
-
-        using HttpRequestMessage message = new(HttpMethod.Post, requestUri)
-        {
-            Content = new StringContent("{}", Encoding.UTF8, "application/json")
-        };
-
-        using HttpResponseMessage response = await HttpClient
-            .SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
-            .ConfigureAwait(false);
-
-        response.EnsureSuccessStatusCode();
-
-        await using Stream contentStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        UiListDataResponse<BuildingInfo>? payload = await JsonSerializer
-            .DeserializeAsync<UiListDataResponse<BuildingInfo>>(contentStream, _serializerOptions, cancellationToken)
-            .ConfigureAwait(false);
-
-        return payload ?? new UiListDataResponse<BuildingInfo>();
+        return await PostAsync<UiListDataResponse<BuildingInfo>>(endpoint, queryString, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<UiListDataResponse<NavigationFolder>> PostNavigationFolderUiListDataAsync(
@@ -201,6 +183,29 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
             request.PropertyIds,
             request.NavigationFolderIds,
             "navigationFolderIds[]");
+        return await PostAsync<UiListDataResponse<NavigationFolder>>(endpoint, queryString, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<IReadOnlyList<TDto>> QueryAsync<TDto>(string endpoint, PythagorasQuery<TDto> query, CancellationToken cancellationToken)
+        where TDto : class, IPythagorasDto
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        return await GetAsync<TDto>(endpoint, query.BuildAsQueryString(), cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<IReadOnlyList<TDto>> GetAsync<TDto>(string endpoint, string queryString, CancellationToken cancellationToken)
+    {
+        string requestUri = BuildRequestUri(NormalizeEndpoint(endpoint), queryString);
+
+        using HttpResponseMessage response = await HttpClient.GetAsync(requestUri, cancellationToken).ConfigureAwait(false);
+        List<TDto>? payload = await ProcessResponseAsync<List<TDto>>(response, cancellationToken).ConfigureAwait(false);
+
+        return payload ?? [];
+    }
+
+    private async Task<TResponse> PostAsync<TResponse>(string endpoint, string queryString, CancellationToken cancellationToken)
+        where TResponse : class, new()
+    {
         string requestUri = BuildRequestUri(NormalizeEndpoint(endpoint), queryString);
 
         using HttpRequestMessage message = new(HttpMethod.Post, requestUri)
@@ -212,30 +217,16 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
             .SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
             .ConfigureAwait(false);
 
+        TResponse? payload = await ProcessResponseAsync<TResponse>(response, cancellationToken).ConfigureAwait(false);
+        return payload ?? new TResponse();
+    }
+
+    private static async Task<T?> ProcessResponseAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
         response.EnsureSuccessStatusCode();
 
         await using Stream contentStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        UiListDataResponse<NavigationFolder>? payload = await JsonSerializer
-            .DeserializeAsync<UiListDataResponse<NavigationFolder>>(contentStream, _serializerOptions, cancellationToken)
-            .ConfigureAwait(false);
-
-        return payload ?? new UiListDataResponse<NavigationFolder>();
-    }
-
-    private async Task<IReadOnlyList<TDto>> QueryAsync<TDto>(string endpoint, PythagorasQuery<TDto> query, CancellationToken cancellationToken)
-        where TDto : class, IPythagorasDto
-    {
-        string requestPath = NormalizeEndpoint(endpoint);
-        string queryString = query.BuildAsQueryString();
-        string requestUri = BuildRequestUri(requestPath, queryString);
-
-        using HttpResponseMessage response = await HttpClient.GetAsync(requestUri, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
-
-        using Stream contentStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        List<TDto>? payload = await JsonSerializer.DeserializeAsync<List<TDto>>(contentStream, _serializerOptions, cancellationToken).ConfigureAwait(false);
-
-        return payload ?? [];
+        return await JsonSerializer.DeserializeAsync<T>(contentStream, _serializerOptions, cancellationToken).ConfigureAwait(false);
     }
 
     private static string BuildRequestUri(string path, string query) => string.IsNullOrEmpty(query) ? path : $"{path}?{query}";
