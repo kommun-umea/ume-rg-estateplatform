@@ -73,6 +73,41 @@ public class PythagorasClientTests
         handler.LastRequest.ShouldNotBeNull().RequestUri!.ToString().ShouldBe("https://example.org/rest/v1/building/25/workspace/info");
     }
 
+    [Fact]
+    public async Task PostBuildingUiListDataAsync_BuildsExpectedRequest_AndDeserializesResponse()
+    {
+        string jsonResponse = TestDataLoader.Load("Pythagoras/building_uilistdata_response.json");
+
+        CapturingHandler handler = new(jsonResponse);
+        HttpClient httpClient = new(handler)
+        {
+            BaseAddress = new Uri("https://example.org/")
+        };
+        FakeHttpClientFactory factory = new(httpClient);
+        PythagorasClient client = new(factory);
+
+        BuildingUiListDataRequest request = new()
+        {
+            NavigationId = 2,
+            PropertyIds = [226],
+            BuildingIds = [1551]
+        };
+
+        UiListDataResponse<BuildingInfo> result = await client.PostBuildingUiListDataAsync(request);
+
+        result.TotalSize.ShouldBe(1);
+        BuildingInfo building = result.Data.ShouldHaveSingleItem();
+        building.Id.ShouldBe(1551);
+        building.PropertyValues.ShouldContainKey(226);
+        building.PropertyValues[226].Value.ShouldBe("1982");
+
+        HttpRequestMessage captured = handler.LastRequest.ShouldNotBeNull();
+        captured.Method.ShouldBe(HttpMethod.Post);
+        captured.RequestUri!.ToString().ShouldBe("https://example.org/rest/v1/building/info/uilistdata?navigationId=2&includePropertyValues=true&propertyIds%5B%5D=226&buildingIds%5B%5D=1551");
+        handler.LastRequestContent.ShouldBe("{}");
+        factory.LastRequestedClientName.ShouldBe(HttpClientNames.Pythagoras);
+    }
+
     private sealed class FakeHttpClientFactory(HttpClient client) : IHttpClientFactory
     {
         public string? LastRequestedClientName { get; private set; }
@@ -93,16 +128,26 @@ public class PythagorasClientTests
     private sealed class CapturingHandler(string json) : HttpMessageHandler
     {
         public HttpRequestMessage? LastRequest { get; private set; }
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        public string? LastRequestContent { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             LastRequest = request;
+            if (request.Content is not null)
+            {
+                LastRequestContent = await request.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                LastRequestContent = null;
+            }
 
             HttpResponseMessage response = new(HttpStatusCode.OK)
             {
                 Content = new StringContent(json, Encoding.UTF8, "application/json")
             };
 
-            return Task.FromResult(response);
+            return response;
         }
     }
 

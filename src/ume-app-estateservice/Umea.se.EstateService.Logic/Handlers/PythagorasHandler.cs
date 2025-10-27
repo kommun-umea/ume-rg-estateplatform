@@ -9,18 +9,98 @@ namespace Umea.se.EstateService.Logic.Handlers;
 
 public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagorasHandler
 {
-    private static readonly IReadOnlyCollection<int> EstateCalculatedPropertyIds = Array.AsReadOnly(
+    private static readonly IReadOnlyCollection<int> _estateCalculatedPropertyIds = Array.AsReadOnly(
     [
         (int)PropertyCategoryId.OperationalArea,
         (int)PropertyCategoryId.MunicipalityArea,
         (int)PropertyCategoryId.PropertyDesignation,
         (int)PropertyCategoryId.YearOfConstruction
     ]);
+    private static readonly IReadOnlyCollection<int> _buildingExtendedPropertyIds = Array.AsReadOnly(
+    [
+        (int)PropertyCategoryId.ExternalOwner,
+        (int)PropertyCategoryId.PropertyDesignation,
+        (int)PropertyCategoryId.YearOfConstruction,
+        (int)PropertyCategoryId.NoticeBoardText,
+        (int)PropertyCategoryId.NoticeBoardStartDate,
+        (int)PropertyCategoryId.NoticeBoardEndDate
+    ]);
 
     public async Task<IReadOnlyList<BuildingInfoModel>> GetBuildingsAsync(PythagorasQuery<BuildingInfo>? query = null, CancellationToken cancellationToken = default)
     {
         IReadOnlyList<BuildingInfo> payload = await pythagorasClient.GetBuildingsAsync(query, cancellationToken).ConfigureAwait(false);
         return PythagorasBuildingInfoMapper.ToModel(payload);
+    }
+
+    public async Task<IReadOnlyList<BuildingInfoModel>> GetBuildingsWithPropertiesAsync(
+        IReadOnlyCollection<int>? buildingIds = null,
+        IReadOnlyCollection<int>? propertyIds = null,
+        int? navigationId = null,
+        CancellationToken cancellationToken = default)
+    {
+        IReadOnlyCollection<int> effectivePropertyIds;
+        if (propertyIds is { Count: > 0 })
+        {
+            List<int> validatedPropertyIds = new(propertyIds.Count);
+            foreach (int propertyId in propertyIds)
+            {
+                if (propertyId <= 0)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(propertyIds), "Property ids must be positive.");
+                }
+
+                validatedPropertyIds.Add(propertyId);
+            }
+
+            effectivePropertyIds = validatedPropertyIds;
+        }
+        else
+        {
+            effectivePropertyIds = _buildingExtendedPropertyIds;
+        }
+
+        IReadOnlyCollection<int>? validatedBuildingIds = null;
+        if (buildingIds is { Count: > 0 })
+        {
+            List<int> ids = new(buildingIds.Count);
+            foreach (int buildingId in buildingIds)
+            {
+                if (buildingId <= 0)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(buildingIds), "Building ids must be positive.");
+                }
+
+                ids.Add(buildingId);
+            }
+
+            validatedBuildingIds = ids;
+        }
+
+        BuildingUiListDataRequest request = new()
+        {
+            BuildingIds = validatedBuildingIds,
+            PropertyIds = effectivePropertyIds,
+            NavigationId = navigationId ?? NavigationType.UmeaKommun,
+            IncludePropertyValues = true
+        };
+
+        UiListDataResponse<BuildingInfo> response = await pythagorasClient
+            .PostBuildingUiListDataAsync(request, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (response.Data.Count == 0)
+        {
+            return [];
+        }
+
+        List<BuildingInfoModel> models = new(response.Data.Count);
+        foreach (BuildingInfo building in response.Data)
+        {
+            BuildingExtendedPropertiesModel? extendedProperties = PythagorasBuildingInfoMapper.ToExtendedPropertiesModel(building.PropertyValues);
+            models.Add(PythagorasBuildingInfoMapper.ToModel(building, extendedProperties));
+        }
+
+        return models;
     }
 
     public async Task<BuildingInfoModel?> GetBuildingByIdAsync(int buildingId, BuildingIncludeOptions includeOptions = BuildingIncludeOptions.None, CancellationToken cancellationToken = default)
@@ -206,7 +286,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
 
         CalculatedPropertyValueRequest propertyRequest = new()
         {
-            PropertyIds = EstateCalculatedPropertyIds,
+            PropertyIds = _estateCalculatedPropertyIds,
             NavigationId = NavigationType.UmeaKommun
         };
 

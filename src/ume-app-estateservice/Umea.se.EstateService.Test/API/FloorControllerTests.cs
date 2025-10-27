@@ -178,5 +178,14 @@ public class FloorControllerTests
 
         public Task<EstateModel?> GetEstateByIdAsync(int estateId, bool includeBuildings = false, CancellationToken cancellationToken = default)
             => Task.FromResult<EstateModel?>(null);
+
+        public Task<IReadOnlyList<BuildingInfoModel>> GetBuildingsWithPropertiesAsync(
+            IReadOnlyCollection<int>? buildingIds = null,
+            IReadOnlyCollection<int>? propertyIds = null,
+            int? navigationId = null,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

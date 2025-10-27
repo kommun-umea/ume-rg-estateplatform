@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using System.Text.Json;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
@@ -108,6 +110,57 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
         return GetCalculatedPropertyValuesAsync("navigationfolder", estateId, request, cancellationToken);
     }
 
+    public async Task<UiListDataResponse<BuildingInfo>> PostBuildingUiListDataAsync(
+        BuildingUiListDataRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (request.BuildingIds is { Count: > 0 })
+        {
+            foreach (int buildingId in request.BuildingIds)
+            {
+                if (buildingId <= 0)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(request), "Building ids must be positive.");
+                }
+            }
+        }
+
+        if (request.PropertyIds is not null)
+        {
+            foreach (int propertyId in request.PropertyIds)
+            {
+                if (propertyId <= 0)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(request), "Property ids must be positive.");
+                }
+            }
+        }
+
+        string endpoint = "rest/v1/building/info/uilistdata";
+        string queryString = BuildUiListDataQuery(request);
+        string requestUri = BuildRequestUri(NormalizeEndpoint(endpoint), queryString);
+
+        using HttpRequestMessage message = new(HttpMethod.Post, requestUri)
+        {
+            Content = new StringContent("{}", Encoding.UTF8, "application/json")
+        };
+
+        using HttpResponseMessage response = await HttpClient
+            .SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+            .ConfigureAwait(false);
+
+        response.EnsureSuccessStatusCode();
+
+        await using Stream contentStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        UiListDataResponse<BuildingInfo>? payload = await JsonSerializer
+            .DeserializeAsync<UiListDataResponse<BuildingInfo>>(contentStream, _serializerOptions, cancellationToken)
+            .ConfigureAwait(false);
+
+        return payload ?? new UiListDataResponse<BuildingInfo>();
+    }
+
     private async Task<IReadOnlyList<TDto>> QueryAsync<TDto>(string endpoint, PythagorasQuery<TDto> query, CancellationToken cancellationToken)
         where TDto : class, IPythagorasDto
     {
@@ -149,6 +202,39 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
 
         return normalized;
     }
+
+    private static string BuildUiListDataQuery(BuildingUiListDataRequest request)
+    {
+        List<string> parts = [];
+
+        if (request.NavigationId is int navigationId)
+        {
+            parts.Add(FormQueryParameter("navigationId", navigationId.ToString(CultureInfo.InvariantCulture)));
+        }
+
+        parts.Add(FormQueryParameter("includePropertyValues", request.IncludePropertyValues ? "true" : "false"));
+
+        if (request.PropertyIds is { Count: > 0 })
+        {
+            foreach (int propertyId in request.PropertyIds)
+            {
+                parts.Add(FormQueryParameter("propertyIds[]", propertyId.ToString(CultureInfo.InvariantCulture)));
+            }
+        }
+
+        if (request.BuildingIds is { Count: > 0 })
+        {
+            foreach (int buildingId in request.BuildingIds)
+            {
+                parts.Add(FormQueryParameter("buildingIds[]", buildingId.ToString(CultureInfo.InvariantCulture)));
+            }
+        }
+
+        return string.Join('&', parts);
+    }
+
+    private static string FormQueryParameter(string name, string value)
+        => $"{Uri.EscapeDataString(name)}={Uri.EscapeDataString(value)}";
 
     public Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken = default)
     {

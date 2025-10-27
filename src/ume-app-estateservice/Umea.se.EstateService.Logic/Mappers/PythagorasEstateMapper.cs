@@ -32,7 +32,7 @@ public static class PythagorasEstateMapper
 
         return dtos.Count == 0
             ? []
-            : dtos.Select(nf => ToModel(nf, null, includeBuildings: false)).ToArray();
+            : dtos.Select(nf => ToModel(nf, null, includeBuildings: true)).ToArray();
     }
 
     private static AddressModel? CreateAddress(NavigationFolder dto)

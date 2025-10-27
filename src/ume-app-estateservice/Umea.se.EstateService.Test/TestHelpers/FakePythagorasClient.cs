@@ -12,6 +12,7 @@ public sealed class FakePythagorasClient : IPythagorasClient
 {
     private readonly ConcurrentDictionary<Type, Queue<object>> _results = new();
     private readonly Queue<IReadOnlyDictionary<int, CalculatedPropertyValueDto>> _calculatedPropertyResults = new();
+    private readonly Queue<UiListDataResponse<BuildingInfo>> _buildingUiListDataResults = new();
 
     /// <summary>
     /// Captured requests in invocation order.
@@ -19,6 +20,7 @@ public sealed class FakePythagorasClient : IPythagorasClient
     public List<RequestCapture> Requests { get; } = [];
 
     public List<CalculatedPropertyRequestCapture> CalculatedPropertyRequests { get; } = [];
+    public List<BuildingUiListDataRequestCapture> BuildingUiListDataRequests { get; } = [];
 
     public string? LastEndpoint => Requests.LastOrDefault().Endpoint;
 
@@ -155,6 +157,8 @@ public sealed class FakePythagorasClient : IPythagorasClient
         Requests.Clear();
         _calculatedPropertyResults.Clear();
         CalculatedPropertyRequests.Clear();
+        BuildingUiListDataRequests.Clear();
+        _buildingUiListDataResults.Clear();
     }
 
     /// <summary>
@@ -173,11 +177,28 @@ public sealed class FakePythagorasClient : IPythagorasClient
         CalculatedPropertyValueRequest? Request,
         CancellationToken CancellationToken);
 
+    public readonly record struct BuildingUiListDataRequestCapture(
+        BuildingUiListDataRequest Request,
+        CancellationToken CancellationToken);
+
     public void SetCalculatedPropertyValuesResult(IReadOnlyDictionary<int, CalculatedPropertyValueDto> result)
     {
         ArgumentNullException.ThrowIfNull(result);
         _calculatedPropertyResults.Clear();
         _calculatedPropertyResults.Enqueue(result);
+    }
+
+    public void SetBuildingUiListDataResponse(UiListDataResponse<BuildingInfo> response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        _buildingUiListDataResults.Clear();
+        _buildingUiListDataResults.Enqueue(response);
+    }
+
+    public void EnqueueBuildingUiListDataResponse(UiListDataResponse<BuildingInfo> response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        _buildingUiListDataResults.Enqueue(response);
     }
 
     public void EnqueueCalculatedPropertyValuesResult(IReadOnlyDictionary<int, CalculatedPropertyValueDto> result)
@@ -220,6 +241,19 @@ public sealed class FakePythagorasClient : IPythagorasClient
         }
 
         return CaptureCalculatedPropertyValuesAsync($"rest/v1/navigationfolder/{estateId}/property/calculatedvalue", estateId, request, cancellationToken);
+    }
+
+    public Task<UiListDataResponse<BuildingInfo>> PostBuildingUiListDataAsync(BuildingUiListDataRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        BuildingUiListDataRequests.Add(new BuildingUiListDataRequestCapture(request, cancellationToken));
+
+        if (_buildingUiListDataResults.Count > 0)
+        {
+            return Task.FromResult(_buildingUiListDataResults.Dequeue());
+        }
+
+        return Task.FromResult(new UiListDataResponse<BuildingInfo>());
     }
 
     private Task<IReadOnlyDictionary<int, CalculatedPropertyValueDto>> CaptureCalculatedPropertyValuesAsync(string endpoint, int entityId, CalculatedPropertyValueRequest? request, CancellationToken cancellationToken)

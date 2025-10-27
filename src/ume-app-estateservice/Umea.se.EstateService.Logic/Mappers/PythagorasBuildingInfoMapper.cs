@@ -124,4 +124,39 @@ public static class PythagorasBuildingInfoMapper
 
         return value.OutputValue;
     }
+
+    public static BuildingExtendedPropertiesModel? ToExtendedPropertiesModel(IReadOnlyDictionary<int, BuildingPropertyValueDto> properties)
+    {
+        if (properties == null || properties.Count == 0)
+        {
+            return null;
+        }
+
+        Dictionary<PropertyCategoryId, CalculatedPropertyValueDto> normalized = new(properties.Count);
+
+        foreach (KeyValuePair<int, BuildingPropertyValueDto> entry in properties)
+        {
+            if (!Enum.IsDefined(typeof(PropertyCategoryId), entry.Key))
+            {
+                continue;
+            }
+
+            BuildingPropertyValueDto property = entry.Value;
+
+            if (property.Value is null)
+            {
+                continue;
+            }
+
+            normalized[(PropertyCategoryId)entry.Key] = new CalculatedPropertyValueDto
+            {
+                OutputValue = property.Value,
+                Valid = true
+            };
+        }
+
+        return normalized.Count == 0
+            ? null
+            : ToExtendedPropertiesModel(normalized);
+    }
 }

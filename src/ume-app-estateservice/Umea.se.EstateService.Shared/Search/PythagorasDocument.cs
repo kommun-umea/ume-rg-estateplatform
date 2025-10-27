@@ -1,4 +1,5 @@
 ﻿using System.Text.Json.Serialization;
+using Umea.se.EstateService.Shared.Models;
 
 namespace Umea.se.EstateService.Shared.Search;
 
@@ -29,6 +30,7 @@ public sealed class PythagorasDocument
     /// Total area for the entity, if available.
     /// </summary>
     public decimal? GrossArea { get; set; }
+    public BuildingExtendedPropertiesModel? BuildingExtendedProperties { get; set; }
     [JsonIgnore]
     public DocumentKey Key => new(Type, Id);
 }

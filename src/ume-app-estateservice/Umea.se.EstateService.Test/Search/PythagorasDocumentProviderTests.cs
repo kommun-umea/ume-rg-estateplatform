@@ -29,6 +29,8 @@ public class PythagorasDocumentProviderTests
         building.Address.ShouldBe("Skolgatan 31A 901 84 Umeå");
         building.NumChildren.ShouldBe(1);
         building.GrossArea.ShouldBe(555m);
+        building.BuildingExtendedProperties.ShouldNotBeNull();
+        building.BuildingExtendedProperties!.YearOfConstruction.ShouldBe("1982");
 
         PythagorasDocument room = documents.Single(d => d.Type == NodeType.Room && d.Id == FakePythagorasHandler.RoomId);
         room.Address.ShouldBe(building.Address);
@@ -127,6 +129,30 @@ public class PythagorasDocumentProviderTests
                 : null;
 
             return Task.FromResult<EstateModel?>(estate);
+        }
+
+        public Task<IReadOnlyList<BuildingInfoModel>> GetBuildingsWithPropertiesAsync(
+            IReadOnlyCollection<int>? buildingIds = null,
+            IReadOnlyCollection<int>? propertyIds = null,
+            int? navigationId = null,
+            CancellationToken cancellationToken = default)
+        {
+            AddressModel address = new("Skolgatan 31A", "901 84", "Umeå", "Sverige", string.Empty);
+
+            BuildingInfoModel model = new()
+            {
+                Id = BuildingId,
+                Name = "Building Info",
+                Address = address,
+                GrossArea = 555m,
+                ExtendedProperties = new BuildingExtendedPropertiesModel
+                {
+                    YearOfConstruction = "1982",
+                    PropertyDesignation = "Property 42"
+                }
+            };
+
+            return Task.FromResult<IReadOnlyList<BuildingInfoModel>>([model]);
         }
     }
 }

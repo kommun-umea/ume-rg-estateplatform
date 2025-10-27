@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 
 namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
@@ -32,6 +33,12 @@ public sealed class BuildingInfo : IPythagorasDto
     public bool IsProspect { get; init; }
     public long? ProspectStartDate { get; init; }
     public Dictionary<string, string?> ExtraInfo { get; init; } = new(StringComparer.OrdinalIgnoreCase);
-    public Dictionary<string, string?> PropertyValues { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<int, BuildingPropertyValueDto> PropertyValues { get; init; } = [];
     public Dictionary<string, string?> NavigationInfo { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+}
+
+public sealed class BuildingPropertyValueDto
+{
+    [JsonPropertyName("value")]
+    public string? Value { get; init; }
 }

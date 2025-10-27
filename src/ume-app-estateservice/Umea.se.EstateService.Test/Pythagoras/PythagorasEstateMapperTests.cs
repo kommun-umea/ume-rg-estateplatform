@@ -1,4 +1,3 @@
-using Shouldly;
 using Umea.se.EstateService.Logic.Mappers;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
@@ -13,11 +12,11 @@ public class PythagorasEstateMapperTests
         NavigationFolder dto = new()
         {
             Id = 1,
-            Buildings = new[]
-            {
+            Buildings =
+            [
                 new Building { Id = 10 },
                 new Building { Id = 11 }
-            }
+            ]
         };
 
         EstateModel model = PythagorasEstateMapper.ToModel(dto, includeBuildings: true);
@@ -33,12 +32,12 @@ public class PythagorasEstateMapperTests
         NavigationFolder dto = new()
         {
             Id = 1,
-            Buildings = new[]
-            {
+            Buildings =
+            [
                 new Building { Id = 10 },
                 new Building { Id = 11 },
                 new Building { Id = 12 }
-            }
+            ]
         };
 
         EstateModel model = PythagorasEstateMapper.ToModel(dto, includeBuildings: false);

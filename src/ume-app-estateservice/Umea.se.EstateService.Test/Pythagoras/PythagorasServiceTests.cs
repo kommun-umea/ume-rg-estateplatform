@@ -32,6 +32,79 @@ public class PythagorasHandlerTests
     }
 
     [Fact]
+    public async Task GetBuildingsWithPropertiesAsync_UsesUiListDataEndpoint()
+    {
+        FakePythagorasClient client = new();
+        client.SetBuildingUiListDataResponse(new UiListDataResponse<BuildingInfo>
+        {
+            Data =
+            [
+                new BuildingInfo
+                {
+                    Id = 1551,
+                    Name = "Building",
+                    PropertyValues = new Dictionary<int, BuildingPropertyValueDto>
+                    {
+                        { (int)PropertyCategoryId.YearOfConstruction, new BuildingPropertyValueDto { Value = "1982" } }
+                    }
+                }
+            ],
+            TotalSize = 1
+        });
+
+        PythagorasHandler service = new(client);
+
+        IReadOnlyList<BuildingInfoModel> result = await service.GetBuildingsWithPropertiesAsync([1551]);
+
+        result.ShouldHaveSingleItem().ExtendedProperties?.YearOfConstruction.ShouldBe("1982");
+
+        FakePythagorasClient.BuildingUiListDataRequestCapture request = client.BuildingUiListDataRequests.ShouldHaveSingleItem();
+        request.Request.NavigationId.ShouldBe(NavigationType.UmeaKommun);
+        request.Request.BuildingIds.ShouldNotBeNull();
+        request.Request.BuildingIds!.ShouldContain(1551);
+        IReadOnlyCollection<int> propertyIds = request.Request.PropertyIds.ShouldNotBeNull();
+        propertyIds.ShouldContain((int)PropertyCategoryId.YearOfConstruction);
+    }
+
+    [Fact]
+    public async Task GetBuildingsWithPropertiesAsync_UsesProvidedPropertyIdsAndNavigation()
+    {
+        FakePythagorasClient client = new();
+        client.SetBuildingUiListDataResponse(new UiListDataResponse<BuildingInfo>());
+
+        PythagorasHandler service = new(client);
+
+        IReadOnlyList<BuildingInfoModel> result = await service.GetBuildingsWithPropertiesAsync(
+            [42],
+            propertyIds: [999],
+            navigationId: 7);
+
+        result.ShouldBeEmpty();
+
+        FakePythagorasClient.BuildingUiListDataRequestCapture request = client.BuildingUiListDataRequests.ShouldHaveSingleItem();
+        request.Request.NavigationId.ShouldBe(7);
+        IReadOnlyCollection<int> requestedPropertyIds = request.Request.PropertyIds.ShouldNotBeNull();
+        requestedPropertyIds.Count.ShouldBe(1);
+        requestedPropertyIds.ShouldContain(999);
+    }
+
+    [Fact]
+    public async Task GetBuildingsWithPropertiesAsync_WithoutIds_FetchesAll()
+    {
+        FakePythagorasClient client = new();
+        client.SetBuildingUiListDataResponse(new UiListDataResponse<BuildingInfo>());
+
+        PythagorasHandler service = new(client);
+
+        IReadOnlyList<BuildingInfoModel> result = await service.GetBuildingsWithPropertiesAsync();
+
+        result.ShouldBeEmpty();
+
+        FakePythagorasClient.BuildingUiListDataRequestCapture request = client.BuildingUiListDataRequests.ShouldHaveSingleItem();
+        request.Request.BuildingIds.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task GetBuildingInfoAsync_DelegatesToClientAndAddsNavigationFolder()
     {
         Guid uid = Guid.NewGuid();

@@ -21,7 +21,9 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
 
     private async Task<IReadOnlyDictionary<int, BuildingInfoModel>> LoadBuildingInfosAsync()
     {
-        IReadOnlyList<BuildingInfoModel> buildings = await pythagorasHandler.GetBuildingsAsync().ConfigureAwait(false);
+        IReadOnlyList<BuildingInfoModel> buildings = await pythagorasHandler
+            .GetBuildingsWithPropertiesAsync(cancellationToken: default)
+            .ConfigureAwait(false);
         if (buildings.Count == 0)
         {
             return new Dictionary<int, BuildingInfoModel>();
@@ -70,6 +72,7 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
                 if (buildingInfo is not null)
                 {
                     doc.GrossArea = buildingInfo.GrossArea;
+                    doc.BuildingExtendedProperties = buildingInfo.ExtendedProperties;
                 }
 
                 doc.Ancestors.Add(CreateAncestorFromDocument(estateDoc));
