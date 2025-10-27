@@ -51,6 +51,7 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
         {
             PythagorasDocument estateDoc = CreateDocumentFromSearchable(estate);
             estateDoc.GrossArea = estate.GrossArea;
+            estateDoc.ExtendedProperties = CreateEstateExtendedProperties(estate.ExtendedProperties);
             docs[estateDoc.Key] = estateDoc;
 
             foreach (BuildingModel building in estate.Buildings ?? [])
@@ -72,7 +73,7 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
                 if (buildingInfo is not null)
                 {
                     doc.GrossArea = buildingInfo.GrossArea;
-                    doc.BuildingExtendedProperties = buildingInfo.ExtendedProperties;
+                    doc.ExtendedProperties = CreateBuildingExtendedProperties(buildingInfo.ExtendedProperties);
                 }
 
                 doc.Ancestors.Add(CreateAncestorFromDocument(estateDoc));
@@ -113,7 +114,6 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
             doc.GrossArea = (decimal?)workspace.GrossArea;
         }
     }
-
     private static PythagorasDocument CreateDocumentFromSearchable(ISearchable item)
     {
         (NodeType nodeType, int rankScore) = item switch
@@ -172,5 +172,54 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
             Name = doc.Name,
             PopularName = doc.PopularName
         };
+    }
+
+    private static IReadOnlyDictionary<string, string>? CreateBuildingExtendedProperties(BuildingExtendedPropertiesModel? source)
+    {
+        if (source is null)
+        {
+            return null;
+        }
+
+        Dictionary<string, string> result = new(2);
+
+        if (!string.IsNullOrWhiteSpace(source.YearOfConstruction))
+        {
+            result["yearOfConstruction"] = source.YearOfConstruction;
+        }
+
+        if (!string.IsNullOrWhiteSpace(source.ExternalOwner))
+        {
+            result["externalOwner"] = source.ExternalOwner;
+        }
+
+        return result.Count == 0 ? null : result;
+    }
+
+    private static IReadOnlyDictionary<string, string>? CreateEstateExtendedProperties(EstateExtendedPropertiesModel? source)
+    {
+        if (source is null)
+        {
+            return null;
+        }
+
+        Dictionary<string, string> result = new(3);
+
+        if (!string.IsNullOrWhiteSpace(source.OperationalArea))
+        {
+            result["operationalArea"] = source.OperationalArea;
+        }
+
+        if (!string.IsNullOrWhiteSpace(source.MunicipalityArea))
+        {
+            result["municipalityArea"] = source.MunicipalityArea;
+        }
+
+        if (!string.IsNullOrWhiteSpace(source.PropertyDesignation))
+        {
+            result["propertyDesignation"] = source.PropertyDesignation;
+        }
+
+        return result.Count == 0 ? null : result;
     }
 }

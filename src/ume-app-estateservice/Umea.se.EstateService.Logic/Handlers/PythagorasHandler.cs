@@ -14,7 +14,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         (int)PropertyCategoryId.OperationalArea,
         (int)PropertyCategoryId.MunicipalityArea,
         (int)PropertyCategoryId.PropertyDesignation,
-        (int)PropertyCategoryId.YearOfConstruction
+        
     ]);
     private static readonly IReadOnlyCollection<int> _buildingExtendedPropertyIds = Array.AsReadOnly(
     [
@@ -23,7 +23,8 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         (int)PropertyCategoryId.YearOfConstruction,
         (int)PropertyCategoryId.NoticeBoardText,
         (int)PropertyCategoryId.NoticeBoardStartDate,
-        (int)PropertyCategoryId.NoticeBoardEndDate
+        (int)PropertyCategoryId.NoticeBoardEndDate,
+        (int)PropertyCategoryId.YearOfConstruction
     ]);
 
     public async Task<IReadOnlyList<BuildingInfoModel>> GetBuildingsAsync(PythagorasQuery<BuildingInfo>? query = null, CancellationToken cancellationToken = default)

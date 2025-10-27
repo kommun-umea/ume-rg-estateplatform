@@ -24,13 +24,18 @@ public class PythagorasDocumentProviderTests
         PythagorasDocument estate = documents.Single(d => d.Type == NodeType.Estate && d.Id == FakePythagorasHandler.EstateId);
         estate.NumChildren.ShouldBe(1);
         estate.GrossArea.ShouldBe(123.45m);
+        estate.ExtendedProperties.ShouldNotBeNull();
+        estate.ExtendedProperties!["propertyDesignation"].ShouldBe("Estate 7");
+        estate.ExtendedProperties!["operationalArea"].ShouldBe("Area 1");
+        estate.ExtendedProperties!["municipalityArea"].ShouldBe("Municipality 1");
 
         PythagorasDocument building = documents.Single(d => d.Type == NodeType.Building && d.Id == FakePythagorasHandler.BuildingId);
         building.Address.ShouldBe("Skolgatan 31A 901 84 Umeå");
         building.NumChildren.ShouldBe(1);
         building.GrossArea.ShouldBe(555m);
-        building.BuildingExtendedProperties.ShouldNotBeNull();
-        building.BuildingExtendedProperties!.YearOfConstruction.ShouldBe("1982");
+        building.ExtendedProperties.ShouldNotBeNull();
+        building.ExtendedProperties!["yearOfConstruction"].ShouldBe("1982");
+        building.ExtendedProperties!.ContainsKey("externalOwner").ShouldBeFalse();
 
         PythagorasDocument room = documents.Single(d => d.Type == NodeType.Room && d.Id == FakePythagorasHandler.RoomId);
         room.Address.ShouldBe(building.Address);
@@ -52,6 +57,12 @@ public class PythagorasDocumentProviderTests
                 Name = "Estate",
                 PopularName = "Estate Popular",
                 GrossArea = 123.45m,
+                ExtendedProperties = new EstateExtendedPropertiesModel
+                {
+                    OperationalArea = "Area 1",
+                    MunicipalityArea = "Municipality 1",
+                    PropertyDesignation = "Estate 7"
+                },
                 Buildings =
                 [
                     new BuildingModel
