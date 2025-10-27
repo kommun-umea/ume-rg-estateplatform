@@ -3,7 +3,7 @@ using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Logic.HostedServices;
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.Logic.Options;
-using Umea.se.EstateService.Logic.Providers;
+using Umea.se.EstateService.Logic.Search.Providers;
 
 namespace Umea.se.EstateService.Logic;
 
