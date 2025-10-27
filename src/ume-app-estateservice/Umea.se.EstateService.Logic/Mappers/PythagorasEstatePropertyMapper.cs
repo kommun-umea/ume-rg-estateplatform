@@ -15,18 +15,18 @@ public static class PythagorasEstatePropertyMapper
             return null;
         }
 
-        string? operatingArea = TryGetOutputValue(properties, PropertyCategoryId.OperatingArea);
+        string? operationalArea = TryGetOutputValue(properties, PropertyCategoryId.OperationalArea);
         string? municipalityArea = TryGetOutputValue(properties, PropertyCategoryId.MunicipalityArea);
         string? propertyDesignation = TryGetOutputValue(properties, PropertyCategoryId.PropertyDesignation);
 
-        if (operatingArea is null && municipalityArea is null && propertyDesignation is null)
+        if (operationalArea is null && municipalityArea is null && propertyDesignation is null)
         {
             return null;
         }
 
         return new EstateExtendedPropertiesModel
         {
-            OperatingArea = operatingArea,
+            OperationalArea = operationalArea,
             MunicipalityArea = municipalityArea,
             PropertyDesignation = propertyDesignation
         };

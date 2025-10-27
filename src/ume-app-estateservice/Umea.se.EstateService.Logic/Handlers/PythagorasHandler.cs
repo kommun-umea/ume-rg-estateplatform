@@ -11,7 +11,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
 {
     private static readonly IReadOnlyCollection<int> EstateCalculatedPropertyIds = Array.AsReadOnly(
     [
-        (int)PropertyCategoryId.OperatingArea,
+        (int)PropertyCategoryId.OperationalArea,
         (int)PropertyCategoryId.MunicipalityArea,
         (int)PropertyCategoryId.PropertyDesignation
     ]);

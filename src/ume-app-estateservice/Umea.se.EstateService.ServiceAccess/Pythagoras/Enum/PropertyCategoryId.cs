@@ -4,7 +4,7 @@ public enum PropertyCategoryId
 {
     PropertyDesignation = 56,
     MunicipalityArea = 209,
-    OperatingArea = 208,
+    OperationalArea = 208,
     YearOfConstruction = 226,
     ExternalOwner = 234,
     Note = 236,
