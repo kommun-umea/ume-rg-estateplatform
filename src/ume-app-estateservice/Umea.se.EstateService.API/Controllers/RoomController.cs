@@ -26,14 +26,11 @@ public class RoomController(IPythagorasHandler pythagorasHandler) : ControllerBa
     [HttpGet("{roomId:int}")]
     [SwaggerOperation(
         Summary = "Get room",
-        Description = "Retrieves a single room and optionally its related building information."
+        Description = "Retrieves a single room"
     )]
     [SwaggerResponse(StatusCodes.Status200OK, "The requested room.", typeof(RoomDetailsModel))]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Room not found.")]
-    public async Task<ActionResult<RoomDetailsModel>> GetRoomAsync(
-        int roomId,
-        [FromQuery] RoomDetailsRequest request,
-        CancellationToken cancellationToken)
+    public async Task<ActionResult<RoomModel>> GetRoomAsync(int roomId, [FromQuery] RoomDetailsRequest request, CancellationToken cancellationToken)
     {
         PythagorasQuery<Workspace> query = new PythagorasQuery<Workspace>()
             .Where(workspace => workspace.Id, roomId);
@@ -48,14 +45,7 @@ public class RoomController(IPythagorasHandler pythagorasHandler) : ControllerBa
             return NotFound();
         }
 
-        BuildingInfoModel? building = null;
-        if (request.IncludeBuilding && room.BuildingId is int buildingId)
-        {
-            building = await FetchBuildingAsync(buildingId, cancellationToken).ConfigureAwait(false);
-        }
-
-        RoomDetailsModel response = new(room, building);
-        return Ok(response);
+        return Ok(room);
     }
 
     /// <summary>
@@ -72,12 +62,11 @@ public class RoomController(IPythagorasHandler pythagorasHandler) : ControllerBa
     )]
     [SwaggerResponse(StatusCodes.Status200OK, "List of rooms", typeof(IReadOnlyList<RoomModel>))]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid request when incompatible filters are provided.")]
-    public async Task<ActionResult<IReadOnlyList<RoomModel>>> GetRoomsAsync(
-        [FromQuery] RoomListRequest request,
-        CancellationToken cancellationToken)
+    public async Task<ActionResult<IReadOnlyList<RoomModel>>> GetRoomsAsync([FromQuery] RoomListRequest request, CancellationToken cancellationToken)
     {
         PythagorasQuery<Workspace> query = BuildQuery(request);
         IReadOnlyList<RoomModel> rooms = await pythagorasHandler.GetRoomsAsync(query, cancellationToken);
+
         return Ok(rooms);
     }
 
@@ -99,22 +88,5 @@ public class RoomController(IPythagorasHandler pythagorasHandler) : ControllerBa
         }
 
         return query;
-    }
-
-    private async Task<BuildingInfoModel?> FetchBuildingAsync(int buildingId, CancellationToken cancellationToken)
-    {
-        PythagorasQuery<BuildingInfo> query = new PythagorasQuery<BuildingInfo>()
-            .Where(info => info.Id, buildingId);
-
-        IReadOnlyList<BuildingInfoModel> buildings = await pythagorasHandler
-            .GetBuildingsAsync(query, cancellationToken)
-            .ConfigureAwait(false);
-
-        if (buildings.Count == 0)
-        {
-            return null;
-        }
-
-        return buildings[0];
     }
 }
