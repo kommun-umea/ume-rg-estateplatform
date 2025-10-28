@@ -1,0 +1,57 @@
+{
+  "data": [
+    {
+      "id": 1001,
+      "uid": "11111111-2222-3333-4444-555555555555",
+      "name": "BUILDING-01",
+      "popularName": "Placeholder Building",
+      "grossarea": 12.345,
+      "netarea": 12.345,
+      "sumGrossFloorarea": 45.6789,
+      "numPlacedPersons": 0,
+      "markerType": 0,
+      "geoX": 60.00000000000001,
+      "geoY": 15.0,
+      "geoRotation": 0,
+      "addressName": "Primäradress",
+      "addressCity": "TESTSTAD",
+      "addressCountry": "Sverige",
+      "addressStreet": "TESTVÄGEN 1",
+      "addressZipCode": "000 00",
+      "addressExtra": "",
+      "origin": "TestData",
+      "propertyValues": {
+        "226": {
+          "valueId": 9999,
+          "valueUid": "99999999-8888-7777-6666-555555555555",
+          "ownerType": "building",
+          "ownerId": 1551,
+          "categoryId": 4,
+          "categoryLabel": "Byggnadsinformation",
+          "containerId": 231,
+          "containerLabel": "Byggnadsår",
+          "isSearchable": true,
+          "searchableLabel": null,
+          "propertyId": 226,
+          "readonly": false,
+          "style": {
+            "horizontalTextAlignment": null,
+            "fontSize": null,
+            "fontBold": null,
+            "fontItalic": null,
+            "fontColor": null,
+            "cellColor": null,
+            "width": null,
+            "height": null
+          },
+          "value": "0000",
+          "cacheValue": "0000",
+          "valueValueType": "STRING",
+          "outputValueType": "STRING"
+        }
+      },
+      "navigationInfo": {}
+    }
+  ],
+  "totalSize": 1
+}
