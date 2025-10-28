@@ -14,7 +14,7 @@ public static class PythagorasBuildingAscendantMapper
 
         if (dtos.Count == 0)
         {
-            return Array.Empty<BuildingAscendantModel>();
+            return [];
         }
 
         List<BuildingAscendantModel> result = new(dtos.Count);
