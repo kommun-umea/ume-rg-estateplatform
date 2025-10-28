@@ -66,6 +66,7 @@ public static class PythagorasWorkspaceMapper
             CommonArea = dto.CommonArea,
             FloorId = dto.FloorId,
             FloorName = dto.FloorName,
+            FloorPopularName = dto.PopularName,
             BuildingId = dto.BuildingId,
             BuildingName = dto.BuildingName,
             BuildingPopularName = dto.BuildingPopularName,
