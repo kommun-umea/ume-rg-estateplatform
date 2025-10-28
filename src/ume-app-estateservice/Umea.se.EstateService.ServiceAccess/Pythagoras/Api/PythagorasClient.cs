@@ -24,18 +24,6 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
         return QueryAsync("rest/v1/building/info", query, cancellationToken);
     }
 
-    public Task<IReadOnlyList<BuildingWorkspace>> GetBuildingWorkspacesAsync(int buildingId, PythagorasQuery<BuildingWorkspace>? query = null, CancellationToken cancellationToken = default)
-    {
-        if (buildingId <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
-        }
-
-        string endpoint = $"rest/v1/building/{buildingId}/workspace/info";
-        query ??= new PythagorasQuery<BuildingWorkspace>();
-        return QueryAsync(endpoint, query, cancellationToken);
-    }
-
     public Task<IReadOnlyList<BuildingAscendant>> GetBuildingAscendantsAsync(int buildingId, PythagorasQuery<BuildingAscendant>? query = null, CancellationToken cancellationToken = default)
     {
         if (buildingId <= 0)
@@ -60,27 +48,9 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
         return QueryAsync(endpoint, query, cancellationToken);
     }
 
-    public Task<IReadOnlyList<BuildingWorkspace>> GetFloorWorkspacesAsync(int floorId, PythagorasQuery<BuildingWorkspace>? query = null, CancellationToken cancellationToken = default)
-    {
-        if (floorId <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(floorId), "Floor id must be positive.");
-        }
-
-        string endpoint = $"rest/v1/floor/{floorId}/workspace/info";
-        query ??= new PythagorasQuery<BuildingWorkspace>();
-        return QueryAsync(endpoint, query, cancellationToken);
-    }
-
     public Task<IReadOnlyList<Workspace>> GetWorkspacesAsync(PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
     {
         query ??= new PythagorasQuery<Workspace>();
-        return QueryAsync("rest/v1/workspace/info", query, cancellationToken);
-    }
-
-    public Task<IReadOnlyList<BuildingWorkspace>> GetWorkspaceInfoAsync(PythagorasQuery<BuildingWorkspace>? query = null, CancellationToken cancellationToken = default)
-    {
-        query ??= new PythagorasQuery<BuildingWorkspace>();
         return QueryAsync("rest/v1/workspace/info", query, cancellationToken);
     }
 

@@ -125,7 +125,7 @@ public class BuildingController(IPythagorasHandler pythagorasService, ILogger<Bu
         [FromQuery] BuildingRoomsRequest request,
         CancellationToken cancellationToken)
     {
-        PythagorasQuery<BuildingWorkspace> query = new PythagorasQuery<BuildingWorkspace>()
+        PythagorasQuery<Workspace> query = new PythagorasQuery<Workspace>()
             .ApplyGeneralSearch(request)
             .ApplyPaging(request);
 

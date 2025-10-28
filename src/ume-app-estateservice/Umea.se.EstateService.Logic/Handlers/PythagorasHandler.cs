@@ -95,11 +95,17 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         return PythagorasBuildingInfoMapper.ToModel(payload[0], extendedProperties);
     }
 
-    public async Task<IReadOnlyList<BuildingRoomModel>> GetBuildingWorkspacesAsync(int buildingId, PythagorasQuery<BuildingWorkspace>? query = null, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<BuildingRoomModel>> GetBuildingWorkspacesAsync(int buildingId, PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
     {
         ValidatePositiveId(buildingId, nameof(buildingId));
-        IReadOnlyList<BuildingWorkspace> payload = await pythagorasClient.GetBuildingWorkspacesAsync(buildingId, query, cancellationToken).ConfigureAwait(false);
-        return PythagorasWorkspaceMapper.ToModel(payload);
+        PythagorasQuery<Workspace> effectiveQuery = (query ?? new PythagorasQuery<Workspace>())
+            .WithQueryParameter("buildingId", buildingId);
+
+        IReadOnlyList<Workspace> payload = await pythagorasClient
+            .GetWorkspacesAsync(effectiveQuery, cancellationToken)
+            .ConfigureAwait(false);
+
+        return PythagorasWorkspaceMapper.ToBuildingModel(payload);
     }
 
     public async Task<IReadOnlyList<BuildingAscendantModel>> GetBuildingAscendantsAsync(int buildingId, CancellationToken cancellationToken = default)
@@ -126,7 +132,7 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
             : PythagorasFloorInfoMapper.ToModel(floors);
     }
 
-    public async Task<IReadOnlyList<FloorInfoModel>> GetBuildingFloorsWithRoomsAsync(int buildingId, PythagorasQuery<Floor>? floorQuery = null, PythagorasQuery<BuildingWorkspace>? workspaceQuery = null, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<FloorInfoModel>> GetBuildingFloorsWithRoomsAsync(int buildingId, PythagorasQuery<Floor>? floorQuery = null, PythagorasQuery<Workspace>? workspaceQuery = null, CancellationToken cancellationToken = default)
     {
         ValidatePositiveId(buildingId, nameof(buildingId));
         IReadOnlyList<Floor> floors = await GetBuildingFloorsInternalAsync(buildingId, floorQuery, cancellationToken).ConfigureAwait(false);
@@ -143,11 +149,14 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
                 return PythagorasFloorInfoMapper.ToModel(floor, []);
             }
 
-            IReadOnlyList<BuildingWorkspace> workspaceDtos = await pythagorasClient
-                .GetFloorWorkspacesAsync(floor.Id, workspaceQuery, cancellationToken)
+            PythagorasQuery<Workspace> floorQueryWithFilter = (workspaceQuery ?? new PythagorasQuery<Workspace>())
+                .WithQueryParameter("floorId", floor.Id);
+
+            IReadOnlyList<Workspace> workspaceDtos = await pythagorasClient
+                .GetWorkspacesAsync(floorQueryWithFilter, cancellationToken)
                 .ConfigureAwait(false);
 
-            IReadOnlyList<BuildingRoomModel> rooms = PythagorasWorkspaceMapper.ToModel(workspaceDtos);
+            IReadOnlyList<BuildingRoomModel> rooms = PythagorasWorkspaceMapper.ToBuildingModel(workspaceDtos);
             return PythagorasFloorInfoMapper.ToModel(floor, rooms);
         });
 
@@ -169,10 +178,10 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         return PythagorasWorkspaceMapper.ToModel(payload);
     }
 
-    public async Task<IReadOnlyDictionary<int, BuildingWorkspaceStatsModel>> GetBuildingWorkspaceStatsAsync(PythagorasQuery<BuildingWorkspace>? query = null, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyDictionary<int, BuildingWorkspaceStatsModel>> GetBuildingWorkspaceStatsAsync(PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<BuildingWorkspace> workspaces = await pythagorasClient
-            .GetWorkspaceInfoAsync(query, cancellationToken)
+        IReadOnlyList<Workspace> workspaces = await pythagorasClient
+            .GetWorkspacesAsync(query, cancellationToken)
             .ConfigureAwait(false);
 
         if (workspaces.Count == 0)
@@ -182,12 +191,17 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
 
         Dictionary<int, WorkspaceStatsAccumulator> accumulators = new(workspaces.Count);
 
-        foreach (BuildingWorkspace workspace in workspaces)
+        foreach (Workspace workspace in workspaces)
         {
-            if (!accumulators.TryGetValue(workspace.BuildingId, out WorkspaceStatsAccumulator? accumulator))
+            if (workspace.BuildingId is not int buildingId || buildingId <= 0)
+            {
+                continue;
+            }
+
+            if (!accumulators.TryGetValue(buildingId, out WorkspaceStatsAccumulator? accumulator))
             {
                 accumulator = new WorkspaceStatsAccumulator();
-                accumulators[workspace.BuildingId] = accumulator;
+                accumulators[buildingId] = accumulator;
             }
 
             accumulator.RoomCount++;
@@ -203,9 +217,10 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         foreach (KeyValuePair<int, WorkspaceStatsAccumulator> entry in accumulators)
         {
             WorkspaceStatsAccumulator accumulator = entry.Value;
-            result[entry.Key] = new BuildingWorkspaceStatsModel
+            int buildingId = entry.Key;
+            result[buildingId] = new BuildingWorkspaceStatsModel
             {
-                BuildingId = entry.Key,
+                BuildingId = buildingId,
                 NumberOfRooms = accumulator.RoomCount,
                 NumberOfFloors = accumulator.FloorIds.Count
             };

@@ -49,6 +49,50 @@ public static class PythagorasWorkspaceMapper
         return buffer;
     }
 
+    public static BuildingRoomModel ToBuildingModel(Workspace dto)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+
+        return new BuildingRoomModel
+        {
+            Id = dto.Id,
+            Created = dto.Created,
+            Updated = dto.Updated,
+            Name = dto.Name ?? string.Empty,
+            PopularName = dto.PopularName,
+            GrossArea = dto.GrossArea,
+            NetArea = dto.NetArea,
+            UpliftedArea = dto.UpliftedArea,
+            CommonArea = dto.CommonArea,
+            Capacity = dto.Capacity,
+            OptimalCapacity = dto.OptimalCapacity,
+            FloorId = dto.FloorId,
+            FloorName = dto.FloorName,
+            FloorPopularName = dto.FloorPopularName,
+            BuildingId = dto.BuildingId ?? 0,
+            BuildingName = dto.BuildingName ?? string.Empty,
+            BuildingPopularName = dto.BuildingPopularName
+        };
+    }
+
+    public static IReadOnlyList<BuildingRoomModel> ToBuildingModel(IReadOnlyList<Workspace> dtos)
+    {
+        ArgumentNullException.ThrowIfNull(dtos);
+
+        if (dtos.Count == 0)
+        {
+            return [];
+        }
+
+        BuildingRoomModel[] buffer = new BuildingRoomModel[dtos.Count];
+        for (int i = 0; i < dtos.Count; i++)
+        {
+            buffer[i] = ToBuildingModel(dtos[i]);
+        }
+
+        return buffer;
+    }
+
     public static RoomModel ToDomain(Workspace dto)
     {
         ArgumentNullException.ThrowIfNull(dto);
@@ -66,7 +110,7 @@ public static class PythagorasWorkspaceMapper
             CommonArea = dto.CommonArea,
             FloorId = dto.FloorId,
             FloorName = dto.FloorName,
-            FloorPopularName = dto.PopularName,
+            FloorPopularName = dto.FloorPopularName,
             BuildingId = dto.BuildingId,
             BuildingName = dto.BuildingName,
             BuildingPopularName = dto.BuildingPopularName,

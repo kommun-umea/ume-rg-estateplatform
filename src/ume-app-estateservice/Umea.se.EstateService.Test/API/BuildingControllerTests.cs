@@ -71,7 +71,7 @@ public class BuildingControllerTests : ControllerTestCloud<TestApiFactory, Progr
     {
         _fakeClient.Reset();
         _fakeClient.SetGetAsyncResult(
-            new BuildingWorkspace { Id = 10, BuildingId = 1, BuildingName = "B" });
+            new Workspace { Id = 10, BuildingId = 1, BuildingName = "B" });
 
         HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Buildings}/1/rooms");
         response.EnsureSuccessStatusCode();
@@ -81,8 +81,10 @@ public class BuildingControllerTests : ControllerTestCloud<TestApiFactory, Progr
 
         BuildingRoomModel room = result.ShouldHaveSingleItem();
         room.Id.ShouldBe(10);
-        _fakeClient.LastQueryString.ShouldBe("maxResults=50");
-        _fakeClient.LastEndpoint.ShouldBe("rest/v1/building/1/workspace/info");
+        string query = _fakeClient.LastQueryString.ShouldNotBeNull();
+        query.ShouldContain("maxResults=50");
+        query.ShouldContain("buildingId=1");
+        _fakeClient.LastEndpoint.ShouldBe("rest/v1/workspace/info");
     }
 
     [Fact]
@@ -90,7 +92,7 @@ public class BuildingControllerTests : ControllerTestCloud<TestApiFactory, Progr
     {
         _fakeClient.Reset();
         _fakeClient.SetGetAsyncResult(new Floor { Id = 5, Uid = Guid.NewGuid(), Name = "Floor 1" });
-        _fakeClient.EnqueueGetAsyncResult(Array.Empty<BuildingWorkspace>());
+        _fakeClient.EnqueueGetAsyncResult(Array.Empty<Workspace>());
 
         HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Buildings}/1/floors?limit=1&offset=5&searchTerm=floor");
 
