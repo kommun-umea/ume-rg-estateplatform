@@ -70,7 +70,8 @@ public class RoomControllerTests : ControllerTestCloud<TestApiFactory, Program, 
         decodedQuery.ShouldContain("generalSearch=lab");
         decodedQuery.ShouldContain("firstResult=5");
         decodedQuery.ShouldContain("maxResults=10");
-        decodedQuery.ShouldContain("buildingId=42");
+        decodedQuery.ShouldContain("pN[]=EQ:buildingId");
+        decodedQuery.ShouldContain("pV[]=42");
     }
 
     [Fact]
