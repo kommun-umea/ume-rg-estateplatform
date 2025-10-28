@@ -141,15 +141,19 @@ public class PythagorasHandlerTests
     {
         FakePythagorasClient client = new();
         client.SetGetAsyncResult(
-            new BuildingWorkspace { Id = 5, BuildingId = 99, BuildingName = "B" });
+            new Workspace { Id = 5, BuildingId = 99, BuildingName = "B" });
 
         PythagorasHandler service = new(client);
 
-        IReadOnlyList<BuildingRoomModel> result = await service.GetBuildingWorkspacesAsync(99);
+        IReadOnlyList<RoomModel> result = await service.GetBuildingWorkspacesAsync(99);
 
         client.GetAsyncCalled.ShouldBeTrue();
-        client.LastEndpoint.ShouldBe("rest/v1/building/99/workspace/info");
-        BuildingRoomModel room = result.ShouldHaveSingleItem();
+        client.LastEndpoint.ShouldBe("rest/v1/workspace/info");
+        string buildingQuery = client.LastQueryString.ShouldNotBeNull();
+        string decodedBuildingQuery = Uri.UnescapeDataString(buildingQuery);
+        decodedBuildingQuery.ShouldContain("pN[]=EQ:buildingId");
+        decodedBuildingQuery.ShouldContain("pV[]=99");
+        RoomModel room = result.ShouldHaveSingleItem();
         room.Id.ShouldBe(5);
     }
 
@@ -190,7 +194,7 @@ public class PythagorasHandlerTests
             });
 
         client.EnqueueGetAsyncResult(
-            new BuildingWorkspace
+            new Workspace
             {
                 Id = 1,
                 Uid = Guid.NewGuid(),
@@ -206,7 +210,7 @@ public class PythagorasHandlerTests
             });
 
         client.EnqueueGetAsyncResult(
-            new BuildingWorkspace
+            new Workspace
             {
                 Id = 2,
                 Uid = Guid.NewGuid(),
@@ -220,7 +224,7 @@ public class PythagorasHandlerTests
                 FloorUid = floorOneUid,
                 FloorName = "01"
             },
-            new BuildingWorkspace
+            new Workspace
             {
                 Id = 3,
                 Uid = Guid.NewGuid(),
@@ -242,23 +246,33 @@ public class PythagorasHandlerTests
         client.EndpointsCalled.ShouldBe(
         [
             "rest/v1/building/10/floor",
-            "rest/v1/floor/3022/workspace/info",
-            "rest/v1/floor/3023/workspace/info"
+            "rest/v1/workspace/info",
+            "rest/v1/workspace/info"
         ]);
 
         result.Count.ShouldBe(2);
         FloorInfoModel floorZero = result[0];
         floorZero.Id.ShouldBe(3022);
-        IReadOnlyList<BuildingRoomModel> floorZeroRooms = floorZero.Rooms.ShouldNotBeNull();
+        IReadOnlyList<RoomModel> floorZeroRooms = floorZero.Rooms.ShouldNotBeNull();
         floorZeroRooms.Count.ShouldBe(1);
         floorZeroRooms[0].Name.ShouldBe("9-1033");
+        FakePythagorasClient.RequestCapture firstWorkspaceRequest = client.GetRequestsFor<Workspace>().ElementAt(0);
+        string firstWorkspaceQuery = firstWorkspaceRequest.QueryString.ShouldNotBeNull();
+        string decodedFirstWorkspace = Uri.UnescapeDataString(firstWorkspaceQuery);
+        decodedFirstWorkspace.ShouldContain("pN[]=EQ:floorId");
+        decodedFirstWorkspace.ShouldContain("pV[]=3022");
 
         FloorInfoModel floorOne = result[1];
         floorOne.Id.ShouldBe(3023);
-        IReadOnlyList<BuildingRoomModel> floorOneRooms = floorOne.Rooms.ShouldNotBeNull();
+        IReadOnlyList<RoomModel> floorOneRooms = floorOne.Rooms.ShouldNotBeNull();
         floorOneRooms.Count.ShouldBe(2);
         floorOneRooms[0].Name.ShouldBe("9-1042B");
         floorOneRooms[1].Name.ShouldBe("9-1001");
+        FakePythagorasClient.RequestCapture secondWorkspaceRequest = client.GetRequestsFor<Workspace>().ElementAt(1);
+        string secondWorkspaceQuery = secondWorkspaceRequest.QueryString.ShouldNotBeNull();
+        string decodedSecondWorkspace = Uri.UnescapeDataString(secondWorkspaceQuery);
+        decodedSecondWorkspace.ShouldContain("pN[]=EQ:floorId");
+        decodedSecondWorkspace.ShouldContain("pV[]=3023");
     }
 
     [Fact]

@@ -5,33 +5,34 @@ namespace Umea.se.EstateService.Logic.Mappers;
 
 public static class PythagorasWorkspaceMapper
 {
-    public static BuildingRoomModel ToModel(BuildingWorkspace dto)
+    public static RoomModel ToModel(BuildingWorkspace dto)
     {
         ArgumentNullException.ThrowIfNull(dto);
 
-        return new BuildingRoomModel
+        return new RoomModel
         {
             Id = dto.Id,
+            Version = 0,
             Created = dto.Created,
             Updated = dto.Updated,
             Name = dto.Name ?? string.Empty,
             PopularName = dto.PopularName,
             GrossArea = dto.GrossArea,
             NetArea = dto.NetArea,
-            UpliftedArea = dto.UpliftedArea,
             CommonArea = dto.CommonArea,
+            UpliftedArea = dto.UpliftedArea,
             Capacity = dto.Capacity,
             OptimalCapacity = dto.OptimalCapacity,
             FloorId = dto.FloorId,
             FloorName = dto.FloorName,
             FloorPopularName = dto.FloorPopularName,
             BuildingId = dto.BuildingId,
-            BuildingName = dto.BuildingName ?? string.Empty,
-            BuildingPopularName = dto.BuildingPopularName,
+            BuildingName = dto.BuildingName,
+            BuildingPopularName = dto.BuildingPopularName
         };
     }
 
-    public static IReadOnlyList<BuildingRoomModel> ToModel(IReadOnlyList<BuildingWorkspace> dtos)
+    public static IReadOnlyList<RoomModel> ToModel(IReadOnlyList<BuildingWorkspace> dtos)
     {
         ArgumentNullException.ThrowIfNull(dtos);
 
@@ -40,7 +41,7 @@ public static class PythagorasWorkspaceMapper
             return [];
         }
 
-        BuildingRoomModel[] buffer = new BuildingRoomModel[dtos.Count];
+        RoomModel[] buffer = new RoomModel[dtos.Count];
         for (int i = 0; i < dtos.Count; i++)
         {
             buffer[i] = ToModel(dtos[i]);
@@ -63,10 +64,13 @@ public static class PythagorasWorkspaceMapper
             PopularName = dto.PopularName,
             GrossArea = dto.GrossArea,
             NetArea = dto.NetArea,
+            UpliftedArea = dto.UpliftedArea,
             CommonArea = dto.CommonArea,
+            Capacity = dto.Capacity,
+            OptimalCapacity = dto.OptimalCapacity,
             FloorId = dto.FloorId,
             FloorName = dto.FloorName,
-            FloorPopularName = dto.PopularName,
+            FloorPopularName = dto.FloorPopularName,
             BuildingId = dto.BuildingId,
             BuildingName = dto.BuildingName,
             BuildingPopularName = dto.BuildingPopularName,

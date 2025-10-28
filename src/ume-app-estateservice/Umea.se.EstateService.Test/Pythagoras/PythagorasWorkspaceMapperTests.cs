@@ -7,7 +7,7 @@ namespace Umea.se.EstateService.Test.Pythagoras;
 public class PythagorasWorkspaceMapperTests
 {
     [Fact]
-    public void ToDomain_BuildingWorkspace_CopiesCoreFields()
+    public void ToModel_Workspace_CopiesCoreFields()
     {
         BuildingWorkspace dto = new()
         {
@@ -33,20 +33,18 @@ public class PythagorasWorkspaceMapperTests
             BuildingUid = Guid.NewGuid(),
             BuildingName = "Building",
             BuildingPopularName = "B",
-            BuildingOrigin = "Origin",
-            StatusName = "Status",
-            StatusColor = "#fff",
-            RentalStatusName = "Rental",
-            RentalStatusColor = "#000"
+            BuildingOrigin = "Origin"
         };
 
-        BuildingRoomModel model = PythagorasWorkspaceMapper.ToModel(dto);
+        RoomModel model = PythagorasWorkspaceMapper.ToModel(dto);
 
         model.Id.ShouldBe(dto.Id);
         model.Name.ShouldBe(dto.Name);
         model.PopularName.ShouldBe(dto.PopularName);
         model.GrossArea.ShouldBe(dto.GrossArea);
         model.BuildingName.ShouldBe(dto.BuildingName);
+        model.OptimalCapacity.ShouldBe(dto.OptimalCapacity);
+        model.FloorPopularName.ShouldBe(dto.FloorPopularName);
     }
 
     [Fact]
@@ -76,5 +74,6 @@ public class PythagorasWorkspaceMapperTests
         model.Id.ShouldBe(dto.Id);
         model.Version.ShouldBe(dto.Version);
         model.PopularName.ShouldBe(dto.PopularName);
+        model.FloorPopularName.ShouldBeNull();
     }
 }

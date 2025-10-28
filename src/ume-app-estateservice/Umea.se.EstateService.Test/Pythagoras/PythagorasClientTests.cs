@@ -57,7 +57,7 @@ public class PythagorasClientTests
     }
 
     [Fact]
-    public async Task GetBuildingWorkspacesAsync_BuildsExpectedEndpoint()
+    public async Task GetWorkspacesAsync_BuildsExpectedRequest()
     {
         const string jsonResponse = "[]";
         CapturingHandler handler = new(jsonResponse);
@@ -68,9 +68,13 @@ public class PythagorasClientTests
         FakeHttpClientFactory factory = new(httpClient);
         PythagorasClient client = new(factory);
 
-        await client.GetBuildingWorkspacesAsync(25, query: null);
+        PythagorasQuery<Workspace> query = new PythagorasQuery<Workspace>()
+            .WithIds(25)
+            .Where(workspace => workspace.BuildingId, 10);
 
-        handler.LastRequest.ShouldNotBeNull().RequestUri!.ToString().ShouldBe("https://example.org/rest/v1/building/25/workspace/info");
+        await client.GetWorkspacesAsync(query);
+
+        handler.LastRequest.ShouldNotBeNull().RequestUri!.ToString().ShouldBe("https://example.org/rest/v1/workspace/info?id%5B%5D=25&pN%5B%5D=EQ%3AbuildingId&pV%5B%5D=10");
     }
 
     [Fact]
