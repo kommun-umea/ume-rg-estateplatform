@@ -7,4 +7,5 @@ public class ApplicationConfig(IConfiguration configuration) : ApplicationConfig
 {
     public string PythagorasApiKey => GetValue("Pythagoras-Api-Key");
     public string PythagorasBaseUrl => GetValue("Pythagoras-Base-Url");
+    public bool ExcludeRoomsFromSearchIndex => TryGetBool("SearchIndex:ExcludeRooms") ?? true;
 }
