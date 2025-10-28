@@ -291,18 +291,6 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
 
     private static string FormQueryParameter(string name, string value) => $"{Uri.EscapeDataString(name)}={Uri.EscapeDataString(value)}";
 
-    public Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-
-        if (request.RequestUri is null)
-        {
-            throw new ArgumentException("Request must have RequestUri set.", nameof(request));
-        }
-
-        return HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-    }
-
     public Task<HttpResponseMessage> GetFloorBlueprintAsync(int floorId, BlueprintFormat format, bool includeWorkspaceTexts, CancellationToken cancellationToken = default)
     {
         if (floorId <= 0)

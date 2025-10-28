@@ -230,10 +230,6 @@ public sealed class FakePythagorasClient : IPythagorasClient
         ArgumentNullException.ThrowIfNull(result);
         _calculatedPropertyResults.Enqueue(result);
     }
-    public Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken = default)
-    {
-        throw new NotSupportedException("SendAsync is not supported by FakePythagorasClient. Use a dedicated fake for blueprint tests.");
-    }
 
     public Func<int, BlueprintFormat, bool, CancellationToken, Task<HttpResponseMessage>>? OnGetFloorBlueprintAsync { get; set; }
 

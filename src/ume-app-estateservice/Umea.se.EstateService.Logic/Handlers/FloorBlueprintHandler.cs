@@ -61,7 +61,7 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IL
                 throw new FloorBlueprintUnavailableException($"Pythagoras returned {(int)response.StatusCode} ({reason}). Body: {errorDescription}");
             }
 
-            await using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+            using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
             MemoryStream buffer = new();
             await responseStream.CopyToAsync(buffer, cancellationToken).ConfigureAwait(false);
             buffer.Position = 0;

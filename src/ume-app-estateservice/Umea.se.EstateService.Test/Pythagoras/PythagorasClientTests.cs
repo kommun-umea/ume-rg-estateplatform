@@ -90,20 +90,20 @@ public class PythagorasClientTests
         {
             NavigationId = 2,
             PropertyIds = [226],
-            BuildingIds = [1551]
+            BuildingIds = [1001]
         };
 
         UiListDataResponse<BuildingInfo> result = await client.PostBuildingUiListDataAsync(request);
 
         result.TotalSize.ShouldBe(1);
         BuildingInfo building = result.Data.ShouldHaveSingleItem();
-        building.Id.ShouldBe(1551);
+        building.Id.ShouldBe(1001);
         building.PropertyValues.ShouldContainKey(226);
-        building.PropertyValues[226].Value.ShouldBe("1982");
+        building.PropertyValues[226].Value.ShouldBe("0000");
 
         HttpRequestMessage captured = handler.LastRequest.ShouldNotBeNull();
         captured.Method.ShouldBe(HttpMethod.Post);
-        captured.RequestUri!.ToString().ShouldBe("https://example.org/rest/v1/building/info/uilistdata?navigationId=2&includePropertyValues=true&propertyIds%5B%5D=226&buildingIds%5B%5D=1551");
+        captured.RequestUri!.ToString().ShouldBe("https://example.org/rest/v1/building/info/uilistdata?navigationId=2&includePropertyValues=true&propertyIds%5B%5D=226&buildingIds%5B%5D=1001");
         handler.LastRequestContent.ShouldBe("{}");
         factory.LastRequestedClientName.ShouldBe(HttpClientNames.Pythagoras);
     }
@@ -183,74 +183,6 @@ public class PythagorasClientTests
             };
 
             return response;
-        }
-    }
-
-    private sealed class BlueprintCapturingHandler : HttpMessageHandler
-    {
-        public HttpRequestMessage? LastRequest { get; private set; }
-
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            LastRequest = request;
-            HttpResponseMessage response = new(HttpStatusCode.OK)
-            {
-                Content = new ByteArrayContent([])
-            };
-
-            return Task.FromResult(response);
-        }
-    }
-
-    private sealed class PagingHandler(IReadOnlyDictionary<int, string> pages) : HttpMessageHandler
-    {
-        public int RequestCount { get; private set; }
-
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            RequestCount++;
-
-            int firstResult = GetFirstResult(request.RequestUri);
-            string json = pages.TryGetValue(firstResult, out string? pageJson) ? pageJson : "[]";
-
-            HttpResponseMessage response = new(HttpStatusCode.OK)
-            {
-                Content = new StringContent(json, Encoding.UTF8, "application/json")
-            };
-
-            return Task.FromResult(response);
-        }
-
-        private static int GetFirstResult(Uri? uri)
-        {
-            if (uri is null || string.IsNullOrEmpty(uri.Query))
-            {
-                return 0;
-            }
-
-            string[] pairs = uri.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries);
-            foreach (string pair in pairs)
-            {
-                int equalsIndex = pair.IndexOf('=');
-                if (equalsIndex <= 0)
-                {
-                    continue;
-                }
-
-                string key = Uri.UnescapeDataString(pair[..equalsIndex]);
-                if (!string.Equals(key, "firstResult", StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                string value = Uri.UnescapeDataString(pair[(equalsIndex + 1)..]);
-                if (int.TryParse(value, out int result))
-                {
-                    return result;
-                }
-            }
-
-            return 0;
         }
     }
 }
