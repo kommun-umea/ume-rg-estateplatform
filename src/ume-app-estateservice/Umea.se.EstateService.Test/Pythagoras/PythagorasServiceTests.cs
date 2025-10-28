@@ -3,7 +3,6 @@ using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.Shared.Models;
-using Umea.se.EstateService.Shared.ValueObjects;
 using Umea.se.EstateService.Test.TestHelpers;
 
 namespace Umea.se.EstateService.Test.Pythagoras;
@@ -25,78 +24,116 @@ public class PythagorasHandlerTests
 
         client.GetAsyncCalled.ShouldBeTrue();
         client.LastEndpoint.ShouldBe("rest/v1/building/info");
-        client.LastQuery.ShouldBeSameAs(query);
         client.LastCancellationToken.ShouldBe(cts.Token);
+        string queryString = client.LastQueryString.ShouldNotBeNull();
+        queryString.ShouldContain($"navigationId={(int)NavigationType.UmeaKommun}");
         BuildingInfoModel model = result.ShouldHaveSingleItem();
         model.Id.ShouldBe(42);
     }
 
     [Fact]
-    public async Task GetBuildingInfoAsync_DelegatesToClientAndAddsNavigationFolder()
+    public async Task GetBuildingsAsync_AddsDefaultNavigationIdWhenQueryIsNull()
     {
-        Guid uid = Guid.NewGuid();
         FakePythagorasClient client = new();
-        client.SetGetAsyncResult(
-            new BuildingInfo
-            {
-                Id = 10,
-                Uid = uid,
-                Name = "Info",
-                PopularName = "Info Popular",
-                Grossarea = 12.5m,
-                Netarea = 10.2m,
-                SumGrossFloorarea = 13.4m,
-                NumPlacedPersons = 3,
-                GeoX = 1,
-                GeoY = 2,
-                GeoRotation = 3,
-                AddressStreet = "Street",
-                AddressZipCode = "Zip",
-                AddressCity = "City",
-                AddressCountry = "Country",
-                MarkerType = PythMarkerType.Unknown
-            });
-
+        client.SetGetAsyncResult(new BuildingInfo { Id = 1 });
         PythagorasHandler service = new(client);
 
-        IReadOnlyList<BuildingInfoModel> result = await service.GetBuildingInfoAsync(navigationFolderId: 1234);
+        IReadOnlyList<BuildingInfoModel> result = await service.GetBuildingsAsync();
 
-        client.GetAsyncCalled.ShouldBeTrue();
-        client.LastEndpoint.ShouldBe("rest/v1/building/info");
-        client.LastQuery.ShouldNotBeNull();
-        PythagorasQuery<BuildingInfo> query = client.LastQuery.ShouldBeOfType<PythagorasQuery<BuildingInfo>>();
-        string queryString = query.BuildAsQueryString();
-        queryString.ShouldContain("navigationFolderId=1234");
-
-        BuildingInfoModel model = result.ShouldHaveSingleItem();
-        model.Id.ShouldBe(10);
-        model.Uid.ShouldBe(uid);
-        model.GrossArea.ShouldBe(12.5m);
-        model.NetArea.ShouldBe(10.2m);
-        model.SumGrossFloorArea.ShouldBe(13.4m);
-        model.NumPlacedPersons.ShouldBe(3);
-        model.GeoLocation.ShouldNotBeNull();
-        model.Address.ShouldNotBe(AddressModel.Empty);
+        result.ShouldHaveSingleItem();
+        string queryString = client.LastQueryString.ShouldNotBeNull();
+        queryString.ShouldContain($"navigationId={(int)NavigationType.UmeaKommun}");
     }
 
     [Fact]
-    public async Task GetBuildingInfoAsync_WithoutNavigationFolder_DoesNotAddFilter()
+    public async Task GetBuildingsAsync_PreservesExistingNavigationFolderParameter()
     {
         FakePythagorasClient client = new();
-        client.SetGetAsyncResult(
-            new BuildingInfo { Id = 1 });
+        client.SetGetAsyncResult(new BuildingInfo { Id = 5 });
+        PythagorasHandler service = new(client);
+
+        PythagorasQuery<BuildingInfo> query = new PythagorasQuery<BuildingInfo>()
+            .WithQueryParameter("navigationFolderId", 1234);
+
+        await service.GetBuildingsAsync(query);
+
+        client.LastQuery.ShouldNotBeNull();
+        string queryString = client.LastQueryString.ShouldNotBeNull();
+        queryString.ShouldContain("navigationFolderId=1234");
+        queryString.ShouldContain($"navigationId={(int)NavigationType.UmeaKommun}");
+    }
+
+    [Fact]
+    public async Task GetBuildingsWithPropertiesAsync_UsesUiListDataEndpoint()
+    {
+        FakePythagorasClient client = new();
+        client.SetBuildingUiListDataResponse(new UiListDataResponse<BuildingInfo>
+        {
+            Data =
+            [
+                new BuildingInfo
+                {
+                    Id = 1551,
+                    Name = "Building",
+                    PropertyValues = new Dictionary<int, PropertyValueDto>
+                    {
+                        { (int)PropertyCategoryId.YearOfConstruction, new PropertyValueDto { Value = "1982" } }
+                    }
+                }
+            ],
+            TotalSize = 1
+        });
 
         PythagorasHandler service = new(client);
 
-        IReadOnlyList<BuildingInfoModel> result = await service.GetBuildingInfoAsync();
+        IReadOnlyList<BuildingInfoModel> result = await service.GetBuildingsWithPropertiesAsync([1551]);
 
-        client.GetAsyncCalled.ShouldBeTrue();
-        client.LastEndpoint.ShouldBe("rest/v1/building/info");
-        client.LastQuery.ShouldNotBeNull();
-        PythagorasQuery<BuildingInfo> query = client.LastQuery.ShouldBeOfType<PythagorasQuery<BuildingInfo>>();
-        string queryString = query.BuildAsQueryString();
-        queryString.ShouldNotContain("navigationFolderId=");
-        result.ShouldHaveSingleItem();
+        result.ShouldHaveSingleItem().ExtendedProperties?.YearOfConstruction.ShouldBe("1982");
+
+        FakePythagorasClient.BuildingUiListDataRequestCapture request = client.BuildingUiListDataRequests.ShouldHaveSingleItem();
+        request.Request.NavigationId.ShouldBe(NavigationType.UmeaKommun);
+        request.Request.BuildingIds.ShouldNotBeNull();
+        request.Request.BuildingIds!.ShouldContain(1551);
+        IReadOnlyCollection<int> propertyIds = request.Request.PropertyIds.ShouldNotBeNull();
+        propertyIds.ShouldContain((int)PropertyCategoryId.YearOfConstruction);
+    }
+
+    [Fact]
+    public async Task GetBuildingsWithPropertiesAsync_UsesProvidedPropertyIdsAndNavigation()
+    {
+        FakePythagorasClient client = new();
+        client.SetBuildingUiListDataResponse(new UiListDataResponse<BuildingInfo>());
+
+        PythagorasHandler service = new(client);
+
+        IReadOnlyList<BuildingInfoModel> result = await service.GetBuildingsWithPropertiesAsync(
+            [42],
+            propertyIds: [999],
+            navigationId: 7);
+
+        result.ShouldBeEmpty();
+
+        FakePythagorasClient.BuildingUiListDataRequestCapture request = client.BuildingUiListDataRequests.ShouldHaveSingleItem();
+        request.Request.NavigationId.ShouldBe(7);
+        IReadOnlyCollection<int> requestedPropertyIds = request.Request.PropertyIds.ShouldNotBeNull();
+        requestedPropertyIds.Count.ShouldBe(1);
+        requestedPropertyIds.ShouldContain(999);
+    }
+
+    [Fact]
+    public async Task GetBuildingsWithPropertiesAsync_WithoutIds_FetchesAll()
+    {
+        FakePythagorasClient client = new();
+        client.SetBuildingUiListDataResponse(new UiListDataResponse<BuildingInfo>());
+
+        PythagorasHandler service = new(client);
+
+        IReadOnlyList<BuildingInfoModel> result = await service.GetBuildingsWithPropertiesAsync();
+
+        result.ShouldBeEmpty();
+
+        FakePythagorasClient.BuildingUiListDataRequestCapture request = client.BuildingUiListDataRequests.ShouldHaveSingleItem();
+        request.Request.BuildingIds.ShouldBeNull();
     }
 
     [Fact]

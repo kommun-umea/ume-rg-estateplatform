@@ -73,6 +73,76 @@ public class PythagorasClientTests
         handler.LastRequest.ShouldNotBeNull().RequestUri!.ToString().ShouldBe("https://example.org/rest/v1/building/25/workspace/info");
     }
 
+    [Fact]
+    public async Task PostBuildingUiListDataAsync_BuildsExpectedRequest_AndDeserializesResponse()
+    {
+        string jsonResponse = TestDataLoader.Load("Pythagoras/building_uilistdata_response.json");
+
+        CapturingHandler handler = new(jsonResponse);
+        HttpClient httpClient = new(handler)
+        {
+            BaseAddress = new Uri("https://example.org/")
+        };
+        FakeHttpClientFactory factory = new(httpClient);
+        PythagorasClient client = new(factory);
+
+        BuildingUiListDataRequest request = new()
+        {
+            NavigationId = 2,
+            PropertyIds = [226],
+            BuildingIds = [1551]
+        };
+
+        UiListDataResponse<BuildingInfo> result = await client.PostBuildingUiListDataAsync(request);
+
+        result.TotalSize.ShouldBe(1);
+        BuildingInfo building = result.Data.ShouldHaveSingleItem();
+        building.Id.ShouldBe(1551);
+        building.PropertyValues.ShouldContainKey(226);
+        building.PropertyValues[226].Value.ShouldBe("1982");
+
+        HttpRequestMessage captured = handler.LastRequest.ShouldNotBeNull();
+        captured.Method.ShouldBe(HttpMethod.Post);
+        captured.RequestUri!.ToString().ShouldBe("https://example.org/rest/v1/building/info/uilistdata?navigationId=2&includePropertyValues=true&propertyIds%5B%5D=226&buildingIds%5B%5D=1551");
+        handler.LastRequestContent.ShouldBe("{}");
+        factory.LastRequestedClientName.ShouldBe(HttpClientNames.Pythagoras);
+    }
+
+    [Fact]
+    public async Task PostNavigationFolderUiListDataAsync_BuildsExpectedRequest_AndDeserializesResponse()
+    {
+        string jsonResponse = "{ \"data\": [{ \"id\": 7, \"name\": \"Estate\", \"propertyValues\": { \"208\": { \"value\": \"Area 1\" } } }], \"totalSize\": 1 }";
+
+        CapturingHandler handler = new(jsonResponse);
+        HttpClient httpClient = new(handler)
+        {
+            BaseAddress = new Uri("https://example.org/")
+        };
+        FakeHttpClientFactory factory = new(httpClient);
+        PythagorasClient client = new(factory);
+
+        NavigationFolderUiListDataRequest request = new()
+        {
+            NavigationId = 2,
+            PropertyIds = [208],
+            NavigationFolderIds = [7]
+        };
+
+        UiListDataResponse<NavigationFolder> result = await client.PostNavigationFolderUiListDataAsync(request);
+
+        result.TotalSize.ShouldBe(1);
+        NavigationFolder estate = result.Data.ShouldHaveSingleItem();
+        estate.Id.ShouldBe(7);
+        estate.PropertyValues.ShouldContainKey(208);
+        estate.PropertyValues[208].Value.ShouldBe("Area 1");
+
+        HttpRequestMessage captured = handler.LastRequest.ShouldNotBeNull();
+        captured.Method.ShouldBe(HttpMethod.Post);
+        captured.RequestUri!.ToString().ShouldBe("https://example.org/rest/v1/navigationfolder/info/uilistdata?navigationId=2&includePropertyValues=true&propertyIds%5B%5D=208&navigationFolderIds%5B%5D=7");
+        handler.LastRequestContent.ShouldBe("{}");
+        factory.LastRequestedClientName.ShouldBe(HttpClientNames.Pythagoras);
+    }
+
     private sealed class FakeHttpClientFactory(HttpClient client) : IHttpClientFactory
     {
         public string? LastRequestedClientName { get; private set; }
@@ -93,16 +163,26 @@ public class PythagorasClientTests
     private sealed class CapturingHandler(string json) : HttpMessageHandler
     {
         public HttpRequestMessage? LastRequest { get; private set; }
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        public string? LastRequestContent { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             LastRequest = request;
+            if (request.Content is not null)
+            {
+                LastRequestContent = await request.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                LastRequestContent = null;
+            }
 
             HttpResponseMessage response = new(HttpStatusCode.OK)
             {
                 Content = new StringContent(json, Encoding.UTF8, "application/json")
             };
 
-            return Task.FromResult(response);
+            return response;
         }
     }
 

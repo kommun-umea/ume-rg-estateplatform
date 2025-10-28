@@ -34,19 +34,10 @@ public class EstateController(IPythagorasHandler pythagorasService) : Controller
         [FromQuery] EstateDetailsRequest request,
         CancellationToken cancellationToken)
     {
-        PythagorasQuery<NavigationFolder> query = new PythagorasQuery<NavigationFolder>()
-            .Where(folder => folder.Id, estateId);
-
-        if (request.IncludeBuildings)
-        {
-            query = query.WithQueryParameter("includeAscendantBuildings", true);
-        }
-
-        IReadOnlyList<EstateModel> estates = await pythagorasService
-            .GetEstatesAsync(query, cancellationToken)
+        EstateModel? estate = await pythagorasService
+            .GetEstateByIdAsync(estateId, request.IncludeBuildings, cancellationToken)
             .ConfigureAwait(false);
 
-        EstateModel? estate = estates.FirstOrDefault();
         if (estate is null)
         {
             return NotFound();
@@ -75,7 +66,7 @@ public class EstateController(IPythagorasHandler pythagorasService) : Controller
         PythagorasQuery<NavigationFolder> query = BuildQuery(request);
 
         IReadOnlyList<EstateModel> estates = await pythagorasService
-            .GetEstatesAsync(query, cancellationToken);
+            .GetEstatesWithBuildingsAsync(query, cancellationToken);
 
         return Ok(estates);
     }
@@ -99,12 +90,17 @@ public class EstateController(IPythagorasHandler pythagorasService) : Controller
         [FromQuery] PagedQueryRequest request,
         CancellationToken cancellationToken)
     {
+        if (estateId <= 0)
+        {
+            return BadRequest("Estate id must be positive.");
+        }
+
         PythagorasQuery<BuildingInfo> query = new PythagorasQuery<BuildingInfo>()
             .ApplyGeneralSearch(request)
             .ApplyPaging(request);
 
         IReadOnlyList<BuildingInfoModel> buildings = await pythagorasService
-            .GetBuildingInfoAsync(query, estateId, cancellationToken);
+            .GetBuildingsAsync(query.WithQueryParameter("navigationFolderId", estateId), cancellationToken);
 
         return Ok(buildings);
     }

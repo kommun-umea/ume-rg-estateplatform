@@ -465,7 +465,7 @@ public sealed class InMemorySearchService
         return denominator <= 0 ? 0 : idf * (tfWeighted * (k1 + 1)) / denominator;
     }
 
-    private static double ComputePositionWeight(IReadOnlyList<int> positions)
+    private static double ComputePositionWeight(List<int> positions)
     {
         if (positions.Count == 0)
         {

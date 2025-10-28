@@ -32,6 +32,6 @@ public sealed class BuildingInfo : IPythagorasDto
     public bool IsProspect { get; init; }
     public long? ProspectStartDate { get; init; }
     public Dictionary<string, string?> ExtraInfo { get; init; } = new(StringComparer.OrdinalIgnoreCase);
-    public Dictionary<string, string?> PropertyValues { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<int, PropertyValueDto> PropertyValues { get; init; } = [];
     public Dictionary<string, string?> NavigationInfo { get; init; } = new(StringComparer.OrdinalIgnoreCase);
 }

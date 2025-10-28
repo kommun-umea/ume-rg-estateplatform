@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.API;
 using Umea.se.EstateService.ServiceAccess;
 using Umea.se.EstateService.Test.TestHelpers;
@@ -37,7 +38,10 @@ public class BuildingControllerTests : ControllerTestCloud<TestApiFactory, Progr
         buildings.ShouldNotBeNull();
 
         buildings.Select(b => b.Id).ShouldBe([1, 2]);
-        _fakeClient.LastQueryString.ShouldBe("maxResults=50");
+        string? lastQuery = _fakeClient.LastQueryString;
+        lastQuery.ShouldNotBeNull();
+        lastQuery.ShouldContain("maxResults=50");
+        lastQuery.ShouldContain($"navigationId={(int)NavigationType.UmeaKommun}");
         _fakeClient.LastEndpoint.ShouldBe("rest/v1/building/info");
     }
 

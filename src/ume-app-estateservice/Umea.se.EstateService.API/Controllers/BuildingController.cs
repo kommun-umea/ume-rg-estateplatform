@@ -20,7 +20,6 @@ public class BuildingController(IPythagorasHandler pythagorasService, ILogger<Bu
     /// Gets details for a specific building.
     /// </summary>
     /// <param name="buildingId">The ID of the building.</param>
-    /// <param name="include">Specifies which related data to include in the result.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <response code="200">Returns the requested building.</response>
     /// <response code="400">If the buildingId is not valid.</response>
@@ -28,15 +27,12 @@ public class BuildingController(IPythagorasHandler pythagorasService, ILogger<Bu
     [HttpGet("{buildingId:int}")]
     [SwaggerOperation(
         Summary = "Get a building",
-        Description = "Retrieves a single building with optional related data."
+        Description = "Retrieves a single building including its extended properties."
     )]
     [SwaggerResponse(StatusCodes.Status200OK, "The building", typeof(BuildingInfoModel))]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid buildingId")]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Building not found")]
-    public async Task<ActionResult<BuildingInfoModel>> GetBuildingByIdAsync(
-        int buildingId,
-        [FromQuery] BuildingIncludeOptions include = BuildingIncludeOptions.None,
-        CancellationToken cancellationToken = default)
+    public async Task<ActionResult<BuildingInfoModel>> GetBuildingByIdAsync(int buildingId, CancellationToken cancellationToken = default)
     {
         if (buildingId <= 0)
         {
@@ -44,7 +40,7 @@ public class BuildingController(IPythagorasHandler pythagorasService, ILogger<Bu
         }
 
         BuildingInfoModel? building = await pythagorasService
-            .GetBuildingByIdAsync(buildingId, include, cancellationToken)
+            .GetBuildingByIdAsync(buildingId, BuildingIncludeOptions.ExtendedProperties, cancellationToken)
             .ConfigureAwait(false);
 
         if (building is null)
@@ -189,13 +185,12 @@ public class BuildingController(IPythagorasHandler pythagorasService, ILogger<Bu
 
         if (request.EstateId is int estateId)
         {
+            PythagorasQuery<BuildingInfo> scopedQuery = query.WithQueryParameter("navigationFolderId", estateId);
             return await pythagorasService
-                .GetBuildingInfoAsync(query, estateId, cancellationToken)
+                .GetBuildingsAsync(scopedQuery, cancellationToken)
                 .ConfigureAwait(false);
         }
 
-        return await pythagorasService
-            .GetBuildingsAsync(query, cancellationToken)
-            .ConfigureAwait(false);
+        return await pythagorasService.GetBuildingsAsync(query, cancellationToken).ConfigureAwait(false);
     }
 }

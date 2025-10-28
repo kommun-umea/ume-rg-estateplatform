@@ -23,7 +23,7 @@ public static class PythagorasBuildingInfoMapper
             SumGrossFloorArea = dto.SumGrossFloorarea ?? 0m,
             NumPlacedPersons = dto.NumPlacedPersons,
             Address = CreateAddress(dto),
-            ExtendedProperties = extendedProperties
+            ExtendedProperties = extendedProperties,
         };
     }
 
@@ -70,7 +70,7 @@ public static class PythagorasBuildingInfoMapper
             dto.AddressExtra ?? string.Empty);
     }
 
-    public static BuildingExtendedPropertiesModel? ToExtendedPropertiesModel(IReadOnlyDictionary<BuildingPropertyCategoryId, CalculatedPropertyValueDto> properties)
+    public static BuildingExtendedPropertiesModel? ToExtendedPropertiesModel(IReadOnlyDictionary<PropertyCategoryId, CalculatedPropertyValueDto> properties)
     {
         ArgumentNullException.ThrowIfNull(properties);
 
@@ -79,10 +79,11 @@ public static class PythagorasBuildingInfoMapper
             return null;
         }
 
-        string? externalOwner = TryGetOutputValue(properties, BuildingPropertyCategoryId.ExternalOwner);
-        string? propertyDesignation = TryGetOutputValue(properties, BuildingPropertyCategoryId.PropertyDesignation);
+        string? externalOwner = TryGetOutputValue(properties, PropertyCategoryId.ExternalOwner);
+        string? propertyDesignation = TryGetOutputValue(properties, PropertyCategoryId.PropertyDesignation);
+        string? yearOfConstruction = TryGetOutputValue(properties, PropertyCategoryId.YearOfConstruction);
 
-        string? noticeBoardText = TryGetOutputValue(properties, BuildingPropertyCategoryId.NoticeBoardText);
+        string? noticeBoardText = TryGetOutputValue(properties, PropertyCategoryId.NoticeBoardText);
         BuildingNoticeBoardModel? noticeBoard = null;
 
         if (!string.IsNullOrEmpty(noticeBoardText))
@@ -90,13 +91,14 @@ public static class PythagorasBuildingInfoMapper
             noticeBoard = new BuildingNoticeBoardModel
             {
                 Text = noticeBoardText,
-                StartDate = DateTime.TryParse(TryGetOutputValue(properties, BuildingPropertyCategoryId.NoticeBoardStartDate), out DateTime startDate) ? startDate : null,
-                EndDate = DateTime.TryParse(TryGetOutputValue(properties, BuildingPropertyCategoryId.NoticeBoardEndDate), out DateTime endDate) ? endDate : null
+                StartDate = DateTime.TryParse(TryGetOutputValue(properties, PropertyCategoryId.NoticeBoardStartDate), out DateTime startDate) ? startDate : null,
+                EndDate = DateTime.TryParse(TryGetOutputValue(properties, PropertyCategoryId.NoticeBoardEndDate), out DateTime endDate) ? endDate : null
             };
         }
 
         bool hasData = externalOwner is not null
             || propertyDesignation is not null
+            || yearOfConstruction is not null
             || noticeBoard is not null;
 
         if (!hasData)
@@ -108,11 +110,12 @@ public static class PythagorasBuildingInfoMapper
         {
             ExternalOwner = externalOwner,
             PropertyDesignation = propertyDesignation,
-            NoticeBoard = noticeBoard
+            NoticeBoard = noticeBoard,
+            YearOfConstruction = yearOfConstruction
         };
     }
 
-    private static string? TryGetOutputValue(IReadOnlyDictionary<BuildingPropertyCategoryId, CalculatedPropertyValueDto> properties, BuildingPropertyCategoryId key)
+    private static string? TryGetOutputValue(IReadOnlyDictionary<PropertyCategoryId, CalculatedPropertyValueDto> properties, PropertyCategoryId key)
     {
         if (!properties.TryGetValue(key, out CalculatedPropertyValueDto? value) || value is null)
         {
@@ -120,5 +123,40 @@ public static class PythagorasBuildingInfoMapper
         }
 
         return value.OutputValue;
+    }
+
+    public static BuildingExtendedPropertiesModel? ToExtendedPropertiesModel(IReadOnlyDictionary<int, PropertyValueDto> properties)
+    {
+        if (properties == null || properties.Count == 0)
+        {
+            return null;
+        }
+
+        Dictionary<PropertyCategoryId, CalculatedPropertyValueDto> normalized = new(properties.Count);
+
+        foreach (KeyValuePair<int, PropertyValueDto> entry in properties)
+        {
+            if (!Enum.IsDefined(typeof(PropertyCategoryId), entry.Key))
+            {
+                continue;
+            }
+
+            PropertyValueDto property = entry.Value;
+
+            if (property.Value is null)
+            {
+                continue;
+            }
+
+            normalized[(PropertyCategoryId)entry.Key] = new CalculatedPropertyValueDto
+            {
+                OutputValue = property.Value,
+                Valid = true
+            };
+        }
+
+        return normalized.Count == 0
+            ? null
+            : ToExtendedPropertiesModel(normalized);
     }
 }

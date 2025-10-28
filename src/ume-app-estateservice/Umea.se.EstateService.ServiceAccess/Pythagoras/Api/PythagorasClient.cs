@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using System.Text.Json;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
@@ -76,6 +78,12 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
         return QueryAsync("rest/v1/workspace/info", query, cancellationToken);
     }
 
+    public Task<IReadOnlyList<BuildingWorkspace>> GetWorkspaceInfoAsync(PythagorasQuery<BuildingWorkspace>? query = null, CancellationToken cancellationToken = default)
+    {
+        query ??= new PythagorasQuery<BuildingWorkspace>();
+        return QueryAsync("rest/v1/workspace/info", query, cancellationToken);
+    }
+
     public Task<IReadOnlyList<NavigationFolder>> GetNavigationFoldersAsync(PythagorasQuery<NavigationFolder>? query = null, CancellationToken cancellationToken = default)
     {
         query ??= new PythagorasQuery<NavigationFolder>();
@@ -95,26 +103,129 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
             throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
         }
 
-        string endpoint = $"rest/v1/building/{buildingId}/property/calculatedvalue";
-        string requestPath = NormalizeEndpoint(endpoint);
-        string queryString = request?.BuildQueryString() ?? string.Empty;
-        return QueryDictionaryAsync<CalculatedPropertyValueDto>(requestPath, queryString, cancellationToken);
+        return GetCalculatedPropertyValuesAsync("building", buildingId, request, cancellationToken);
+    }
+
+    public Task<IReadOnlyDictionary<int, CalculatedPropertyValueDto>> GetCalculatedPropertyValuesForEstateAsync(int estateId, CalculatedPropertyValueRequest? request = null, CancellationToken cancellationToken = default)
+    {
+        if (estateId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(estateId), "Estate id must be positive.");
+        }
+
+        return GetCalculatedPropertyValuesAsync("navigationfolder", estateId, request, cancellationToken);
+    }
+
+    public async Task<UiListDataResponse<BuildingInfo>> PostBuildingUiListDataAsync(BuildingUiListDataRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (request.BuildingIds is { Count: > 0 })
+        {
+            foreach (int buildingId in request.BuildingIds)
+            {
+                if (buildingId <= 0)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(request), "Building ids must be positive.");
+                }
+            }
+        }
+
+        if (request.PropertyIds is not null)
+        {
+            foreach (int propertyId in request.PropertyIds)
+            {
+                if (propertyId <= 0)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(request), "Property ids must be positive.");
+                }
+            }
+        }
+
+        string endpoint = "rest/v1/building/info/uilistdata";
+        string queryString = BuildUiListDataQuery(request.NavigationId, request.IncludePropertyValues, request.PropertyIds, request.BuildingIds, "buildingIds[]");
+        return await PostAsync<UiListDataResponse<BuildingInfo>>(endpoint, queryString, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<UiListDataResponse<NavigationFolder>> PostNavigationFolderUiListDataAsync(
+        NavigationFolderUiListDataRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (request.NavigationFolderIds is { Count: > 0 })
+        {
+            foreach (int navigationFolderId in request.NavigationFolderIds)
+            {
+                if (navigationFolderId <= 0)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(request), "Navigation folder ids must be positive.");
+                }
+            }
+        }
+
+        if (request.PropertyIds is not null)
+        {
+            foreach (int propertyId in request.PropertyIds)
+            {
+                if (propertyId <= 0)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(request), "Property ids must be positive.");
+                }
+            }
+        }
+
+        string endpoint = "rest/v1/navigationfolder/info/uilistdata";
+        string queryString = BuildUiListDataQuery(
+            request.NavigationId,
+            request.IncludePropertyValues,
+            request.PropertyIds,
+            request.NavigationFolderIds,
+            "navigationFolderIds[]");
+        return await PostAsync<UiListDataResponse<NavigationFolder>>(endpoint, queryString, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<IReadOnlyList<TDto>> QueryAsync<TDto>(string endpoint, PythagorasQuery<TDto> query, CancellationToken cancellationToken)
         where TDto : class, IPythagorasDto
     {
-        string requestPath = NormalizeEndpoint(endpoint);
-        string queryString = query.BuildAsQueryString();
-        string requestUri = BuildRequestUri(requestPath, queryString);
+        ArgumentNullException.ThrowIfNull(query);
+        return await GetAsync<TDto>(endpoint, query.BuildAsQueryString(), cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<IReadOnlyList<TDto>> GetAsync<TDto>(string endpoint, string queryString, CancellationToken cancellationToken)
+    {
+        string requestUri = BuildRequestUri(NormalizeEndpoint(endpoint), queryString);
 
         using HttpResponseMessage response = await HttpClient.GetAsync(requestUri, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
-
-        using Stream contentStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        List<TDto>? payload = await JsonSerializer.DeserializeAsync<List<TDto>>(contentStream, _serializerOptions, cancellationToken).ConfigureAwait(false);
+        List<TDto>? payload = await ProcessResponseAsync<List<TDto>>(response, cancellationToken).ConfigureAwait(false);
 
         return payload ?? [];
+    }
+
+    private async Task<TResponse> PostAsync<TResponse>(string endpoint, string queryString, CancellationToken cancellationToken)
+        where TResponse : class, new()
+    {
+        string requestUri = BuildRequestUri(NormalizeEndpoint(endpoint), queryString);
+
+        using HttpRequestMessage message = new(HttpMethod.Post, requestUri)
+        {
+            Content = new StringContent("{}", Encoding.UTF8, "application/json")
+        };
+
+        using HttpResponseMessage response = await HttpClient
+            .SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+            .ConfigureAwait(false);
+
+        TResponse? payload = await ProcessResponseAsync<TResponse>(response, cancellationToken).ConfigureAwait(false);
+        return payload ?? new TResponse();
+    }
+
+    private static async Task<T?> ProcessResponseAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        response.EnsureSuccessStatusCode();
+
+        await using Stream contentStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        return await JsonSerializer.DeserializeAsync<T>(contentStream, _serializerOptions, cancellationToken).ConfigureAwait(false);
     }
 
     private static string BuildRequestUri(string path, string query) => string.IsNullOrEmpty(query) ? path : $"{path}?{query}";
@@ -142,6 +253,43 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
 
         return normalized;
     }
+
+    private static string BuildUiListDataQuery(
+        int? navigationId,
+        bool includePropertyValues,
+        IReadOnlyCollection<int>? propertyIds,
+        IReadOnlyCollection<int>? entityIds,
+        string entityIdParameterName)
+    {
+        List<string> parts = [];
+
+        if (navigationId is int value)
+        {
+            parts.Add(FormQueryParameter("navigationId", value.ToString(CultureInfo.InvariantCulture)));
+        }
+
+        parts.Add(FormQueryParameter("includePropertyValues", includePropertyValues ? "true" : "false"));
+
+        if (propertyIds is { Count: > 0 })
+        {
+            foreach (int propertyId in propertyIds)
+            {
+                parts.Add(FormQueryParameter("propertyIds[]", propertyId.ToString(CultureInfo.InvariantCulture)));
+            }
+        }
+
+        if (entityIds is { Count: > 0 })
+        {
+            foreach (int entityId in entityIds)
+            {
+                parts.Add(FormQueryParameter(entityIdParameterName, entityId.ToString(CultureInfo.InvariantCulture)));
+            }
+        }
+
+        return string.Join('&', parts);
+    }
+
+    private static string FormQueryParameter(string name, string value) => $"{Uri.EscapeDataString(name)}={Uri.EscapeDataString(value)}";
 
     public Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken = default)
     {
@@ -218,16 +366,28 @@ where TValue : class
         }
         catch (Exception readException)
         {
-            throw new PythagorasApiException(
-                $"Pythagoras API request failed with status code {response.StatusCode}.",
-                response.StatusCode,
-                errorBody,
-                readException);
+            throw new PythagorasApiException($"Pythagoras API request failed with status code {response.StatusCode}.", response.StatusCode, errorBody, readException);
         }
 
-        throw new PythagorasApiException(
-            $"Pythagoras API request failed with status code {response.StatusCode}.",
-            response.StatusCode,
-            errorBody);
+        throw new PythagorasApiException($"Pythagoras API request failed with status code {response.StatusCode}.", response.StatusCode, errorBody);
+    }
+
+    private Task<IReadOnlyDictionary<int, CalculatedPropertyValueDto>> GetCalculatedPropertyValuesAsync(string entityType, long entityId, CalculatedPropertyValueRequest? request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(entityType))
+        {
+            throw new ArgumentException("Entity type must be non-empty.", nameof(entityType));
+        }
+
+        if (entityId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(entityId), "Entity id must be positive.");
+        }
+
+        string endpoint = $"rest/v1/{entityType}/{entityId}/property/calculatedvalue";
+        string requestPath = NormalizeEndpoint(endpoint);
+        string queryString = request?.BuildQueryString() ?? string.Empty;
+
+        return QueryDictionaryAsync<CalculatedPropertyValueDto>(requestPath, queryString, cancellationToken);
     }
 }

@@ -11,11 +11,18 @@ namespace Umea.se.EstateService.Test.TestHelpers;
 public sealed class FakePythagorasClient : IPythagorasClient
 {
     private readonly ConcurrentDictionary<Type, Queue<object>> _results = new();
+    private readonly Queue<IReadOnlyDictionary<int, CalculatedPropertyValueDto>> _calculatedPropertyResults = new();
+    private readonly Queue<UiListDataResponse<BuildingInfo>> _buildingUiListDataResults = new();
+    private readonly Queue<UiListDataResponse<NavigationFolder>> _navigationFolderUiListDataResults = new();
 
     /// <summary>
     /// Captured requests in invocation order.
     /// </summary>
     public List<RequestCapture> Requests { get; } = [];
+
+    public List<CalculatedPropertyRequestCapture> CalculatedPropertyRequests { get; } = [];
+    public List<BuildingUiListDataRequestCapture> BuildingUiListDataRequests { get; } = [];
+    public List<NavigationFolderUiListDataRequestCapture> NavigationFolderUiListDataRequests { get; } = [];
 
     public string? LastEndpoint => Requests.LastOrDefault().Endpoint;
 
@@ -117,6 +124,9 @@ public sealed class FakePythagorasClient : IPythagorasClient
     public Task<IReadOnlyList<Workspace>> GetWorkspacesAsync(PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
         => CaptureAsync("rest/v1/workspace/info", query, cancellationToken);
 
+    public Task<IReadOnlyList<BuildingWorkspace>> GetWorkspaceInfoAsync(PythagorasQuery<BuildingWorkspace>? query = null, CancellationToken cancellationToken = default)
+        => CaptureAsync("rest/v1/workspace/info", query, cancellationToken);
+
     public Task<IReadOnlyList<NavigationFolder>> GetNavigationFoldersAsync(PythagorasQuery<NavigationFolder>? query = null, CancellationToken cancellationToken = default)
         => CaptureAsync("rest/v1/navigationfolder/info", query, cancellationToken);
 
@@ -150,6 +160,12 @@ public sealed class FakePythagorasClient : IPythagorasClient
     {
         _results.Clear();
         Requests.Clear();
+        _calculatedPropertyResults.Clear();
+        CalculatedPropertyRequests.Clear();
+        BuildingUiListDataRequests.Clear();
+        _buildingUiListDataResults.Clear();
+        NavigationFolderUiListDataRequests.Clear();
+        _navigationFolderUiListDataResults.Clear();
     }
 
     /// <summary>
@@ -161,6 +177,59 @@ public sealed class FakePythagorasClient : IPythagorasClient
         object? Query,
         string? QueryString,
         CancellationToken CancellationToken);
+
+    public readonly record struct CalculatedPropertyRequestCapture(
+        string Endpoint,
+        int EntityId,
+        CalculatedPropertyValueRequest? Request,
+        CancellationToken CancellationToken);
+
+    public readonly record struct BuildingUiListDataRequestCapture(
+        BuildingUiListDataRequest Request,
+        CancellationToken CancellationToken);
+
+    public readonly record struct NavigationFolderUiListDataRequestCapture(
+        NavigationFolderUiListDataRequest Request,
+        CancellationToken CancellationToken);
+
+    public void SetCalculatedPropertyValuesResult(IReadOnlyDictionary<int, CalculatedPropertyValueDto> result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        _calculatedPropertyResults.Clear();
+        _calculatedPropertyResults.Enqueue(result);
+    }
+
+    public void SetBuildingUiListDataResponse(UiListDataResponse<BuildingInfo> response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        _buildingUiListDataResults.Clear();
+        _buildingUiListDataResults.Enqueue(response);
+    }
+
+    public void EnqueueBuildingUiListDataResponse(UiListDataResponse<BuildingInfo> response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        _buildingUiListDataResults.Enqueue(response);
+    }
+
+    public void SetNavigationFolderUiListDataResponse(UiListDataResponse<NavigationFolder> response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        _navigationFolderUiListDataResults.Clear();
+        _navigationFolderUiListDataResults.Enqueue(response);
+    }
+
+    public void EnqueueNavigationFolderUiListDataResponse(UiListDataResponse<NavigationFolder> response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        _navigationFolderUiListDataResults.Enqueue(response);
+    }
+
+    public void EnqueueCalculatedPropertyValuesResult(IReadOnlyDictionary<int, CalculatedPropertyValueDto> result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        _calculatedPropertyResults.Enqueue(result);
+    }
     public Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken = default)
     {
         throw new NotSupportedException("SendAsync is not supported by FakePythagorasClient. Use a dedicated fake for blueprint tests.");
@@ -178,13 +247,61 @@ public sealed class FakePythagorasClient : IPythagorasClient
         return OnGetFloorBlueprintAsync(floorId, format, includeWorkspaceTexts, cancellationToken);
     }
 
-    public Task<IReadOnlyDictionary<int, TValue>> GetDictionaryAsync<TValue>(string endpoint, PythagorasQuery<TValue>? query, CancellationToken cancellationToken = default) where TValue : class
-    {
-        throw new NotImplementedException();
-    }
-
     public Task<IReadOnlyDictionary<int, CalculatedPropertyValueDto>> GetBuildingCalculatedPropertyValuesAsync(int buildingId, CalculatedPropertyValueRequest? request = null, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        if (buildingId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
+        }
+
+        return CaptureCalculatedPropertyValuesAsync($"rest/v1/building/{buildingId}/property/calculatedvalue", buildingId, request, cancellationToken);
+    }
+
+    public Task<IReadOnlyDictionary<int, CalculatedPropertyValueDto>> GetCalculatedPropertyValuesForEstateAsync(int estateId, CalculatedPropertyValueRequest? request = null, CancellationToken cancellationToken = default)
+    {
+        if (estateId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(estateId), "Estate id must be positive.");
+        }
+
+        return CaptureCalculatedPropertyValuesAsync($"rest/v1/navigationfolder/{estateId}/property/calculatedvalue", estateId, request, cancellationToken);
+    }
+
+    public Task<UiListDataResponse<BuildingInfo>> PostBuildingUiListDataAsync(BuildingUiListDataRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        BuildingUiListDataRequests.Add(new BuildingUiListDataRequestCapture(request, cancellationToken));
+
+        if (_buildingUiListDataResults.Count > 0)
+        {
+            return Task.FromResult(_buildingUiListDataResults.Dequeue());
+        }
+
+        return Task.FromResult(new UiListDataResponse<BuildingInfo>());
+    }
+
+    public Task<UiListDataResponse<NavigationFolder>> PostNavigationFolderUiListDataAsync(NavigationFolderUiListDataRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        NavigationFolderUiListDataRequests.Add(new NavigationFolderUiListDataRequestCapture(request, cancellationToken));
+
+        if (_navigationFolderUiListDataResults.Count > 0)
+        {
+            return Task.FromResult(_navigationFolderUiListDataResults.Dequeue());
+        }
+
+        return Task.FromResult(new UiListDataResponse<NavigationFolder>());
+    }
+
+    private Task<IReadOnlyDictionary<int, CalculatedPropertyValueDto>> CaptureCalculatedPropertyValuesAsync(string endpoint, int entityId, CalculatedPropertyValueRequest? request, CancellationToken cancellationToken)
+    {
+        CalculatedPropertyRequests.Add(new CalculatedPropertyRequestCapture(endpoint, entityId, request, cancellationToken));
+
+        if (_calculatedPropertyResults.Count > 0)
+        {
+            return Task.FromResult(_calculatedPropertyResults.Dequeue());
+        }
+
+        return Task.FromResult<IReadOnlyDictionary<int, CalculatedPropertyValueDto>>(new Dictionary<int, CalculatedPropertyValueDto>());
     }
 }
