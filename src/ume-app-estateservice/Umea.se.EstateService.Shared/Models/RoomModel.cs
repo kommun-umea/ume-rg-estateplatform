@@ -23,4 +23,6 @@ public sealed class RoomModel : ISearchable
     public AddressModel? Address => null;
     public GeoPointModel? GeoLocation => null;
     public DateTimeOffset UpdatedAt => DateTimeOffset.FromUnixTimeMilliseconds(Updated / 1000);
+
+    public string? FloorPopularName { get; set; }
 }
