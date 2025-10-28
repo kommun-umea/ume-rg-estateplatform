@@ -5,9 +5,7 @@ namespace Umea.se.EstateService.Shared.Infrastructure;
 
 public class ApplicationConfig(IConfiguration configuration) : ApplicationConfigCloudBase(configuration)
 {
-    private readonly IConfiguration _configuration = configuration;
-
     public string PythagorasApiKey => GetValue("Pythagoras-Api-Key");
     public string PythagorasBaseUrl => GetValue("Pythagoras-Base-Url");
-    public bool ExcludeRoomsFromSearchIndex => _configuration.GetValue("SearchIndex:ExcludeRooms", false);
+    public bool ExcludeRoomsFromSearchIndex => TryGetBool("SearchIndex:ExcludeRooms") ?? true;
 }
