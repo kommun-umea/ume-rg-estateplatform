@@ -1,13 +1,19 @@
-﻿using Umea.se.EstateService.Logic.Interfaces;
+﻿using System.Linq;
+using Microsoft.Extensions.Options;
+using Umea.se.EstateService.Logic.Interfaces;
+using Umea.se.EstateService.Logic.Options;
 using Umea.se.EstateService.Logic.Search;
 using Umea.se.EstateService.Shared.Autocomplete;
 using Umea.se.EstateService.Shared.Search;
 
 namespace Umea.se.EstateService.Logic.Handlers;
 
-public class SearchHandler(IPythagorasDocumentProvider documentProvider)
+public class SearchHandler(
+    IPythagorasDocumentProvider documentProvider,
+    IOptions<SearchOptions> searchOptions)
 {
     private readonly IPythagorasDocumentProvider _documentProvider = documentProvider;
+    private readonly bool _excludeRooms = searchOptions.Value.ExcludeRooms;
     private readonly SemaphoreSlim _indexLock = new(1, 1);
     private InMemorySearchService? _searchService;
 
@@ -67,7 +73,11 @@ public class SearchHandler(IPythagorasDocumentProvider documentProvider)
     private async Task<InMemorySearchService> BuildSearchServiceAsync(CancellationToken _)
     {
         ICollection<PythagorasDocument> documents = await _documentProvider.GetDocumentsAsync().ConfigureAwait(false);
-        InMemorySearchService service = new(documents);
+        IEnumerable<PythagorasDocument> documentsToIndex = _excludeRooms
+            ? documents.Where(static doc => doc.Type != NodeType.Room)
+            : documents;
+
+        InMemorySearchService service = new(documentsToIndex);
         _searchService = service;
         return service;
     }
