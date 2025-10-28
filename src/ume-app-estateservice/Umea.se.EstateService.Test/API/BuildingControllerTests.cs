@@ -76,14 +76,16 @@ public class BuildingControllerTests : ControllerTestCloud<TestApiFactory, Progr
         HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Buildings}/1/rooms");
         response.EnsureSuccessStatusCode();
 
-        IReadOnlyList<BuildingRoomModel>? result = await response.Content.ReadFromJsonAsync<IReadOnlyList<BuildingRoomModel>>();
+        IReadOnlyList<RoomModel>? result = await response.Content.ReadFromJsonAsync<IReadOnlyList<RoomModel>>();
         result.ShouldNotBeNull();
 
-        BuildingRoomModel room = result.ShouldHaveSingleItem();
+        RoomModel room = result.ShouldHaveSingleItem();
         room.Id.ShouldBe(10);
         string query = _fakeClient.LastQueryString.ShouldNotBeNull();
-        query.ShouldContain("maxResults=50");
-        query.ShouldContain("buildingId=1");
+        string decodedQuery = Uri.UnescapeDataString(query);
+        decodedQuery.ShouldContain("maxResults=50");
+        decodedQuery.ShouldContain("pN[]=EQ:buildingId");
+        decodedQuery.ShouldContain("pV[]=1");
         _fakeClient.LastEndpoint.ShouldBe("rest/v1/workspace/info");
     }
 

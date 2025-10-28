@@ -70,11 +70,11 @@ public class PythagorasClientTests
 
         PythagorasQuery<Workspace> query = new PythagorasQuery<Workspace>()
             .WithIds(25)
-            .WithQueryParameter("buildingId", 10);
+            .Where(workspace => workspace.BuildingId, 10);
 
         await client.GetWorkspacesAsync(query);
 
-        handler.LastRequest.ShouldNotBeNull().RequestUri!.ToString().ShouldBe("https://example.org/rest/v1/workspace/info?id%5B%5D=25&buildingId=10");
+        handler.LastRequest.ShouldNotBeNull().RequestUri!.ToString().ShouldBe("https://example.org/rest/v1/workspace/info?id%5B%5D=25&pN%5B%5D=EQ%3AbuildingId&pV%5B%5D=10");
     }
 
     [Fact]

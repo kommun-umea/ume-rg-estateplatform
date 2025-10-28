@@ -118,9 +118,9 @@ public class BuildingController(IPythagorasHandler pythagorasService, ILogger<Bu
         Summary = "Get rooms for a building",
         Description = "Retrieves rooms for the specified building using the shared query parameters."
     )]
-    [SwaggerResponse(StatusCodes.Status200OK, "List of rooms for the building", typeof(IReadOnlyList<BuildingRoomModel>))]
+    [SwaggerResponse(StatusCodes.Status200OK, "List of rooms for the building", typeof(IReadOnlyList<RoomModel>))]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid buildingId")]
-    public async Task<ActionResult<IReadOnlyList<BuildingRoomModel>>> GetBuildingRoomsAsync(
+    public async Task<ActionResult<IReadOnlyList<RoomModel>>> GetBuildingRoomsAsync(
         int buildingId,
         [FromQuery] BuildingRoomsRequest request,
         CancellationToken cancellationToken)
@@ -134,7 +134,7 @@ public class BuildingController(IPythagorasHandler pythagorasService, ILogger<Bu
             query = query.Where(workspace => workspace.FloorId, floorId);
         }
 
-        IReadOnlyList<BuildingRoomModel> rooms = await pythagorasService
+        IReadOnlyList<RoomModel> rooms = await pythagorasService
             .GetBuildingWorkspacesAsync(buildingId, query, cancellationToken)
             .ConfigureAwait(false);
 

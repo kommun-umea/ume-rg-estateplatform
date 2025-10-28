@@ -7,9 +7,9 @@ namespace Umea.se.EstateService.Test.Pythagoras;
 public class PythagorasWorkspaceMapperTests
 {
     [Fact]
-    public void ToBuildingModel_Workspace_CopiesCoreFields()
+    public void ToModel_Workspace_CopiesCoreFields()
     {
-        Workspace dto = new()
+        BuildingWorkspace dto = new()
         {
             Id = 1,
             Uid = Guid.NewGuid(),
@@ -36,7 +36,7 @@ public class PythagorasWorkspaceMapperTests
             BuildingOrigin = "Origin"
         };
 
-        BuildingRoomModel model = PythagorasWorkspaceMapper.ToBuildingModel(dto);
+        RoomModel model = PythagorasWorkspaceMapper.ToModel(dto);
 
         model.Id.ShouldBe(dto.Id);
         model.Name.ShouldBe(dto.Name);

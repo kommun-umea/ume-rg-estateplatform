@@ -28,7 +28,7 @@ public class RoomController(IPythagorasHandler pythagorasHandler) : ControllerBa
         Summary = "Get room",
         Description = "Retrieves a single room"
     )]
-    [SwaggerResponse(StatusCodes.Status200OK, "The requested room.", typeof(RoomDetailsModel))]
+    [SwaggerResponse(StatusCodes.Status200OK, "The requested room.", typeof(RoomModel))]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Room not found.")]
     public async Task<ActionResult<RoomModel>> GetRoomAsync(int roomId, [FromQuery] RoomDetailsRequest request, CancellationToken cancellationToken)
     {
@@ -84,7 +84,7 @@ public class RoomController(IPythagorasHandler pythagorasHandler) : ControllerBa
 
         if (request.BuildingId is int buildingId)
         {
-            query = query.WithQueryParameter("buildingId", buildingId);
+            query = query.Where(workspace => workspace.BuildingId, buildingId);
         }
 
         return query;

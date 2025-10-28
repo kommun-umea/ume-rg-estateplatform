@@ -9,7 +9,7 @@ public interface IPythagorasHandler
 {
     Task<IReadOnlyList<EstateModel>> GetEstatesWithBuildingsAsync(PythagorasQuery<NavigationFolder>? query = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<BuildingInfoModel>> GetBuildingsAsync(PythagorasQuery<BuildingInfo>? query = null, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<BuildingRoomModel>> GetBuildingWorkspacesAsync(int buildingId, PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<RoomModel>> GetBuildingWorkspacesAsync(int buildingId, PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<FloorInfoModel>> GetBuildingFloorsAsync(int buildingId, PythagorasQuery<Floor>? floorQuery = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<FloorInfoModel>> GetBuildingFloorsWithRoomsAsync(int buildingId, PythagorasQuery<Floor>? floorQuery = null, PythagorasQuery<Workspace>? workspaceQuery = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<BuildingAscendantModel>> GetBuildingAscendantsAsync(int buildingId, CancellationToken cancellationToken = default);

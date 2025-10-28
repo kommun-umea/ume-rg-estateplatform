@@ -248,7 +248,7 @@ public class FloorBlueprintServiceTests
             throw new NotImplementedException();
         }
 
-        public Task<IReadOnlyList<BuildingRoomModel>> GetBuildingWorkspacesAsync(int buildingId, PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
+        public Task<IReadOnlyList<RoomModel>> GetBuildingWorkspacesAsync(int buildingId, PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
         {
             throw new NotImplementedException();
         }

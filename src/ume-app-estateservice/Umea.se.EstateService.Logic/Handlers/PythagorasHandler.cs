@@ -95,17 +95,17 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         return PythagorasBuildingInfoMapper.ToModel(payload[0], extendedProperties);
     }
 
-    public async Task<IReadOnlyList<BuildingRoomModel>> GetBuildingWorkspacesAsync(int buildingId, PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<RoomModel>> GetBuildingWorkspacesAsync(int buildingId, PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
     {
         ValidatePositiveId(buildingId, nameof(buildingId));
         PythagorasQuery<Workspace> effectiveQuery = (query ?? new PythagorasQuery<Workspace>())
-            .WithQueryParameter("buildingId", buildingId);
+            .Where(workspace => workspace.BuildingId, buildingId);
 
         IReadOnlyList<Workspace> payload = await pythagorasClient
             .GetWorkspacesAsync(effectiveQuery, cancellationToken)
             .ConfigureAwait(false);
 
-        return PythagorasWorkspaceMapper.ToBuildingModel(payload);
+        return PythagorasWorkspaceMapper.ToModel(payload);
     }
 
     public async Task<IReadOnlyList<BuildingAscendantModel>> GetBuildingAscendantsAsync(int buildingId, CancellationToken cancellationToken = default)
@@ -150,13 +150,13 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
             }
 
             PythagorasQuery<Workspace> floorQueryWithFilter = (workspaceQuery ?? new PythagorasQuery<Workspace>())
-                .WithQueryParameter("floorId", floor.Id);
+                .Where(workspace => workspace.FloorId, floor.Id);
 
             IReadOnlyList<Workspace> workspaceDtos = await pythagorasClient
                 .GetWorkspacesAsync(floorQueryWithFilter, cancellationToken)
                 .ConfigureAwait(false);
 
-            IReadOnlyList<BuildingRoomModel> rooms = PythagorasWorkspaceMapper.ToBuildingModel(workspaceDtos);
+            IReadOnlyList<RoomModel> rooms = PythagorasWorkspaceMapper.ToModel(workspaceDtos);
             return PythagorasFloorInfoMapper.ToModel(floor, rooms);
         });
 

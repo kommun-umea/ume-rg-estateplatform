@@ -5,7 +5,7 @@ namespace Umea.se.EstateService.Logic.Mappers;
 
 public static class PythagorasFloorInfoMapper
 {
-    public static FloorInfoModel ToModel(Floor dto, IReadOnlyList<BuildingRoomModel>? rooms = null)
+    public static FloorInfoModel ToModel(Floor dto, IReadOnlyList<RoomModel>? rooms = null)
     {
         ArgumentNullException.ThrowIfNull(dto);
 

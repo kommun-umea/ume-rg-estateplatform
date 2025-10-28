@@ -20,5 +20,5 @@ public sealed class FloorInfoModel
     public string? BuildingPopularName { get; init; }
     public string? BuildingOrigin { get; init; }
     public int NumPlacedPersons { get; init; }
-    public IReadOnlyList<BuildingRoomModel>? Rooms { get; init; }
+    public IReadOnlyList<RoomModel>? Rooms { get; init; }
 }
