@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Text;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
@@ -290,8 +292,7 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
     }
 
     private static string FormQueryParameter(string name, string value) => $"{Uri.EscapeDataString(name)}={Uri.EscapeDataString(value)}";
-
-    public Task<HttpResponseMessage> GetFloorBlueprintAsync(int floorId, BlueprintFormat format, bool includeWorkspaceTexts, CancellationToken cancellationToken = default)
+    public Task<HttpResponseMessage> GetFloorBlueprintAsync(int floorId, BlueprintFormat format, IDictionary<int, IReadOnlyList<string>>? workspaceTexts, CancellationToken cancellationToken = default)
     {
         if (floorId <= 0)
         {
@@ -300,6 +301,11 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
 
         string endpoint = $"rest/v1/floor/{floorId}/gmodel/print/{FormatToSegment(format)}";
         FloorBlueprintRequestPayload payload = FloorBlueprintRequestPayload.CreateDefault();
+
+        if (workspaceTexts is not null)
+        {
+            payload = payload.WithWorkspaceTexts(workspaceTexts);
+        }
 
         HttpRequestMessage request = new(HttpMethod.Post, endpoint)
         {

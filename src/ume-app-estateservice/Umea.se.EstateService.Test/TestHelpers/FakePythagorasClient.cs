@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
@@ -231,16 +232,20 @@ public sealed class FakePythagorasClient : IPythagorasClient
         _calculatedPropertyResults.Enqueue(result);
     }
 
-    public Func<int, BlueprintFormat, bool, CancellationToken, Task<HttpResponseMessage>>? OnGetFloorBlueprintAsync { get; set; }
+    public Func<int, BlueprintFormat, IDictionary<int, IReadOnlyList<string>>?, CancellationToken, Task<HttpResponseMessage>>? OnGetFloorBlueprintAsync { get; set; }
 
-    public Task<HttpResponseMessage> GetFloorBlueprintAsync(int floorId, BlueprintFormat format, bool includeWorkspaceTexts, CancellationToken cancellationToken = default)
+    public Task<HttpResponseMessage> GetFloorBlueprintAsync(
+        int floorId,
+        BlueprintFormat format,
+        IDictionary<int, IReadOnlyList<string>>? workspaceTexts,
+        CancellationToken cancellationToken = default)
     {
         if (OnGetFloorBlueprintAsync is null)
         {
             throw new NotSupportedException("Configure OnGetFloorBlueprintAsync before calling this method.");
         }
 
-        return OnGetFloorBlueprintAsync(floorId, format, includeWorkspaceTexts, cancellationToken);
+        return OnGetFloorBlueprintAsync(floorId, format, workspaceTexts, cancellationToken);
     }
 
     public Task<IReadOnlyDictionary<int, CalculatedPropertyValueDto>> GetBuildingCalculatedPropertyValuesAsync(int buildingId, CalculatedPropertyValueRequest? request = null, CancellationToken cancellationToken = default)
