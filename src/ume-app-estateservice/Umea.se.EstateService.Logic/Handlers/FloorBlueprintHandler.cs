@@ -51,7 +51,7 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IP
             {
                 workspaceTexts = rooms.ToDictionary(
                     static room => room.Id,
-                    static room => (IReadOnlyList<string>)[room.Name ?? string.Empty]);
+                    static room => (IReadOnlyList<string>)[ResolveWorkspaceText(room)]);
 
                 _logger.LogInformation("Found {Count} rooms to include in blueprint for floor {FloorId}.", rooms.Count, floorId);
             }
@@ -152,6 +152,21 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IP
         }
 
         return $"{fileName}.{FormatToExtension(format)}";
+    }
+
+    private static string ResolveWorkspaceText(RoomModel room)
+    {
+        if (!string.IsNullOrWhiteSpace(room.PopularName))
+        {
+            return room.PopularName!;
+        }
+
+        if (!string.IsNullOrWhiteSpace(room.Name))
+        {
+            return room.Name;
+        }
+
+        return string.Empty;
     }
 
     private static string TryResolveFileName(ContentDispositionHeaderValue? header)

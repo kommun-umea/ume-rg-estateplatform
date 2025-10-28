@@ -134,7 +134,7 @@ public class FloorBlueprintServiceTests
             {
                 RoomModel[] rooms =
                 [
-                    new() { Id = 5, Name = "Alpha" },
+                    new() { Id = 5, Name = "Alpha", PopularName = "Popular Alpha" },
                     new() { Id = 6, Name = "Beta" }
                 ];
 
@@ -150,7 +150,7 @@ public class FloorBlueprintServiceTests
         capturedTexts.ShouldNotBeNull();
         capturedTexts!.ShouldContainKey(5);
         capturedTexts.ShouldContainKey(6);
-        capturedTexts[5].ShouldBe(["Alpha"]);
+        capturedTexts[5].ShouldBe(["Popular Alpha"]);
         capturedTexts[6].ShouldBe(["Beta"]);
 
         handler.CapturedRoomsQuery.ShouldNotBeNull();
