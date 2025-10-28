@@ -43,7 +43,6 @@ public class PythagorasWorkspaceMapperTests
         BuildingRoomModel model = PythagorasWorkspaceMapper.ToModel(dto);
 
         model.Id.ShouldBe(dto.Id);
-        model.Uid.ShouldBe(dto.Uid);
         model.Name.ShouldBe(dto.Name);
         model.PopularName.ShouldBe(dto.PopularName);
         model.GrossArea.ShouldBe(dto.GrossArea);

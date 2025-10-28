@@ -3,7 +3,6 @@ namespace Umea.se.EstateService.Shared.Models;
 public sealed class BuildingRoomModel
 {
     public int Id { get; init; }
-    public Guid Uid { get; init; }
     public long Created { get; init; }
     public long Updated { get; init; }
     public string Name { get; init; } = string.Empty;
@@ -15,11 +14,9 @@ public sealed class BuildingRoomModel
     public int Capacity { get; init; }
     public int OptimalCapacity { get; init; }
     public int? FloorId { get; init; }
-    public Guid? FloorUid { get; init; }
     public string? FloorName { get; init; }
     public string? FloorPopularName { get; init; }
     public int BuildingId { get; init; }
-    public Guid BuildingUid { get; init; }
     public string BuildingName { get; init; } = string.Empty;
     public string? BuildingPopularName { get; init; }
 

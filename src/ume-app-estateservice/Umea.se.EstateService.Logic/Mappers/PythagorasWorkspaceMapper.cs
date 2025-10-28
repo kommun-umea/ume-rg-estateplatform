@@ -12,7 +12,6 @@ public static class PythagorasWorkspaceMapper
         return new BuildingRoomModel
         {
             Id = dto.Id,
-            Uid = dto.Uid,
             Created = dto.Created,
             Updated = dto.Updated,
             Name = dto.Name ?? string.Empty,
@@ -24,11 +23,9 @@ public static class PythagorasWorkspaceMapper
             Capacity = dto.Capacity,
             OptimalCapacity = dto.OptimalCapacity,
             FloorId = dto.FloorId,
-            FloorUid = dto.FloorUid,
             FloorName = dto.FloorName,
             FloorPopularName = dto.FloorPopularName,
             BuildingId = dto.BuildingId,
-            BuildingUid = dto.BuildingUid,
             BuildingName = dto.BuildingName ?? string.Empty,
             BuildingPopularName = dto.BuildingPopularName,
         };
@@ -59,7 +56,6 @@ public static class PythagorasWorkspaceMapper
         return new RoomModel
         {
             Id = dto.Id,
-            Uid = dto.Uid,
             Version = dto.Version,
             Created = dto.Created,
             Updated = dto.Updated,
@@ -68,9 +64,10 @@ public static class PythagorasWorkspaceMapper
             GrossArea = dto.GrossArea,
             NetArea = dto.NetArea,
             CommonArea = dto.CommonArea,
-
+            FloorId = dto.FloorId,
+            FloorName = dto.FloorName,
+            FloorPopularName = dto.PopularName,
             BuildingId = dto.BuildingId,
-            BuildingUid = dto.BuildingUid,
             BuildingName = dto.BuildingName,
             BuildingPopularName = dto.BuildingPopularName,
         };

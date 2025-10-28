@@ -6,7 +6,6 @@ namespace Umea.se.EstateService.Shared.Models;
 public sealed class RoomModel : ISearchable
 {
     public int Id { get; init; }
-    public Guid Uid { get; init; }
     public int Version { get; init; }
     public long Created { get; init; }
     public long Updated { get; init; }
@@ -15,11 +14,11 @@ public sealed class RoomModel : ISearchable
     public double GrossArea { get; init; }
     public double NetArea { get; init; }
     public double CommonArea { get; init; }
-
     public int? BuildingId { get; init; }
-    public Guid? BuildingUid { get; init; }
     public string? BuildingName { get; init; }
     public string? BuildingPopularName { get; set; }
+    public int? FloorId { get; init; }
+    public string? FloorName { get; init; }
 
     public AddressModel? Address => null;
     public GeoPointModel? GeoLocation => null;
