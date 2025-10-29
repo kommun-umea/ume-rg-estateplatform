@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Net.Http.Headers;
 using Microsoft.Extensions.Logging.Abstractions;
 using Umea.se.EstateService.API.Controllers;
 using Umea.se.EstateService.API.Controllers.Requests;
@@ -71,6 +73,10 @@ public class FloorControllerTests
         };
 
         FloorController controller = new(service, new StubPythagorasHandler(), NullLogger<FloorController>.Instance);
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
 
         IActionResult result = await controller.GetFloorBlueprintAsync(
             10,
@@ -80,6 +86,39 @@ public class FloorControllerTests
         FileStreamResult fileResult = result.ShouldBeOfType<FileStreamResult>();
         fileResult.ContentType.ShouldBe("application/pdf");
         fileResult.FileDownloadName.ShouldBe("floor.pdf");
+        controller.Response.Headers[HeaderNames.CacheControl].ToString().ShouldBe("public, max-age=86400");
+    }
+
+    [Fact]
+    public async Task GetFloorBlueprintAsync_ForSvg_ReturnsFileWithName()
+    {
+        StubFloorBlueprintService service = new()
+        {
+            OnGetBlueprintAsync = (_, _, _, _) =>
+            {
+                MemoryStream stream = new([1, 2]);
+                FloorBlueprint blueprint = new(stream, "image/svg+xml", "floor.svg");
+                return Task.FromResult(blueprint);
+            }
+        };
+
+        FloorController controller = new(service, new StubPythagorasHandler(), NullLogger<FloorController>.Instance)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+
+        IActionResult result = await controller.GetFloorBlueprintAsync(
+            7,
+            new FloorBlueprintRequest { Format = BlueprintFormat.Svg },
+            CancellationToken.None);
+
+        FileStreamResult fileResult = result.ShouldBeOfType<FileStreamResult>();
+        fileResult.ContentType.ShouldBe("image/svg+xml");
+        fileResult.FileDownloadName.ShouldBe("floor.svg");
+        controller.Response.Headers[HeaderNames.CacheControl].ToString().ShouldBe("public, max-age=86400");
     }
 
     [Fact]
@@ -116,6 +155,32 @@ public class FloorControllerTests
 
         ObjectResult objectResult = result.ShouldBeOfType<ObjectResult>();
         objectResult.StatusCode.ShouldBe(StatusCodes.Status502BadGateway);
+    }
+
+    [Fact]
+    public async Task GetFloorBlueprintAsync_WhenServiceReportsMissingBlueprint_Returns404()
+    {
+        StubFloorBlueprintService service = new()
+        {
+            OnGetBlueprintAsync = (_, _, _, _) => throw new KeyNotFoundException("missing")
+        };
+
+        FloorController controller = new(service, new StubPythagorasHandler(), NullLogger<FloorController>.Instance)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+
+        IActionResult result = await controller.GetFloorBlueprintAsync(
+            42,
+            new FloorBlueprintRequest { Format = BlueprintFormat.Svg },
+            CancellationToken.None);
+
+        NotFoundObjectResult objectResult = result.ShouldBeOfType<NotFoundObjectResult>();
+        ProblemDetails problem = objectResult.Value.ShouldBeOfType<ProblemDetails>();
+        problem.Status.ShouldBe(StatusCodes.Status404NotFound);
     }
 
     private sealed class StubFloorBlueprintService : IFloorBlueprintService

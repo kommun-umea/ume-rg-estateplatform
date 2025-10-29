@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Net.Http.Headers;
 using Swashbuckle.AspNetCore.Annotations;
 using Umea.se.EstateService.API.Controllers.Requests;
 using Umea.se.EstateService.Logic.Exceptions;
@@ -94,6 +95,13 @@ public sealed class FloorController(
         {
             FloorBlueprint blueprint = await _blueprintService.GetBlueprintAsync(floorId, request.Format, request.IncludeWorkspaceTexts, cancellationToken).ConfigureAwait(false);
             blueprint.Content.Position = 0;
+
+            Response.GetTypedHeaders().CacheControl = new CacheControlHeaderValue
+            {
+                Public = true,
+                MaxAge = TimeSpan.FromHours(24)
+            };
+
             return File(blueprint.Content, blueprint.ContentType, blueprint.FileName);
         }
         catch (FloorBlueprintValidationException ex)

@@ -92,6 +92,7 @@ public class FloorBlueprintServiceTests
         FloorBlueprint result = await fbHandler.GetBlueprintAsync(11, BlueprintFormat.Svg, includeWorkspaceTexts: false);
 
         result.FileName.ShouldBe("floor.svg");
+        result.ContentType.ShouldBe("image/svg+xml");
     }
 
     [Fact]

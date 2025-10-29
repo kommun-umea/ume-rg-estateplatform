@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
@@ -79,7 +80,22 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IP
             if (!response.IsSuccessStatusCode)
             {
                 string errorDescription = await ReadErrorBodyAsync(response, cancellationToken).ConfigureAwait(false);
-                _logger.LogWarning("Blueprint request returned {StatusCode} for floor {FloorId}. Body: {Body}", (int)response.StatusCode, floorId, errorDescription);
+
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                {
+                    _logger.LogWarning(
+                        "Blueprint not found for floor {FloorId} in Pythagoras. Body: {Body}",
+                        floorId,
+                        errorDescription);
+
+                    throw new KeyNotFoundException($"Blueprint for floor {floorId} was not found.");
+                }
+
+                _logger.LogWarning(
+                    "Blueprint request returned {StatusCode} for floor {FloorId}. Body: {Body}",
+                    (int)response.StatusCode,
+                    floorId,
+                    errorDescription);
 
                 string reason = string.IsNullOrWhiteSpace(response.ReasonPhrase)
                     ? response.StatusCode.ToString()
@@ -106,7 +122,7 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IP
                 }
             }
 
-            string contentType = response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
+            string contentType = ResolveContentType(format, response.Content.Headers.ContentType?.MediaType);
             string resolvedFileName = TryResolveFileName(response.Content.Headers.ContentDisposition);
             string fileName = EnsureFileName(resolvedFileName, floorId, format);
 
@@ -224,5 +240,16 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IP
         }
 
         return $"{singleLine[..maxLength]}…";
+    }
+
+    private static string ResolveContentType(BlueprintFormat format, string? fallback)
+    {
+        return format switch
+        {
+            BlueprintFormat.Pdf => "application/pdf",
+            BlueprintFormat.Svg => "image/svg+xml",
+            _ when !string.IsNullOrWhiteSpace(fallback) => fallback!,
+            _ => "application/octet-stream"
+        };
     }
 }
