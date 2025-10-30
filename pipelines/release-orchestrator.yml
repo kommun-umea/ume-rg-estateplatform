@@ -1,9 +1,11 @@
 name: $(buildName)_$(Date:yyyy-MM-ddTHH.mm.ss)
 
+pr: none
+
 trigger:
   branches:
     include:
-      - kv/14992-autoreleasepipeline //TODO: set to main when done testing
+      - kv/14992-autoreleasepipeline #TODO: set to main when done testing
 
 pool:
   vmImage: ubuntu-latest
@@ -24,7 +26,7 @@ variables:
       mainBranch: kv/14992-autoreleasepipeline #TODO: ta bort denna när det ska mergas till main
 
 stages:
-  - stage: PrintVariablesStage # TODO: Remove
+  - stage: PrintVariablesStage # TODO: Remove this stagepart when merging to main
     displayName: Print Variables
     jobs:
       - job: PrintVariablesJob
@@ -34,7 +36,7 @@ stages:
           - script: |
               printenv | sort
             displayName: Print Variables
-            
+
   - template: pipelines/release/template-release-orchestrator.yml@templates
     parameters:
       templateRepoAlias: templates

@@ -1,5 +1,7 @@
 name: $(buildName)_$(Date:yyyy-MM-ddTHH.mm.ss)
 
+pr: none
+
 trigger: none
 
 pool:
