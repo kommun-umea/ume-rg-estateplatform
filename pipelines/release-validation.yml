@@ -2,6 +2,11 @@ name: $(buildName)_$(Date:yyyy-MM-ddTHH.mm.ss)
 
 # This pipeline is triggered by DevOps Build Validation feature
 # Project Settings > Repositories > [repo] > Policies > [branch] > Build Validation
+pr:
+  branches:
+    include:
+      - kv/14992-autoreleasepipeline #TODO: set to main when done testing
+
 trigger: none
 
 pool:
