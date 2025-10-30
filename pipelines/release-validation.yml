@@ -5,7 +5,7 @@ name: $(buildName)_$(Date:yyyy-MM-ddTHH.mm.ss)
 pr:
   branches:
     include:
-      - main
+      - kv/14992-autoreleasepipeline #TODO: set to main when done testing
 
 trigger: none
 
