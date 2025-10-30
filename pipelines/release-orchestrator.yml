@@ -1,0 +1,30 @@
+name: $(buildName)_$(Date:yyyy-MM-ddTHH.mm.ss)
+
+trigger:
+  branches:
+    include:
+      - kv/14992-autoreleasepipeline //TODO: set to main when done testing
+
+pool:
+  vmImage: ubuntu-latest
+
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: Turkos/ume-pipeline-templates
+      ref: refs/tags/release/v251002T1332-14281
+
+variables:
+  - template: pipelines/general/template-default-pipeline-variables.yml@templates
+    parameters:
+      environment: dev #TODO: set to prod when done testing
+  - template: pipelines/release/template-release-orchestrator-variables.yml@templates
+    parameters:
+      mainBranch: kv/14992-autoreleasepipeline #TODO: ta bort denna när det ska mergas till main
+
+stages:
+  - template: pipelines/release/template-release-orchestrator.yml@templates
+    parameters:
+      templateRepoAlias: templates
+      environment: $(environment)

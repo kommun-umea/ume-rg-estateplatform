@@ -1,14 +1,6 @@
-# branchName_environment_YYYY-MM-DD_HH.MM.SS
-name: ${{ replace(replace(variables['Build.SourceBranch'], 'refs/heads/', ''), '/', '') }}_${{ parameters.environment }}_$(Date:yyyy-MM-dd_HH.mm.ss)
+name: $(buildName)_$(Date:yyyy-MM-ddTHH.mm.ss)
 
-pr: none
-trigger:
-  branches:
-    include:
-      - main
-  paths:
-    include:
-      - src
+trigger: none
 
 pool:
   vmImage: ubuntu-latest
@@ -18,7 +10,7 @@ resources:
     - repository: templates
       type: git
       name: Turkos/ume-pipeline-templates
-      ref: release/v250903
+      ref: refs/tags/release/v251002T1332-14281
 
 parameters:
   - name: environment
@@ -36,17 +28,28 @@ parameters:
     default: false
 
 variables:
-  - ${{ if eq(parameters.environment, 'prod') }}:
-      - name: serviceConnection
-        value: Ume_ServiceConnection_Prod-Turkos
-  - ${{ if eq(parameters.environment, 'test') }}:
-      - name: serviceConnection
-        value: Ume_ServiceConnection_Test-Turkos
-  - ${{ if eq(parameters.environment, 'dev') }}:
-      - name: serviceConnection
-        value: Ume_ServiceConnection_Dev-Turkos
+  - template: pipelines/general/template-default-pipeline-variables.yml@templates
+    parameters:
+      environment: ${{ parameters.environment }}
+
+  - name: isAutomatedDeployment
+    value: $[ eq(variables['Build.RequestedFor'], 'Project Collection Build Service (umeakommun)') ]
+
+  - group: ume-rg-estateplatform-${{ parameters.environment }}
 
 stages:
+  - stage: ValidateRequestStage
+    displayName: Validate Request
+    jobs:
+      - template: pipelines/general/template-fail-on-condition.yml@templates
+        parameters:
+          failCondition: >-
+            and(
+              eq('${{ parameters.environment }}', 'prod'),
+              not(startsWith(variables['Build.SourceBranch'], 'refs/tags/release/'))
+            )
+          errorMessage: Manual deployments to prod are only allowed from release tags.
+
   - stage: CheckForChangesStage
     displayName: Check for changes
     jobs:
@@ -60,15 +63,19 @@ stages:
     displayName: Build EstateService
     dependsOn: CheckForChangesStage
     variables:
-      changedPaths: $[ dependencies.CheckForChangesStage.outputs['Job.Task.changedPaths'] ]
-    condition: |
+      changedPaths: $[ dependencies.CheckForChangesStage.outputs['Job.Task.CHANGED_PATHS'] ]
+    condition: >-
       and(
         not(or(failed(), canceled())),
         or(
           eq(${{ parameters.buildAndDeployEstateServiceJobPicker }}, true),
           and(
-            eq(variables['Build.Reason'], 'IndividualCI'),
-            contains(variables['changedPaths'], 'ume-app-estateservice')
+            contains(variables['changedPaths'],
+            'ume-app-estateservice'),
+            or(
+              eq(variables['Build.Reason'], 'IndividualCI'),
+              eq(variables['isAutomatedDeployment'], true)
+            )
           )
         )
       )
