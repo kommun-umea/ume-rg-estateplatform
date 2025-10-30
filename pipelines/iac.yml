@@ -1,7 +1,5 @@
-# branchName_environment_YYYY-MM-DD_HH.MM.SS
-name: ${{ replace(replace(variables['Build.SourceBranch'], 'refs/heads/', ''), '/', '') }}_${{ parameters.environment }}_$(Date:yyyy-MM-dd_HH.mm.ss)
+name: $(buildName)_$(Date:yyyy-MM-ddTHH.mm.ss)
 
-pr: none
 trigger:
   branches:
     include:
@@ -41,15 +39,9 @@ parameters:
     default: false
 
 variables:
-  - ${{ if eq(parameters.environment, 'prod') }}:
-      - name: serviceConnection
-        value: Ume_ServiceConnection_Prod-Turkos
-  - ${{ if eq(parameters.environment, 'test') }}:
-      - name: serviceConnection
-        value: Ume_ServiceConnection_Test-Turkos
-  - ${{ if eq(parameters.environment, 'dev') }}:
-      - name: serviceConnection
-        value: Ume_ServiceConnection_Dev-Turkos
+  - template: pipelines/general/template-default-pipeline-variables.yml@templates
+    parameters:
+      environment: ${{ parameters.environment }}
 
   - name: resourceGroup
     value: ume-rg-estateplatform-${{ parameters.environment }}
