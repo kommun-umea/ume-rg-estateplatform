@@ -12,7 +12,8 @@ resources:
     - repository: templates
       type: git
       name: Turkos/ume-pipeline-templates
-      ref: refs/tags/release/v251002T1332-14281
+      ref: refs/tags/release/v251002T1332-14281 #ÄNDRA DENNA TILL EN EGEN FÖR GITHUB TEMPLATES. GÄller för alla ställen där denna refereras in
+
 
 parameters:
   - name: environment
