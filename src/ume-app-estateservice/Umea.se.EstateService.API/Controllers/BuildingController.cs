@@ -42,7 +42,7 @@ public class BuildingController(IPythagorasHandler pythagorasService, IIndexedPy
         }
 
         BuildingInfoModel? building = await pythagorasService
-            .GetBuildingByIdAsync(buildingId, BuildingIncludeOptions.Ascendants, cancellationToken)
+            .GetBuildingByIdAsync(buildingId, BuildingIncludeOptions.Ascendants | BuildingIncludeOptions.ExtendedProperties, cancellationToken)
             .ConfigureAwait(false);
 
         if (building is null)
