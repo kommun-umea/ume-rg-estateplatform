@@ -1,4 +1,3 @@
-using Shouldly;
 using Umea.se.EstateService.Logic.Search;
 
 namespace Umea.se.EstateService.Test.Search;

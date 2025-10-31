@@ -1,7 +1,3 @@
-using System;
-using System.IO;
-using System.Net.Http;
-
 namespace Umea.se.EstateService.Shared.Models;
 
 public sealed class BuildingImageResult : IDisposable, IAsyncDisposable
