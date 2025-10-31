@@ -1,6 +1,4 @@
 using Umea.se.EstateService.Logic.Interfaces;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Interfaces;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.EstateService.Shared.Search;
@@ -23,7 +21,7 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
     private async Task<IReadOnlyDictionary<int, BuildingInfoModel>> LoadBuildingInfosAsync()
     {
         IReadOnlyList<BuildingInfoModel> buildings = await pythagorasHandler
-            .GetBuildingsWithPropertiesAsync(cancellationToken: default)
+            .GetBuildingsAsync(buildingIds: null, estateId: null, includeOptions: ServiceAccess.Pythagoras.Enum.BuildingIncludeOptions.ExtendedProperties, queryArgs: null, cancellationToken: default)
             .ConfigureAwait(false);
         if (buildings.Count == 0)
         {
@@ -87,9 +85,7 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
     {
         ArgumentNullException.ThrowIfNull(workspaceStats);
 
-        PythagorasQuery<Workspace> query = new();
-
-        IReadOnlyList<RoomModel> workspaces = await pythagorasHandler.GetRoomsAsync(query).ConfigureAwait(false);
+        IReadOnlyList<RoomModel> workspaces = await pythagorasHandler.GetRoomsAsync().ConfigureAwait(false);
 
         foreach (RoomModel workspace in workspaces)
         {

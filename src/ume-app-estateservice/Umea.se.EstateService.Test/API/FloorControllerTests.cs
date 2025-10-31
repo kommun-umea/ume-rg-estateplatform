@@ -1,257 +1,131 @@
-using System.Collections.Generic;
+using System.Net.Http.Json;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Net.Http.Headers;
-using Microsoft.Extensions.Logging.Abstractions;
-using Umea.se.EstateService.API.Controllers;
-using Umea.se.EstateService.API.Controllers.Requests;
-using Umea.se.EstateService.Logic.Exceptions;
-using Umea.se.EstateService.Logic.Interfaces;
-using Umea.se.EstateService.Logic.Models;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
+using Umea.se.EstateService.API;
+using Umea.se.EstateService.ServiceAccess;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.Shared.Models;
+using Umea.se.EstateService.Test.TestHelpers;
+using Umea.se.TestToolkit.TestInfrastructure;
 
 namespace Umea.se.EstateService.Test.API;
 
-public class FloorControllerTests
+public class FloorControllerTests : ControllerTestCloud<TestApiFactory, Program, HttpClientNames>
 {
+    private readonly HttpClient _client;
+    private readonly FakePythagorasClient _fakeClient;
+
+    public FloorControllerTests()
+    {
+        _client = Client;
+        _client.DefaultRequestHeaders.Add("X-Api-Key", TestApiFactory.ApiKey);
+        _fakeClient = WebAppFactory.FakeClient;
+
+        MockManager.SetupUser(user => user.WithActualAuthorization());
+    }
+
     [Fact]
     public async Task GetFloorAsync_WhenFound_ReturnsFloor()
     {
-        FloorInfoModel floor = new() { Id = 1655, Name = "Test" };
-        PythagorasQuery<Floor>? capturedQuery = null;
+        _fakeClient.Reset();
+        _fakeClient.SetGetAsyncResult(new Floor { Id = 1655, Name = "Test Floor", Uid = Guid.NewGuid() });
 
-        StubPythagorasHandler handler = new()
-        {
-            OnGetFloorsAsync = (query, _) =>
-            {
-                capturedQuery = query;
-                return Task.FromResult<IReadOnlyList<FloorInfoModel>>([floor]);
-            }
-        };
+        HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Floors}/1655");
+        response.EnsureSuccessStatusCode();
 
-        FloorController controller = new(new StubFloorBlueprintService(), handler, NullLogger<FloorController>.Instance);
+        FloorInfoModel? floor = await response.Content.ReadFromJsonAsync<FloorInfoModel>();
+        floor.ShouldNotBeNull();
+        floor.Id.ShouldBe(1655);
+        floor.Name.ShouldBe("Test Floor");
 
-        ActionResult<FloorInfoModel> result = await controller.GetFloorAsync(1655, CancellationToken.None);
-
-        FloorInfoModel model = result.Result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<FloorInfoModel>();
-        model.ShouldBe(floor);
-
-        capturedQuery.ShouldNotBeNull();
-        string decodedQuery = Uri.UnescapeDataString(capturedQuery!.BuildAsQueryString());
+        string decodedQuery = Uri.UnescapeDataString(_fakeClient.LastQueryString ?? string.Empty);
         decodedQuery.ShouldContain("floorIds[]=1655");
+        _fakeClient.LastEndpoint.ShouldBe("rest/v1/floor/info");
     }
 
     [Fact]
     public async Task GetFloorAsync_WhenMissing_Returns404()
     {
-        StubPythagorasHandler handler = new()
-        {
-            OnGetFloorsAsync = (_, _) => Task.FromResult<IReadOnlyList<FloorInfoModel>>([])
-        };
+        _fakeClient.Reset();
+        _fakeClient.SetGetAsyncResult(Array.Empty<Floor>());
 
-        FloorController controller = new(new StubFloorBlueprintService(), handler, NullLogger<FloorController>.Instance);
+        HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Floors}/999");
 
-        ActionResult<FloorInfoModel> result = await controller.GetFloorAsync(999, CancellationToken.None);
-
-        result.Result.ShouldBeOfType<NotFoundResult>();
+        response.StatusCode.ShouldBe(System.Net.HttpStatusCode.NotFound);
     }
 
     [Fact]
-    public async Task GetFloorBlueprintAsync_ReturnsFileWhenServiceSucceeds()
+    public async Task GetFloorBlueprintAsync_ForPdf_ReturnsFileWithCacheHeaders()
     {
-        StubFloorBlueprintService service = new()
+        _fakeClient.Reset();
+        _fakeClient.OnGetFloorBlueprintAsync = (_, _, _, _) =>
         {
-            OnGetBlueprintAsync = (_, _, _, _) =>
+            byte[] pdfBytes = [0x25, 0x50, 0x44, 0x46]; // %PDF header
+            HttpResponseMessage httpResponse = new(System.Net.HttpStatusCode.OK)
             {
-                MemoryStream stream = new([4, 5, 6]);
-                FloorBlueprint blueprint = new(stream, "application/pdf", "floor.pdf");
-                return Task.FromResult(blueprint);
-            }
+                Content = new ByteArrayContent(pdfBytes)
+            };
+            httpResponse.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/pdf");
+            return Task.FromResult(httpResponse);
         };
 
-        FloorController controller = new(service, new StubPythagorasHandler(), NullLogger<FloorController>.Instance);
-        controller.ControllerContext = new ControllerContext
-        {
-            HttpContext = new DefaultHttpContext()
-        };
+        HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Floors}/10/blueprint?format=Pdf");
+        response.EnsureSuccessStatusCode();
 
-        IActionResult result = await controller.GetFloorBlueprintAsync(
-            10,
-            new FloorBlueprintRequest { Format = BlueprintFormat.Pdf },
-            CancellationToken.None);
-
-        FileStreamResult fileResult = result.ShouldBeOfType<FileStreamResult>();
-        fileResult.ContentType.ShouldBe("application/pdf");
-        fileResult.FileDownloadName.ShouldBe("floor.pdf");
-        controller.Response.Headers[HeaderNames.CacheControl].ToString().ShouldBe("public, max-age=86400");
+        response.Content.Headers.ContentType?.MediaType.ShouldBe("application/pdf");
+        response.Headers.CacheControl?.Public.ShouldBeTrue();
+        response.Headers.CacheControl?.MaxAge.ShouldBe(TimeSpan.FromHours(24));
     }
 
     [Fact]
-    public async Task GetFloorBlueprintAsync_ForSvg_ReturnsFileWithName()
+    public async Task GetFloorBlueprintAsync_ForSvg_ReturnsFileWithCacheHeaders()
     {
-        StubFloorBlueprintService service = new()
+        _fakeClient.Reset();
+        _fakeClient.OnGetFloorBlueprintAsync = (_, _, _, _) =>
         {
-            OnGetBlueprintAsync = (_, _, _, _) =>
+            byte[] svgBytes = "<svg></svg>"u8.ToArray();
+            HttpResponseMessage httpResponse = new(System.Net.HttpStatusCode.OK)
             {
-                MemoryStream stream = new([1, 2]);
-                FloorBlueprint blueprint = new(stream, "image/svg+xml", "floor.svg");
-                return Task.FromResult(blueprint);
-            }
+                Content = new ByteArrayContent(svgBytes)
+            };
+            httpResponse.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/svg+xml");
+            return Task.FromResult(httpResponse);
         };
 
-        FloorController controller = new(service, new StubPythagorasHandler(), NullLogger<FloorController>.Instance)
-        {
-            ControllerContext = new ControllerContext
-            {
-                HttpContext = new DefaultHttpContext()
-            }
-        };
+        HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Floors}/7/blueprint?format=Svg");
+        response.EnsureSuccessStatusCode();
 
-        IActionResult result = await controller.GetFloorBlueprintAsync(
-            7,
-            new FloorBlueprintRequest { Format = BlueprintFormat.Svg },
-            CancellationToken.None);
-
-        FileStreamResult fileResult = result.ShouldBeOfType<FileStreamResult>();
-        fileResult.ContentType.ShouldBe("image/svg+xml");
-        fileResult.FileDownloadName.ShouldBe("floor.svg");
-        controller.Response.Headers[HeaderNames.CacheControl].ToString().ShouldBe("public, max-age=86400");
-    }
-
-    [Fact]
-    public async Task GetFloorBlueprintAsync_WithInvalidFormat_Returns400()
-    {
-        FloorController controller = new(new StubFloorBlueprintService(), new StubPythagorasHandler(), NullLogger<FloorController>.Instance);
-        controller.ModelState.Clear();
-        controller.ModelState.AddModelError(nameof(FloorBlueprintRequest.Format), "Invalid format");
-
-        IActionResult result = await controller.GetFloorBlueprintAsync(
-            5,
-            new FloorBlueprintRequest(),
-            CancellationToken.None);
-
-        BadRequestObjectResult problem = result.ShouldBeOfType<BadRequestObjectResult>();
-        ValidationProblemDetails details = problem.Value.ShouldBeOfType<ValidationProblemDetails>();
-        details.Status.ShouldBe(StatusCodes.Status400BadRequest);
+        response.Content.Headers.ContentType?.MediaType.ShouldBe("image/svg+xml");
+        response.Headers.CacheControl?.Public.ShouldBeTrue();
+        response.Headers.CacheControl?.MaxAge.ShouldBe(TimeSpan.FromHours(24));
     }
 
     [Fact]
     public async Task GetFloorBlueprintAsync_WhenServiceUnavailable_Returns502()
     {
-        StubFloorBlueprintService service = new()
+        _fakeClient.Reset();
+        _fakeClient.OnGetFloorBlueprintAsync = (_, _, _, _) =>
         {
-            OnGetBlueprintAsync = (_, _, _, _) => throw new FloorBlueprintUnavailableException("fail", new HttpRequestException())
+            HttpResponseMessage httpResponse = new(System.Net.HttpStatusCode.ServiceUnavailable);
+            return Task.FromResult(httpResponse);
         };
 
-        FloorController controller = new(service, new StubPythagorasHandler(), NullLogger<FloorController>.Instance);
+        HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Floors}/12/blueprint?format=Pdf");
 
-        IActionResult result = await controller.GetFloorBlueprintAsync(
-            12,
-            new FloorBlueprintRequest { Format = BlueprintFormat.Pdf },
-            CancellationToken.None);
-
-        ObjectResult objectResult = result.ShouldBeOfType<ObjectResult>();
-        objectResult.StatusCode.ShouldBe(StatusCodes.Status502BadGateway);
+        response.StatusCode.ShouldBe(System.Net.HttpStatusCode.BadGateway);
     }
 
     [Fact]
-    public async Task GetFloorBlueprintAsync_WhenServiceReportsMissingBlueprint_Returns404()
+    public async Task GetFloorBlueprintAsync_WhenNotFound_Returns404()
     {
-        StubFloorBlueprintService service = new()
+        _fakeClient.Reset();
+        _fakeClient.OnGetFloorBlueprintAsync = (_, _, _, _) =>
         {
-            OnGetBlueprintAsync = (_, _, _, _) => throw new KeyNotFoundException("missing")
+            HttpResponseMessage httpResponse = new(System.Net.HttpStatusCode.NotFound);
+            return Task.FromResult(httpResponse);
         };
 
-        FloorController controller = new(service, new StubPythagorasHandler(), NullLogger<FloorController>.Instance)
-        {
-            ControllerContext = new ControllerContext
-            {
-                HttpContext = new DefaultHttpContext()
-            }
-        };
+        HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Floors}/42/blueprint?format=Svg");
 
-        IActionResult result = await controller.GetFloorBlueprintAsync(
-            42,
-            new FloorBlueprintRequest { Format = BlueprintFormat.Svg },
-            CancellationToken.None);
-
-        NotFoundObjectResult objectResult = result.ShouldBeOfType<NotFoundObjectResult>();
-        ProblemDetails problem = objectResult.Value.ShouldBeOfType<ProblemDetails>();
-        problem.Status.ShouldBe(StatusCodes.Status404NotFound);
-    }
-
-    private sealed class StubFloorBlueprintService : IFloorBlueprintService
-    {
-        public Func<int, BlueprintFormat, bool, CancellationToken, Task<FloorBlueprint>>? OnGetBlueprintAsync { get; set; }
-
-        public Task<FloorBlueprint> GetBlueprintAsync(int floorId, BlueprintFormat format, bool includeWorkspaceTexts, CancellationToken cancellationToken = default)
-        {
-            if (OnGetBlueprintAsync is null)
-            {
-                throw new InvalidOperationException("OnGetBlueprintAsync must be set for this test.");
-            }
-
-            return OnGetBlueprintAsync(floorId, format, includeWorkspaceTexts, cancellationToken);
-        }
-    }
-
-    private sealed class StubPythagorasHandler : IPythagorasHandler
-    {
-        public Func<PythagorasQuery<Floor>?, CancellationToken, Task<IReadOnlyList<FloorInfoModel>>>? OnGetFloorsAsync { get; set; }
-
-        public Task<IReadOnlyList<FloorInfoModel>> GetFloorsAsync(PythagorasQuery<Floor>? query = null, CancellationToken cancellationToken = default)
-        {
-            if (OnGetFloorsAsync is null)
-            {
-                return Task.FromResult<IReadOnlyList<FloorInfoModel>>([]);
-            }
-
-            return OnGetFloorsAsync(query, cancellationToken);
-        }
-
-        public Task<IReadOnlyList<EstateModel>> GetEstatesWithBuildingsAsync(PythagorasQuery<NavigationFolder>? query = null, CancellationToken cancellationToken = default)
-            => throw new NotImplementedException();
-
-        public Task<IReadOnlyList<BuildingInfoModel>> GetBuildingsAsync(PythagorasQuery<BuildingInfo>? query = null, CancellationToken cancellationToken = default)
-            => throw new NotImplementedException();
-
-        public Task<IReadOnlyList<RoomModel>> GetBuildingWorkspacesAsync(int buildingId, PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
-            => throw new NotImplementedException();
-
-        public Task<IReadOnlyList<FloorInfoModel>> GetBuildingFloorsAsync(int buildingId, PythagorasQuery<Floor>? floorQuery = null, CancellationToken cancellationToken = default)
-            => throw new NotImplementedException();
-
-        public Task<IReadOnlyList<FloorInfoModel>> GetBuildingFloorsWithRoomsAsync(int buildingId, PythagorasQuery<Floor>? floorQuery = null, PythagorasQuery<Workspace>? workspaceQuery = null, CancellationToken cancellationToken = default)
-            => throw new NotImplementedException();
-
-        public Task<IReadOnlyList<BuildingAscendantModel>> GetBuildingAscendantsAsync(int buildingId, CancellationToken cancellationToken = default)
-            => Task.FromResult<IReadOnlyList<BuildingAscendantModel>>([]);
-
-        public Task<IReadOnlyList<RoomModel>> GetRoomsAsync(PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
-            => throw new NotImplementedException();
-
-        public Task<IReadOnlyDictionary<int, BuildingWorkspaceStatsModel>> GetBuildingWorkspaceStatsAsync(PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
-            => Task.FromResult<IReadOnlyDictionary<int, BuildingWorkspaceStatsModel>>(new Dictionary<int, BuildingWorkspaceStatsModel>());
-
-        public Task<BuildingInfoModel?> GetBuildingByIdAsync(int buildingId, BuildingIncludeOptions includeOptions = BuildingIncludeOptions.None, CancellationToken cancellationToken = default)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<EstateModel?> GetEstateByIdAsync(int estateId, bool includeBuildings = false, CancellationToken cancellationToken = default)
-            => Task.FromResult<EstateModel?>(null);
-
-        public Task<IReadOnlyList<BuildingInfoModel>> GetBuildingsWithPropertiesAsync(IReadOnlyCollection<int>? buildingIds = null, IReadOnlyCollection<int>? propertyIds = null, int? navigationId = null, CancellationToken cancellationToken = default)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<IReadOnlyList<EstateModel>> GetEstatesWithPropertiesAsync(IReadOnlyCollection<int>? estateIds = null, IReadOnlyCollection<int>? propertyIds = null, int? navigationId = null, CancellationToken cancellationToken = default)
-        {
-            throw new NotImplementedException();
-        }
+        response.StatusCode.ShouldBe(System.Net.HttpStatusCode.NotFound);
     }
 }

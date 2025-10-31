@@ -3,10 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 using Umea.se.EstateService.API.Controllers.Requests;
 using Umea.se.EstateService.Logic.Interfaces;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.Toolkit.Auth;
+using QueryArgs = Umea.se.EstateService.Logic.Interfaces.QueryArgs;
 
 namespace Umea.se.EstateService.API.Controllers;
 
@@ -32,11 +31,8 @@ public class RoomController(IPythagorasHandler pythagorasHandler) : ControllerBa
     [SwaggerResponse(StatusCodes.Status404NotFound, "Room not found.")]
     public async Task<ActionResult<RoomModel>> GetRoomAsync(int roomId, [FromQuery] RoomDetailsRequest request, CancellationToken cancellationToken)
     {
-        PythagorasQuery<Workspace> query = new PythagorasQuery<Workspace>()
-            .Where(workspace => workspace.Id, roomId);
-
         IReadOnlyList<RoomModel> rooms = await pythagorasHandler
-            .GetRoomsAsync(query, cancellationToken)
+            .GetRoomsAsync([roomId], buildingId: null, null, queryArgs: null, cancellationToken)
             .ConfigureAwait(false);
 
         RoomModel? room = rooms.Count > 0 ? rooms[0] : null;
@@ -64,29 +60,18 @@ public class RoomController(IPythagorasHandler pythagorasHandler) : ControllerBa
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid request when incompatible filters are provided.")]
     public async Task<ActionResult<IReadOnlyList<RoomModel>>> GetRoomsAsync([FromQuery] RoomListRequest request, CancellationToken cancellationToken)
     {
-        PythagorasQuery<Workspace> query = BuildQuery(request);
-        IReadOnlyList<RoomModel> rooms = await pythagorasHandler.GetRoomsAsync(query, cancellationToken);
+        ImmutableArray<int> ids = request.GetIdsOrEmpty();
+        int[]? roomIds = ids.Length > 0 ? [.. ids] : null;
+
+        QueryArgs? queryArgs = roomIds is null
+            ? QueryArgs.Create(
+                skip: request.Offset > 0 ? request.Offset : null,
+                take: request.Limit > 0 ? request.Limit : null,
+                searchTerm: request.SearchTerm)
+            : null;
+
+        IReadOnlyList<RoomModel> rooms = await pythagorasHandler.GetRoomsAsync(roomIds, request.BuildingId, null, queryArgs, cancellationToken);
 
         return Ok(rooms);
-    }
-
-    private static PythagorasQuery<Workspace> BuildQuery(RoomListRequest request)
-    {
-        ImmutableArray<int> ids = request.GetIdsOrEmpty();
-        if (ids.Length > 0)
-        {
-            return new PythagorasQuery<Workspace>().WithIds([.. ids]);
-        }
-
-        PythagorasQuery<Workspace> query = new PythagorasQuery<Workspace>()
-            .ApplyGeneralSearch(request)
-            .ApplyPaging(request);
-
-        if (request.BuildingId is int buildingId)
-        {
-            query = query.Where(workspace => workspace.BuildingId, buildingId);
-        }
-
-        return query;
     }
 }

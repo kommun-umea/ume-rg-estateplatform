@@ -4,12 +4,9 @@ using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
 using Umea.se.EstateService.Logic.Exceptions;
 using Umea.se.EstateService.Logic.Handlers;
-using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.Logic.Models;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
-using Umea.se.EstateService.Shared.Models;
 using Umea.se.EstateService.Test.TestHelpers;
 
 namespace Umea.se.EstateService.Test.Blueprint;
@@ -37,7 +34,7 @@ public class FloorBlueprintServiceTests
             }
         };
 
-        StubPythagorasHandler handler = new();
+        PythagorasHandler handler = new(client);
         FloorBlueprintHandler fbHandler = new(client, handler, NullLogger<FloorBlueprintHandler>.Instance);
 
         FloorBlueprint result = await fbHandler.GetBlueprintAsync(42, BlueprintFormat.Pdf, includeWorkspaceTexts: false);
@@ -58,7 +55,7 @@ public class FloorBlueprintServiceTests
             OnGetFloorBlueprintAsync = (_, _, _, _) => throw new HttpRequestException("fail")
         };
 
-        StubPythagorasHandler handler = new();
+        PythagorasHandler handler = new(client);
         FloorBlueprintHandler fbHandler = new(client, handler, NullLogger<FloorBlueprintHandler>.Instance);
 
         await Should.ThrowAsync<FloorBlueprintUnavailableException>(() =>
@@ -86,7 +83,7 @@ public class FloorBlueprintServiceTests
             }
         };
 
-        StubPythagorasHandler handler = new();
+        PythagorasHandler handler = new(client);
         FloorBlueprintHandler fbHandler = new(client, handler, NullLogger<FloorBlueprintHandler>.Instance);
 
         FloorBlueprint result = await fbHandler.GetBlueprintAsync(11, BlueprintFormat.Svg, includeWorkspaceTexts: false);
@@ -99,7 +96,7 @@ public class FloorBlueprintServiceTests
     public async Task GetBlueprintAsync_WithInvalidFloorId_ThrowsValidationException()
     {
         FakePythagorasClient client = new();
-        StubPythagorasHandler handler = new();
+        PythagorasHandler handler = new(client);
         FloorBlueprintHandler fbHandler = new(client, handler, NullLogger<FloorBlueprintHandler>.Instance);
 
         await Should.ThrowAsync<FloorBlueprintValidationException>(() =>
@@ -127,20 +124,11 @@ public class FloorBlueprintServiceTests
             }
         };
 
-        StubPythagorasHandler handler = new()
-        {
-            OnGetRoomsAsync = (query, _) =>
-            {
-                RoomModel[] rooms =
-                [
-                    new() { Id = 5, Name = "Alpha", PopularName = "Popular Alpha" },
-                    new() { Id = 6, Name = "Beta" }
-                ];
+        client.SetGetAsyncResult(
+            new Workspace { Id = 5, Name = "Alpha", PopularName = "Popular Alpha" },
+            new Workspace { Id = 6, Name = "Beta" });
 
-                return Task.FromResult<IReadOnlyList<RoomModel>>(rooms);
-            }
-        };
-
+        PythagorasHandler handler = new(client);
         FloorBlueprintHandler fbHandler = new(client, handler, NullLogger<FloorBlueprintHandler>.Instance);
 
         FloorBlueprint result = await fbHandler.GetBlueprintAsync(99, BlueprintFormat.Pdf, includeWorkspaceTexts: true);
@@ -152,8 +140,9 @@ public class FloorBlueprintServiceTests
         capturedTexts[5].ShouldBe(["Popular Alpha"]);
         capturedTexts[6].ShouldBe(["Beta"]);
 
-        handler.CapturedRoomsQuery.ShouldNotBeNull();
-        string decodedQuery = System.Uri.UnescapeDataString(handler.CapturedRoomsQuery!.BuildAsQueryString());
+        string? lastQuery = client.LastQueryString;
+        lastQuery.ShouldNotBeNull();
+        string decodedQuery = Uri.UnescapeDataString(lastQuery);
         decodedQuery.ShouldContain("floorId");
         decodedQuery.ShouldContain("99");
     }
@@ -193,7 +182,7 @@ public class FloorBlueprintServiceTests
             }
         };
 
-        StubPythagorasHandler handler = new();
+        PythagorasHandler handler = new(client);
         FloorBlueprintHandler fbHandler = new(client, handler, NullLogger<FloorBlueprintHandler>.Instance);
 
         FloorBlueprint result = await fbHandler.GetBlueprintAsync(5, BlueprintFormat.Svg, includeWorkspaceTexts: false);
@@ -209,83 +198,5 @@ public class FloorBlueprintServiceTests
         cleaned.ShouldContain("preserveAspectRatio=\"xMidYMid\"");
         cleaned.ShouldNotContain(" x=\"10\"");
         cleaned.ShouldNotContain(" y=\"20\"");
-    }
-
-    private sealed class StubPythagorasHandler : IPythagorasHandler
-    {
-        public PythagorasQuery<Workspace>? CapturedRoomsQuery { get; private set; }
-
-        public Func<PythagorasQuery<Workspace>?, CancellationToken, Task<IReadOnlyList<RoomModel>>>? OnGetRoomsAsync { get; set; }
-
-        public Task<IReadOnlyList<BuildingAscendantModel>> GetBuildingAscendantsAsync(int buildingId, CancellationToken cancellationToken = default)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<BuildingInfoModel?> GetBuildingByIdAsync(int buildingId, BuildingIncludeOptions includeOptions = BuildingIncludeOptions.None, CancellationToken cancellationToken = default)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<IReadOnlyList<FloorInfoModel>> GetBuildingFloorsAsync(int buildingId, PythagorasQuery<Floor>? floorQuery = null, CancellationToken cancellationToken = default)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<IReadOnlyList<FloorInfoModel>> GetBuildingFloorsWithRoomsAsync(int buildingId, PythagorasQuery<Floor>? floorQuery = null, PythagorasQuery<Workspace>? workspaceQuery = null, CancellationToken cancellationToken = default)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<IReadOnlyList<BuildingInfoModel>> GetBuildingsAsync(PythagorasQuery<BuildingInfo>? query = null, CancellationToken cancellationToken = default)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<IReadOnlyList<BuildingInfoModel>> GetBuildingsWithPropertiesAsync(IReadOnlyCollection<int>? buildingIds = null, IReadOnlyCollection<int>? propertyIds = null, int? navigationId = null, CancellationToken cancellationToken = default)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<IReadOnlyList<RoomModel>> GetBuildingWorkspacesAsync(int buildingId, PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<IReadOnlyDictionary<int, BuildingWorkspaceStatsModel>> GetBuildingWorkspaceStatsAsync(PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<EstateModel?> GetEstateByIdAsync(int estateId, bool includeBuildings = false, CancellationToken cancellationToken = default)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<IReadOnlyList<EstateModel>> GetEstatesWithBuildingsAsync(PythagorasQuery<NavigationFolder>? query = null, CancellationToken cancellationToken = default)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<IReadOnlyList<EstateModel>> GetEstatesWithPropertiesAsync(IReadOnlyCollection<int>? estateIds = null, IReadOnlyCollection<int>? propertyIds = null, int? navigationId = null, CancellationToken cancellationToken = default)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<IReadOnlyList<FloorInfoModel>> GetFloorsAsync(PythagorasQuery<Floor>? query = null, CancellationToken cancellationToken = default)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<IReadOnlyList<RoomModel>> GetRoomsAsync(PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
-        {
-            CapturedRoomsQuery = query;
-            if (OnGetRoomsAsync is null)
-            {
-                return Task.FromResult<IReadOnlyList<RoomModel>>([]);
-            }
-
-            return OnGetRoomsAsync(query, cancellationToken);
-        }
     }
 }

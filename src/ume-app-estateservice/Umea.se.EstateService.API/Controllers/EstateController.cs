@@ -2,10 +2,9 @@
 using Swashbuckle.AspNetCore.Annotations;
 using Umea.se.EstateService.API.Controllers.Requests;
 using Umea.se.EstateService.Logic.Interfaces;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.Toolkit.Auth;
+using QueryArgs = Umea.se.EstateService.Logic.Interfaces.QueryArgs;
 
 namespace Umea.se.EstateService.API.Controllers;
 
@@ -63,10 +62,13 @@ public class EstateController(IPythagorasHandler pythagorasService) : Controller
         [FromQuery] EstateListRequest request,
         CancellationToken cancellationToken)
     {
-        PythagorasQuery<NavigationFolder> query = BuildQuery(request);
+        QueryArgs queryArgs = QueryArgs.Create(
+            skip: request.Offset > 0 ? request.Offset : null,
+            take: request.Limit > 0 ? request.Limit : null,
+            searchTerm: request.SearchTerm);
 
         IReadOnlyList<EstateModel> estates = await pythagorasService
-            .GetEstatesWithBuildingsAsync(query, cancellationToken);
+            .GetEstatesWithBuildingsAsync(request.IncludeBuildings, queryArgs, cancellationToken);
 
         return Ok(estates);
     }
@@ -95,26 +97,14 @@ public class EstateController(IPythagorasHandler pythagorasService) : Controller
             return BadRequest("Estate id must be positive.");
         }
 
-        PythagorasQuery<BuildingInfo> query = new PythagorasQuery<BuildingInfo>()
-            .ApplyGeneralSearch(request)
-            .ApplyPaging(request);
+        QueryArgs queryArgs = QueryArgs.Create(
+            skip: request.Offset > 0 ? request.Offset : null,
+            take: request.Limit > 0 ? request.Limit : null,
+            searchTerm: request.SearchTerm);
 
         IReadOnlyList<BuildingInfoModel> buildings = await pythagorasService
-            .GetBuildingsAsync(query.WithQueryParameter("navigationFolderId", estateId), cancellationToken);
+            .GetBuildingsAsync(buildingIds: null, estateId: estateId, includeOptions: ServiceAccess.Pythagoras.Enum.BuildingIncludeOptions.None, queryArgs: queryArgs, cancellationToken);
 
         return Ok(buildings);
-    }
-
-    private static PythagorasQuery<NavigationFolder> BuildQuery(EstateListRequest request)
-    {
-        PythagorasQuery<NavigationFolder> query = new PythagorasQuery<NavigationFolder>()
-            .ApplyGeneralSearch(request);
-
-        if (request.IncludeBuildings)
-        {
-            query = query.WithQueryParameter("includeAscendantBuildings", true);
-        }
-
-        return query.ApplyPaging(request);
     }
 }
