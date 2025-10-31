@@ -274,6 +274,9 @@ public sealed class FakePythagorasClient : IPythagorasClient
     {
         CalculatedPropertyRequests.Add(new CalculatedPropertyRequestCapture(endpoint, entityId, request, cancellationToken));
 
+        // Also add to general Requests list so it appears in EndpointsCalled
+        Requests.Add(new RequestCapture(typeof(CalculatedPropertyValueDto), endpoint, request, null, cancellationToken));
+
         if (_calculatedPropertyResults.Count > 0)
         {
             return Task.FromResult(_calculatedPropertyResults.Dequeue());

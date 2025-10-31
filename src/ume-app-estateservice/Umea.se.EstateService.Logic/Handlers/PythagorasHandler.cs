@@ -230,25 +230,31 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
 
     public async Task<IReadOnlyList<RoomModel>> GetRoomsAsync(int[]? roomIds = null, int? buildingId = null, int? floorId = null, QueryArgs? queryArgs = null, CancellationToken cancellationToken = default)
     {
-        PythagorasQuery<Workspace> query = new();
+        PythagorasQuery<Workspace>? query = null;
 
         if (roomIds is { Length: > 0 })
         {
-            query = query.WithIds(roomIds);
+            query = new PythagorasQuery<Workspace>().WithIds(roomIds);
         }
         else
         {
             if (buildingId.HasValue)
             {
+                query ??= new PythagorasQuery<Workspace>();
                 query = query.Where(workspace => workspace.BuildingId, buildingId.Value);
             }
 
             if (floorId.HasValue)
             {
+                query ??= new PythagorasQuery<Workspace>();
                 query = query.Where(workspace => workspace.FloorId, floorId.Value);
             }
 
-            query = ApplyQueryArgs(query, queryArgs);
+            if (queryArgs is not null)
+            {
+                query ??= new PythagorasQuery<Workspace>();
+                query = ApplyQueryArgs(query, queryArgs);
+            }
         }
 
         IReadOnlyList<Workspace> payload = await pythagorasClient.GetWorkspacesAsync(query, cancellationToken).ConfigureAwait(false);
