@@ -4,6 +4,7 @@ using Umea.se.EstateService.API.Controllers.Requests;
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.Shared.Models;
+using Umea.se.EstateService.Shared.Search;
 using Umea.se.Toolkit.Auth;
 using QueryArgs = Umea.se.EstateService.Logic.Interfaces.QueryArgs;
 
@@ -13,8 +14,10 @@ namespace Umea.se.EstateService.API.Controllers;
 [Produces("application/json")]
 [Route(ApiRoutes.Buildings)]
 [AuthorizeApiKey]
-public class BuildingController(IPythagorasHandler pythagorasService) : ControllerBase
+public class BuildingController(IPythagorasHandler pythagorasService, IIndexedPythagorasDocumentReader documentReader) : ControllerBase
 {
+    private readonly IIndexedPythagorasDocumentReader _documentReader = documentReader;
+
     /// <summary>
     /// Gets details for a specific building.
     /// </summary>
@@ -47,6 +50,8 @@ public class BuildingController(IPythagorasHandler pythagorasService) : Controll
             return NotFound();
         }
 
+        await EnrichBuildingStatisticsAsync([building], cancellationToken).ConfigureAwait(false);
+
         return Ok(building);
     }
 
@@ -70,6 +75,7 @@ public class BuildingController(IPythagorasHandler pythagorasService) : Controll
         CancellationToken cancellationToken)
     {
         IReadOnlyList<BuildingInfoModel> buildings = await QueryBuildingsAsync(request, cancellationToken).ConfigureAwait(false);
+        await EnrichBuildingStatisticsAsync(buildings, cancellationToken).ConfigureAwait(false);
         return Ok(buildings);
     }
 
@@ -145,5 +151,42 @@ public class BuildingController(IPythagorasHandler pythagorasService) : Controll
             searchTerm: request.SearchTerm);
 
         return await pythagorasService.GetBuildingsAsync(buildingIds: null, estateId: request.EstateId, includeOptions: BuildingIncludeOptions.None, queryArgs: queryArgs, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task EnrichBuildingStatisticsAsync(IEnumerable<BuildingInfoModel> buildings, CancellationToken cancellationToken)
+    {
+        if (buildings is null)
+        {
+            return;
+        }
+
+        int[] ids = buildings
+            .Select(static building => building.Id)
+            .Where(static id => id > 0)
+            .Distinct()
+            .ToArray();
+
+        if (ids.Length == 0)
+        {
+            return;
+        }
+
+        IReadOnlyDictionary<int, PythagorasDocument> docs = await _documentReader
+            .GetBuildingDocumentsByIdsAsync(ids, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (docs.Count == 0)
+        {
+            return;
+        }
+
+        foreach (BuildingInfoModel building in buildings)
+        {
+            if (docs.TryGetValue(building.Id, out PythagorasDocument? doc))
+            {
+                building.NumFloors = doc.NumFloors;
+                building.NumRooms = doc.NumRooms;
+            }
+        }
     }
 }
