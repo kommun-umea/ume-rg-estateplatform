@@ -1,11 +1,9 @@
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using Shouldly;
 using Umea.se.EstateService.API.Controllers.Requests;
 
 namespace Umea.se.EstateService.Test.API.Controllers.Requests;
 
-public class AutocompleteRequestTests
+public class SearchRequestTests
 {
     [Fact]
     public void Validate_ReturnsError_WhenQueryMissingAndNoGeoParameters()
