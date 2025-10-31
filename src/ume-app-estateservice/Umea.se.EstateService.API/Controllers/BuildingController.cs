@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Net.Http.Headers;
 using Swashbuckle.AspNetCore.Annotations;
 using Umea.se.EstateService.API.Controllers.Requests;
 using Umea.se.EstateService.Logic.Interfaces;
@@ -14,9 +15,10 @@ namespace Umea.se.EstateService.API.Controllers;
 [Produces("application/json")]
 [Route(ApiRoutes.Buildings)]
 [AuthorizeApiKey]
-public class BuildingController(IPythagorasHandler pythagorasService, IIndexedPythagorasDocumentReader documentReader) : ControllerBase
+public class BuildingController(IPythagorasHandler pythagorasService, IIndexedPythagorasDocumentReader documentReader, IBuildingImageService buildingImageService) : ControllerBase
 {
     private readonly IIndexedPythagorasDocumentReader _documentReader = documentReader;
+    private readonly IBuildingImageService _buildingImageService = buildingImageService;
 
     /// <summary>
     /// Gets details for a specific building.
@@ -53,6 +55,65 @@ public class BuildingController(IPythagorasHandler pythagorasService, IIndexedPy
         await EnrichBuildingStatisticsAsync([building], cancellationToken).ConfigureAwait(false);
 
         return Ok(building);
+    }
+
+    /// <summary>
+    /// Gets the primary image for a specific building.
+    /// </summary>
+    /// <param name="buildingId">The ID of the building.</param>
+    /// <param name="size">Optional image size. Defaults to the original image.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <response code="200">Returns the image stream.</response>
+    /// <response code="400">If the buildingId is not valid.</response>
+    /// <response code="404">If no image is available.</response>
+    [HttpGet("{buildingId:int}/image")]
+    [Produces("image/jpeg", "image/png", "application/octet-stream")]
+    [SwaggerOperation(
+        Summary = "Get building image",
+        Description = "Retrieves the first available gallery image for the specified building."
+    )]
+    [SwaggerResponse(StatusCodes.Status200OK, "Image stream")]
+    [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid buildingId")]
+    [SwaggerResponse(StatusCodes.Status404NotFound, "Image not found")]
+    public async Task<IActionResult> GetBuildingImageAsync(
+        int buildingId,
+        [FromQuery(Name = "size")] BuildingImageSize size = BuildingImageSize.Original,
+        CancellationToken cancellationToken = default)
+    {
+        if (buildingId <= 0)
+        {
+            return BadRequest("Building id must be positive.");
+        }
+
+        BuildingImageResult? image = await _buildingImageService
+            .GetPrimaryImageAsync(buildingId, size, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (image is null)
+        {
+            return NotFound();
+        }
+
+        HttpContext.Response.RegisterForDispose(image);
+
+        FileStreamResult fileResult = File(
+            image.Content,
+            image.ContentType ?? "application/octet-stream",
+            fileDownloadName: image.FileName,
+            enableRangeProcessing: false);
+
+        if (image.ContentLength.HasValue)
+        {
+            HttpContext.Response.ContentLength = image.ContentLength.Value;
+        }
+
+        Response.GetTypedHeaders().CacheControl = new CacheControlHeaderValue
+        {
+            Public = true,
+            MaxAge = TimeSpan.FromHours(24)
+        };
+
+        return fileResult;
     }
 
     /// <summary>

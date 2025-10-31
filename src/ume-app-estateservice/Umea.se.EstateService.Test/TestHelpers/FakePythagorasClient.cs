@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Net.Http;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
@@ -110,6 +111,33 @@ public sealed class FakePythagorasClient : IPythagorasClient
     public Task<IReadOnlyList<Floor>> GetFloorsAsync(PythagorasQuery<Floor>? query = null, CancellationToken cancellationToken = default)
         => CaptureAsync("rest/v1/floor/info", query, cancellationToken);
 
+    public Task<IReadOnlyList<GalleryImageFile>> GetBuildingGalleryImagesAsync(int buildingId, CancellationToken cancellationToken = default)
+    {
+        if (buildingId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
+        }
+
+        return CaptureAsync<GalleryImageFile>($"rest/v1/building/{buildingId}/galleryimagefile", query: null, cancellationToken);
+    }
+
+    public Func<int, GalleryImageVariant, CancellationToken, Task<HttpResponseMessage>>? OnGetGalleryImageDataAsync { get; set; }
+
+    public Task<HttpResponseMessage> GetGalleryImageDataAsync(int imageId, GalleryImageVariant variant, CancellationToken cancellationToken = default)
+    {
+        if (imageId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(imageId), "Image id must be positive.");
+        }
+
+        if (OnGetGalleryImageDataAsync is null)
+        {
+            throw new NotSupportedException("Configure OnGetGalleryImageDataAsync before calling this method.");
+        }
+
+        return OnGetGalleryImageDataAsync(imageId, variant, cancellationToken);
+    }
+
     private Task<IReadOnlyList<T>> CaptureAsync<T>(string endpoint, PythagorasQuery<T>? query, CancellationToken cancellationToken) where T : class, IPythagorasDto
     {
         PythagorasQuery<T>? originalQuery = query;
@@ -143,6 +171,7 @@ public sealed class FakePythagorasClient : IPythagorasClient
         _buildingUiListDataResults.Clear();
         NavigationFolderUiListDataRequests.Clear();
         _navigationFolderUiListDataResults.Clear();
+        OnGetGalleryImageDataAsync = null;
     }
 
     /// <summary>

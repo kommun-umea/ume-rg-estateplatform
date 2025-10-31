@@ -1,20 +1,32 @@
 using System.Globalization;
+using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.Toolkit.ExternalService;
+using Umea.se.EstateService.ServiceAccess;
 
 namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 
-public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
-    : ExternalServiceBase(HttpClientNames.Pythagoras, httpClientFactory), IPythagorasClient
+public sealed class PythagorasClient : ExternalServiceBase, IPythagorasClient
 {
+    private const string PythagorasApplicationName = "se.pythagoras.pythagorasweb";
+
     private static readonly JsonSerializerOptions _serializerOptions = new(JsonSerializerDefaults.Web)
     {
         PropertyNameCaseInsensitive = true,
-        NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString
+        NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString,
+        Converters =
+        {
+            new UnixMillisDateTimeConverter()
+        }
     };
+
+    public PythagorasClient(IHttpClientFactory httpClientFactory)
+        : base(HttpClientNames.Pythagoras, httpClientFactory)
+    {
+    }
 
     protected override string PingUrl => "";
 
@@ -351,5 +363,40 @@ where TValue : class
         string queryString = request?.BuildQueryString() ?? string.Empty;
 
         return QueryDictionaryAsync<CalculatedPropertyValueDto>(requestPath, queryString, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<GalleryImageFile>> GetBuildingGalleryImagesAsync(int buildingId, CancellationToken cancellationToken = default)
+    {
+        if (buildingId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
+        }
+
+        string endpoint = $"rest/v1/building/{buildingId}/galleryimagefile";
+        PythagorasQuery<GalleryImageFile> query = new();
+
+        return QueryAsync(endpoint, query, cancellationToken);
+    }
+
+    public Task<HttpResponseMessage> GetGalleryImageDataAsync(int imageId, GalleryImageVariant variant, CancellationToken cancellationToken = default)
+    {
+        if (imageId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(imageId), "Image id must be positive.");
+        }
+
+        string segment = variant switch
+        {
+            GalleryImageVariant.Thumbnail => "thumbnail/data",
+            GalleryImageVariant.Original => "data",
+            _ => throw new ArgumentOutOfRangeException(nameof(variant), variant, "Unsupported gallery image variant.")
+        };
+
+        string endpoint = $"rest/v1/galleryimagefile/{imageId}/{segment}";
+        string queryString = FormQueryParameter("pyApp", PythagorasApplicationName);
+        string requestUri = BuildRequestUri(NormalizeEndpoint(endpoint), queryString);
+
+        HttpRequestMessage request = new(HttpMethod.Get, requestUri);
+        return HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
     }
 }

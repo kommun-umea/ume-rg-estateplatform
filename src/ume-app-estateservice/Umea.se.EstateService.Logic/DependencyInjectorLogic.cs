@@ -16,6 +16,7 @@ public static class DependencyInjectorLogic
         services.AddSingleton<IIndexedPythagorasDocumentReader>(sp => sp.GetRequiredService<SearchHandler>());
         services.AddSingleton<IPythagorasDocumentProvider, PythagorasDocumentProvider>();
         services.AddSingleton<IFloorBlueprintService, FloorBlueprintHandler>();
+        services.AddScoped<IBuildingImageService, BuildingImageService>();
         services.AddOptions<SearchOptions>()
             .BindConfiguration(SearchOptions.SectionName);
         services.AddOptions<SearchIndexRefreshOptions>()
