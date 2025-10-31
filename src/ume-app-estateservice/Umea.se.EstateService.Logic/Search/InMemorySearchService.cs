@@ -522,24 +522,111 @@ public sealed class InMemorySearchService
         string normalizedQuery = TextNormalizer.Normalize(query ?? string.Empty).Trim();
         string[] qTokens = [.. TextNormalizer.Tokenize(query)];
 
-        if (qTokens.Length == 0)
+        bool hasQuery = qTokens.Length > 0;
+
+        Dictionary<int, double> docScores;
+        Dictionary<int, Dictionary<string, string>> matchedPerDoc;
+
+        if (hasQuery)
+        {
+            List<HashSet<string>> termCandidates = ExpandQueryTokens(qTokens, options);
+
+            HashSet<int> candidateDocIds = FindCandidateDocuments(termCandidates);
+            if (candidateDocIds.Count == 0)
+            {
+                return [];
+            }
+
+            (docScores, matchedPerDoc) =
+                ScoreDocuments(termCandidates, candidateDocIds, qTokens, normalizedQuery);
+
+            ApplyProximityBonus(docScores, matchedPerDoc);
+        }
+        else
+        {
+            docScores = new Dictionary<int, double>(_docs.Count);
+            matchedPerDoc = [];
+
+            for (int docId = 0; docId < _docs.Count; docId++)
+            {
+                double baseScore = _typeBaseBoost.TryGetValue(_docs[docId].Type, out double boost) ? boost : 0.0;
+                docScores[docId] = baseScore;
+            }
+        }
+
+        (Dictionary<int, double> filteredScores, Dictionary<int, Dictionary<string, string>> filteredMatches) =
+            ApplyGeospatialFilter(docScores, matchedPerDoc, options);
+        if (filteredScores.Count == 0)
         {
             return [];
         }
 
-        List<HashSet<string>> termCandidates = ExpandQueryTokens(qTokens, options);
-
-        HashSet<int> candidateDocIds = FindCandidateDocuments(termCandidates);
-        if (candidateDocIds.Count == 0)
-        {
-            return [];
-        }
-
-        (Dictionary<int, double> docScores, Dictionary<int, Dictionary<string, string>> matchedPerDoc) =
-            ScoreDocuments(termCandidates, candidateDocIds, qTokens, normalizedQuery);
-
-        ApplyProximityBonus(docScores, matchedPerDoc);
+        docScores = filteredScores;
+        matchedPerDoc = filteredMatches;
 
         return ComposeResults(docScores, matchedPerDoc, options);
+    }
+
+    private (Dictionary<int, double> Scores, Dictionary<int, Dictionary<string, string>> Matches) ApplyGeospatialFilter(
+        Dictionary<int, double> docScores,
+        Dictionary<int, Dictionary<string, string>> matchedPerDoc,
+        QueryOptions options)
+    {
+        if (options.GeoFilter is not { } geoFilter)
+        {
+            return (docScores, matchedPerDoc);
+        }
+
+        double latitude = geoFilter.Coordinate.Latitude;
+        double longitude = geoFilter.Coordinate.Longitude;
+        int radiusMeters = geoFilter.RadiusMeters;
+
+        Dictionary<int, double> filteredScores = new(docScores.Count);
+        foreach (KeyValuePair<int, double> kv in docScores)
+        {
+            int docId = kv.Key;
+            PythagorasDocument document = _docs[docId];
+            GeoPoint? geo = document.Geo;
+            if (geo is null ||
+                double.IsNaN(geo.Lat) ||
+                double.IsNaN(geo.Lng))
+            {
+                continue;
+            }
+
+            double distance = GeoHelper.CalculateDistanceInMeters(latitude, longitude, geo.Lat, geo.Lng);
+            if (double.IsNaN(distance) || distance > radiusMeters)
+            {
+                continue;
+            }
+
+            double closenessBoost = radiusMeters > 0
+                ? Math.Max(0.0, (radiusMeters - distance) / radiusMeters)
+                : 0.0;
+
+            filteredScores[docId] = kv.Value + closenessBoost;
+        }
+
+        if (filteredScores.Count == 0)
+        {
+            return (filteredScores, []);
+        }
+
+        Dictionary<int, Dictionary<string, string>> filteredMatches = matchedPerDoc.Count == 0
+            ? matchedPerDoc
+            : new Dictionary<int, Dictionary<string, string>>(matchedPerDoc.Count);
+
+        if (matchedPerDoc.Count > 0)
+        {
+            foreach (KeyValuePair<int, Dictionary<string, string>> entry in matchedPerDoc)
+            {
+                if (filteredScores.ContainsKey(entry.Key))
+                {
+                    filteredMatches[entry.Key] = entry.Value;
+                }
+            }
+        }
+
+        return (filteredScores, filteredMatches);
     }
 }

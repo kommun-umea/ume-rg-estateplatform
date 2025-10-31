@@ -23,9 +23,15 @@ public class SearchHandler(
 
     public int GetDocumentCount() => _searchService?.DocumentCount ?? 0;
 
-    public async Task<IReadOnlyList<SearchResult>> SearchAsync(string query, IReadOnlyCollection<AutocompleteType> types, int limit, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<SearchResult>> SearchAsync(
+        string? query,
+        IReadOnlyCollection<AutocompleteType> types,
+        int limit,
+        GeoFilter? geoFilter = null,
+        CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(query))
+        bool hasGeo = geoFilter is not null;
+        if (string.IsNullOrWhiteSpace(query) && !hasGeo)
         {
             return [];
         }
@@ -34,8 +40,12 @@ public class SearchHandler(
 
         IReadOnlyCollection<NodeType>? filterByTypes = BuildNodeTypeFilter(types);
 
-        QueryOptions options = new(MaxResults: Math.Max(limit, 1), FilterByTypes: filterByTypes);
-        IEnumerable<SearchResult> results = service.Search(query, options);
+        QueryOptions options = new(
+            MaxResults: Math.Max(limit, 1),
+            FilterByTypes: filterByTypes,
+            GeoFilter: geoFilter);
+
+        IEnumerable<SearchResult> results = service.Search(query ?? string.Empty, options);
 
         return [.. results.Take(limit)];
     }

@@ -33,17 +33,20 @@ public class SearchController(SearchHandler searchHandler) : ControllerBase
     [SwaggerResponse(StatusCodes.Status200OK, "A list of matching Pythagoras documents.", typeof(ICollection<PythagorasDocument>))]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid request parameters.")]
     public async Task<ActionResult<ICollection<PythagorasDocument>>> Search(
-        [FromQuery][SwaggerParameter("Search request parameters.", Required = true)] AutocompleteRequest req,
+        [FromQuery][SwaggerParameter("Search request parameters.", Required = true)] SearchRequest req,
         CancellationToken cancellationToken)
     {
         IReadOnlyCollection<AutocompleteType> types = req.Type is { Count: > 0 }
             ? req.Type
             : Array.Empty<AutocompleteType>();
 
+        string? query = req.Query?.Trim();
+
         IReadOnlyList<SearchResult> results = await searchHandler.SearchAsync(
-            req.Query,
+            query,
             types,
             req.Limit,
+            req.GeoFilter,
             cancellationToken)
             .ConfigureAwait(false);
 
