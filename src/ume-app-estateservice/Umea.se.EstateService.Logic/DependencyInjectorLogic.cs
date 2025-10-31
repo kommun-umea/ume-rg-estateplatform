@@ -13,6 +13,7 @@ public static class DependencyInjectorLogic
     {
         services.AddSingleton<IPythagorasHandler, PythagorasHandler>();
         services.AddSingleton<SearchHandler>();
+        services.AddSingleton<IIndexedPythagorasDocumentReader>(sp => sp.GetRequiredService<SearchHandler>());
         services.AddSingleton<IPythagorasDocumentProvider, PythagorasDocumentProvider>();
         services.AddSingleton<IFloorBlueprintService, FloorBlueprintHandler>();
         services.AddOptions<SearchOptions>()
