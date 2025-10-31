@@ -32,7 +32,7 @@ public sealed record SearchRequest : IValidatableObject
     public int? RadiusMeters { get; init; }
 
     [JsonIgnore]
-    public GeoFilter? GeoFilter
+    internal GeoFilter? GeoFilter
     {
         get
         {
