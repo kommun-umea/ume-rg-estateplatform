@@ -1,15 +1,13 @@
 using System.Globalization;
-using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.Toolkit.ExternalService;
-using Umea.se.EstateService.ServiceAccess;
 
 namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 
-public sealed class PythagorasClient : ExternalServiceBase, IPythagorasClient
+public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : ExternalServiceBase(HttpClientNames.Pythagoras, httpClientFactory), IPythagorasClient
 {
     private const string PythagorasApplicationName = "se.pythagoras.pythagorasweb";
 
@@ -22,11 +20,6 @@ public sealed class PythagorasClient : ExternalServiceBase, IPythagorasClient
             new UnixMillisDateTimeConverter()
         }
     };
-
-    public PythagorasClient(IHttpClientFactory httpClientFactory)
-        : base(HttpClientNames.Pythagoras, httpClientFactory)
-    {
-    }
 
     protected override string PingUrl => "";
 

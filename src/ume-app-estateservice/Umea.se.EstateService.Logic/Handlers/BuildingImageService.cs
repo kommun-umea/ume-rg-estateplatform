@@ -1,7 +1,4 @@
-using System;
-using System.IO;
 using System.Net;
-using System.Linq;
 using Microsoft.Extensions.Logging;
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
@@ -11,17 +8,8 @@ using Umea.se.EstateService.Shared.Models;
 
 namespace Umea.se.EstateService.Logic.Handlers;
 
-public sealed class BuildingImageService : IBuildingImageService
+public sealed class BuildingImageService(IPythagorasClient pythagorasClient, ILogger<BuildingImageService> logger) : IBuildingImageService
 {
-    private readonly IPythagorasClient _pythagorasClient;
-    private readonly ILogger<BuildingImageService> _logger;
-
-    public BuildingImageService(IPythagorasClient pythagorasClient, ILogger<BuildingImageService> logger)
-    {
-        _pythagorasClient = pythagorasClient ?? throw new ArgumentNullException(nameof(pythagorasClient));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
-
     public async Task<BuildingImageResult?> GetPrimaryImageAsync(int buildingId, BuildingImageSize size, CancellationToken cancellationToken = default)
     {
         if (buildingId <= 0)
@@ -29,26 +17,26 @@ public sealed class BuildingImageService : IBuildingImageService
             throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
         }
 
-        IReadOnlyList<GalleryImageFile> images = await _pythagorasClient
+        IReadOnlyList<GalleryImageFile> images = await pythagorasClient
             .GetBuildingGalleryImagesAsync(buildingId, cancellationToken)
             .ConfigureAwait(false);
 
         if (images.Count == 0)
         {
-            _logger.LogDebug("No gallery images returned for building {BuildingId}.", buildingId);
+            logger.LogDebug("No gallery images returned for building {BuildingId}.", buildingId);
             return null;
         }
 
         GalleryImageFile selected = SelectPrimaryImage(images);
         GalleryImageVariant variant = MapVariant(size);
 
-        HttpResponseMessage response = await _pythagorasClient
+        HttpResponseMessage response = await pythagorasClient
             .GetGalleryImageDataAsync(selected.Id, variant, cancellationToken)
             .ConfigureAwait(false);
 
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
-            _logger.LogInformation("Gallery image {ImageId} for building {BuildingId} returned 404.", selected.Id, buildingId);
+            logger.LogInformation("Gallery image {ImageId} for building {BuildingId} returned 404.", selected.Id, buildingId);
             response.Dispose();
             return null;
         }

@@ -221,11 +221,10 @@ public class BuildingController(IPythagorasHandler pythagorasService, IIndexedPy
             return;
         }
 
-        int[] ids = buildings
+        int[] ids = [.. buildings
             .Select(static building => building.Id)
             .Where(static id => id > 0)
-            .Distinct()
-            .ToArray();
+            .Distinct()];
 
         if (ids.Length == 0)
         {

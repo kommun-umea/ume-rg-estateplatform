@@ -1,4 +1,3 @@
-using System.Threading;
 using Microsoft.Extensions.Options;
 using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Logic.Interfaces;
