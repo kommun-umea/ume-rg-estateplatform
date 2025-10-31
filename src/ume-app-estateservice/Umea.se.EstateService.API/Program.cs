@@ -34,7 +34,7 @@ builder.Services
     .AddLogicDependencies()
     .AddServiceAccessDependencies()
     .AddSharedDependencies()
-    ;
+;
 
 builder.Services.AddDefaultHttpClient(HttpClientNames.Pythagoras, options =>
 {
