@@ -194,7 +194,7 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
     {
         response.EnsureSuccessStatusCode();
 
-        await using Stream contentStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        using Stream contentStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         return await JsonSerializer.DeserializeAsync<T>(contentStream, _serializerOptions, cancellationToken).ConfigureAwait(false);
     }
 
