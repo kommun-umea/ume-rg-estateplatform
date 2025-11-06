@@ -1,3 +1,4 @@
+using Umea.se.EstateService.Logic.Helpers;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.Shared.Models;
@@ -63,11 +64,11 @@ public static class PythagorasBuildingInfoMapper
         }
 
         return new AddressModel(
-            dto.AddressStreet ?? string.Empty,
-            dto.AddressZipCode ?? string.Empty,
-            dto.AddressCity ?? string.Empty,
-            dto.AddressCountry ?? string.Empty,
-            dto.AddressExtra ?? string.Empty);
+            StringHelper.Trim(dto.AddressStreet),
+            StringHelper.Trim(dto.AddressZipCode),
+            StringHelper.Trim(dto.AddressCity),
+            StringHelper.Trim(dto.AddressCountry),
+            StringHelper.Trim(dto.AddressExtra));
     }
 
     public static BuildingExtendedPropertiesModel? ToExtendedPropertiesModel(IReadOnlyDictionary<PropertyCategoryId, CalculatedPropertyValueDto> properties)

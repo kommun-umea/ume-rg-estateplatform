@@ -128,7 +128,7 @@ public sealed class InMemorySearchService
             IndexField(Field.Name, it.Name, createNgrams: true);
             IndexField(Field.PopularName, it.PopularName, createNgrams: true);
             IndexField(Field.Path, it.Path);
-            IndexField(Field.Address, it.Address);
+            IndexField(Field.Address, it.AddressSearchText);
             foreach (Ancestor a in it.Ancestors ?? [])
             {
                 IndexField(Field.AncestorName, a.Name);
@@ -581,7 +581,7 @@ public sealed class InMemorySearchService
         {
             GeoRadiusFilter radiusFilter => ApplyRadiusFilter(docScores, radiusFilter),
             GeoBoundingBoxFilter boxFilter => ApplyBoundingBoxFilter(docScores, boxFilter),
-            _ => new Dictionary<int, double>()
+            _ => []
         };
 
         if (filteredScores.Count == 0)
