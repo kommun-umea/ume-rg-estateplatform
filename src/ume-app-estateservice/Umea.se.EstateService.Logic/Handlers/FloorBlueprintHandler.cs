@@ -134,6 +134,7 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IP
             XDocument document = XDocument.Load(source);
             SvgCleaner.RemoveNodes(document, _nodesToRemove);
             document = SvgCleaner.CropSvgToContent(document);
+            document = SvgCleaner.NormalizeFontSizes(document);
 
             MemoryStream cleaned = new();
             document.Save(cleaned, SaveOptions.DisableFormatting | SaveOptions.OmitDuplicateNamespaces);
