@@ -31,6 +31,18 @@ public sealed record SearchRequest : IValidatableObject
     [FromQuery(Name = "radius")]
     public int? RadiusMeters { get; init; }
 
+    [FromQuery(Name = "south")]
+    public double? SouthLatitude { get; init; }
+
+    [FromQuery(Name = "west")]
+    public double? WestLongitude { get; init; }
+
+    [FromQuery(Name = "north")]
+    public double? NorthLatitude { get; init; }
+
+    [FromQuery(Name = "east")]
+    public double? EastLongitude { get; init; }
+
     [JsonIgnore]
     internal GeoFilter? GeoFilter
     {
@@ -38,7 +50,17 @@ public sealed record SearchRequest : IValidatableObject
         {
             if (Latitude is double lat && Longitude is double lon && RadiusMeters is int radius)
             {
-                return new GeoFilter(new GeoCoordinate(lat, lon), radius);
+                return new GeoRadiusFilter(new GeoCoordinate(lat, lon), radius);
+            }
+
+            if (SouthLatitude is double south &&
+                WestLongitude is double west &&
+                NorthLatitude is double north &&
+                EastLongitude is double east)
+            {
+                return new GeoBoundingBoxFilter(
+                    new GeoCoordinate(south, west),
+                    new GeoCoordinate(north, east));
             }
 
             return null;
@@ -60,6 +82,18 @@ public sealed record SearchRequest : IValidatableObject
         bool hasLongitude = Longitude.HasValue;
         bool hasRadius = RadiusMeters.HasValue;
         bool hasGeo = hasLatitude || hasLongitude || hasRadius;
+        bool hasSouth = SouthLatitude.HasValue;
+        bool hasWest = WestLongitude.HasValue;
+        bool hasNorth = NorthLatitude.HasValue;
+        bool hasEast = EastLongitude.HasValue;
+        bool hasGeoBox = hasSouth || hasWest || hasNorth || hasEast;
+
+        if (hasGeo && hasGeoBox)
+        {
+            yield return new ValidationResult(
+                "Provide either a radius-based geo filter or a bounding box, not both.",
+                [nameof(Latitude), nameof(Longitude), nameof(RadiusMeters), nameof(SouthLatitude), nameof(WestLongitude), nameof(NorthLatitude), nameof(EastLongitude)]);
+        }
 
         if (hasGeo)
         {
@@ -97,13 +131,72 @@ public sealed record SearchRequest : IValidatableObject
             }
         }
 
+        if (hasGeoBox)
+        {
+            if (!hasSouth || !hasWest || !hasNorth || !hasEast)
+            {
+                yield return new ValidationResult(
+                    "South, west, north, and east must be provided together.",
+                    [nameof(SouthLatitude), nameof(WestLongitude), nameof(NorthLatitude), nameof(EastLongitude)]);
+            }
+            else
+            {
+                double south = SouthLatitude!.Value;
+                double north = NorthLatitude!.Value;
+                double west = WestLongitude!.Value;
+                double east = EastLongitude!.Value;
+
+                if (double.IsNaN(south) || south < -90 || south > 90)
+                {
+                    yield return new ValidationResult(
+                        "South latitude must be between -90 and 90 degrees.",
+                        [nameof(SouthLatitude)]);
+                }
+
+                if (double.IsNaN(north) || north < -90 || north > 90)
+                {
+                    yield return new ValidationResult(
+                        "North latitude must be between -90 and 90 degrees.",
+                        [nameof(NorthLatitude)]);
+                }
+
+                if (double.IsNaN(west) || west < -180 || west > 180)
+                {
+                    yield return new ValidationResult(
+                        "West longitude must be between -180 and 180 degrees.",
+                        [nameof(WestLongitude)]);
+                }
+
+                if (double.IsNaN(east) || east < -180 || east > 180)
+                {
+                    yield return new ValidationResult(
+                        "East longitude must be between -180 and 180 degrees.",
+                        [nameof(EastLongitude)]);
+                }
+
+                if (south >= north)
+                {
+                    yield return new ValidationResult(
+                        "South latitude must be less than north latitude.",
+                        [nameof(SouthLatitude), nameof(NorthLatitude)]);
+                }
+
+                if (west >= east)
+                {
+                    yield return new ValidationResult(
+                        "West longitude must be less than east longitude.",
+                        [nameof(WestLongitude), nameof(EastLongitude)]);
+                }
+            }
+        }
+
         if (hasQuery && trimmedQuery.Length < MinQueryLength)
         {
             yield return new ValidationResult(
                 $"Query must be at least {MinQueryLength} characters when provided.",
                 [nameof(Query)]);
         }
-        else if (!hasQuery && !hasGeo)
+        else if (!hasQuery && !hasGeo && !hasGeoBox)
         {
             yield return new ValidationResult(
                 "Query must be provided unless geospatial parameters are specified.",

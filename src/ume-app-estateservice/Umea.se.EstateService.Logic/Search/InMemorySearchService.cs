@@ -577,9 +577,41 @@ public sealed class InMemorySearchService
             return (docScores, matchedPerDoc);
         }
 
-        double latitude = geoFilter.Coordinate.Latitude;
-        double longitude = geoFilter.Coordinate.Longitude;
-        int radiusMeters = geoFilter.RadiusMeters;
+        Dictionary<int, double> filteredScores = geoFilter switch
+        {
+            GeoRadiusFilter radiusFilter => ApplyRadiusFilter(docScores, radiusFilter),
+            GeoBoundingBoxFilter boxFilter => ApplyBoundingBoxFilter(docScores, boxFilter),
+            _ => new Dictionary<int, double>()
+        };
+
+        if (filteredScores.Count == 0)
+        {
+            return (filteredScores, []);
+        }
+
+        Dictionary<int, Dictionary<string, string>> filteredMatches = matchedPerDoc.Count == 0
+            ? matchedPerDoc
+            : new Dictionary<int, Dictionary<string, string>>(matchedPerDoc.Count);
+
+        if (matchedPerDoc.Count > 0)
+        {
+            foreach (KeyValuePair<int, Dictionary<string, string>> entry in matchedPerDoc)
+            {
+                if (filteredScores.ContainsKey(entry.Key))
+                {
+                    filteredMatches[entry.Key] = entry.Value;
+                }
+            }
+        }
+
+        return (filteredScores, filteredMatches);
+    }
+
+    private Dictionary<int, double> ApplyRadiusFilter(Dictionary<int, double> docScores, GeoRadiusFilter radiusFilter)
+    {
+        double latitude = radiusFilter.Coordinate.Latitude;
+        double longitude = radiusFilter.Coordinate.Longitude;
+        int radiusMeters = radiusFilter.RadiusMeters;
 
         Dictionary<int, double> filteredScores = new(docScores.Count);
         foreach (KeyValuePair<int, double> kv in docScores)
@@ -607,26 +639,55 @@ public sealed class InMemorySearchService
             filteredScores[docId] = kv.Value + closenessBoost;
         }
 
-        if (filteredScores.Count == 0)
-        {
-            return (filteredScores, []);
-        }
+        return filteredScores;
+    }
 
-        Dictionary<int, Dictionary<string, string>> filteredMatches = matchedPerDoc.Count == 0
-            ? matchedPerDoc
-            : new Dictionary<int, Dictionary<string, string>>(matchedPerDoc.Count);
+    private Dictionary<int, double> ApplyBoundingBoxFilter(Dictionary<int, double> docScores, GeoBoundingBoxFilter boxFilter)
+    {
+        double south = boxFilter.SouthWest.Latitude;
+        double west = boxFilter.SouthWest.Longitude;
+        double north = boxFilter.NorthEast.Latitude;
+        double east = boxFilter.NorthEast.Longitude;
 
-        if (matchedPerDoc.Count > 0)
+        double latSpan = north - south;
+        double lonSpan = east - west;
+        double latCenter = south + latSpan / 2.0;
+        double lonCenter = west + lonSpan / 2.0;
+
+        Dictionary<int, double> filteredScores = new(docScores.Count);
+        foreach (KeyValuePair<int, double> kv in docScores)
         {
-            foreach (KeyValuePair<int, Dictionary<string, string>> entry in matchedPerDoc)
+            int docId = kv.Key;
+            PythagorasDocument document = _docs[docId];
+            GeoPoint? geo = document.Geo;
+            if (geo is null ||
+                double.IsNaN(geo.Lat) ||
+                double.IsNaN(geo.Lng))
             {
-                if (filteredScores.ContainsKey(entry.Key))
-                {
-                    filteredMatches[entry.Key] = entry.Value;
-                }
+                continue;
             }
+
+            double lat = geo.Lat;
+            double lng = geo.Lng;
+
+            if (lat < south || lat > north || lng < west || lng > east)
+            {
+                continue;
+            }
+
+            // Encourage items closer to the box center without requiring extra configuration.
+            double closenessBoost = 0.0;
+            if (latSpan > 0.0 || lonSpan > 0.0)
+            {
+                double latDelta = Math.Abs(lat - latCenter) / (latSpan == 0.0 ? 1.0 : latSpan);
+                double lonDelta = Math.Abs(lng - lonCenter) / (lonSpan == 0.0 ? 1.0 : lonSpan);
+                double normalizedDistance = (latDelta + lonDelta) / 2.0;
+                closenessBoost = Math.Max(0.0, 1.0 - normalizedDistance);
+            }
+
+            filteredScores[docId] = kv.Value + closenessBoost;
         }
 
-        return (filteredScores, filteredMatches);
+        return filteredScores;
     }
 }
