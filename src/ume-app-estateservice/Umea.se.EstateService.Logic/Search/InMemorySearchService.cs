@@ -577,35 +577,12 @@ public sealed class InMemorySearchService
             return (docScores, matchedPerDoc);
         }
 
-        double latitude = geoFilter.Coordinate.Latitude;
-        double longitude = geoFilter.Coordinate.Longitude;
-        int radiusMeters = geoFilter.RadiusMeters;
-
-        Dictionary<int, double> filteredScores = new(docScores.Count);
-        foreach (KeyValuePair<int, double> kv in docScores)
+        Dictionary<int, double> filteredScores = geoFilter switch
         {
-            int docId = kv.Key;
-            PythagorasDocument document = _docs[docId];
-            GeoPoint? geo = document.Geo;
-            if (geo is null ||
-                double.IsNaN(geo.Lat) ||
-                double.IsNaN(geo.Lng))
-            {
-                continue;
-            }
-
-            double distance = GeoHelper.CalculateDistanceInMeters(latitude, longitude, geo.Lat, geo.Lng);
-            if (double.IsNaN(distance) || distance > radiusMeters)
-            {
-                continue;
-            }
-
-            double closenessBoost = radiusMeters > 0
-                ? Math.Max(0.0, (radiusMeters - distance) / radiusMeters)
-                : 0.0;
-
-            filteredScores[docId] = kv.Value + closenessBoost;
-        }
+            GeoRadiusFilter radiusFilter => ApplyRadiusFilter(docScores, radiusFilter),
+            GeoBoundingBoxFilter boxFilter => ApplyBoundingBoxFilter(docScores, boxFilter),
+            _ => new Dictionary<int, double>()
+        };
 
         if (filteredScores.Count == 0)
         {
@@ -628,5 +605,89 @@ public sealed class InMemorySearchService
         }
 
         return (filteredScores, filteredMatches);
+    }
+
+    private Dictionary<int, double> ApplyRadiusFilter(Dictionary<int, double> docScores, GeoRadiusFilter radiusFilter)
+    {
+        double latitude = radiusFilter.Coordinate.Latitude;
+        double longitude = radiusFilter.Coordinate.Longitude;
+        int radiusMeters = radiusFilter.RadiusMeters;
+
+        Dictionary<int, double> filteredScores = new(docScores.Count);
+        foreach (KeyValuePair<int, double> kv in docScores)
+        {
+            int docId = kv.Key;
+            PythagorasDocument document = _docs[docId];
+            GeoPoint? geo = document.GeoLocation;
+            if (geo is null ||
+                double.IsNaN(geo.Lat) ||
+                double.IsNaN(geo.Lng))
+            {
+                continue;
+            }
+
+            double distance = GeoHelper.CalculateDistanceInMeters(latitude, longitude, geo.Lat, geo.Lng);
+            if (double.IsNaN(distance) || distance > radiusMeters)
+            {
+                continue;
+            }
+
+            double closenessBoost = radiusMeters > 0
+                ? Math.Max(0.0, (radiusMeters - distance) / radiusMeters)
+                : 0.0;
+
+            filteredScores[docId] = kv.Value + closenessBoost;
+        }
+
+        return filteredScores;
+    }
+
+    private Dictionary<int, double> ApplyBoundingBoxFilter(Dictionary<int, double> docScores, GeoBoundingBoxFilter boxFilter)
+    {
+        double south = boxFilter.SouthWest.Latitude;
+        double west = boxFilter.SouthWest.Longitude;
+        double north = boxFilter.NorthEast.Latitude;
+        double east = boxFilter.NorthEast.Longitude;
+
+        double latSpan = north - south;
+        double lonSpan = east - west;
+        double latCenter = south + latSpan / 2.0;
+        double lonCenter = west + lonSpan / 2.0;
+
+        Dictionary<int, double> filteredScores = new(docScores.Count);
+        foreach (KeyValuePair<int, double> kv in docScores)
+        {
+            int docId = kv.Key;
+            PythagorasDocument document = _docs[docId];
+            GeoPoint? geo = document.GeoLocation;
+            if (geo is null ||
+                double.IsNaN(geo.Lat) ||
+                double.IsNaN(geo.Lng))
+            {
+                continue;
+            }
+
+            double lat = geo.Lat;
+            double lng = geo.Lng;
+
+            if (lat < south || lat > north || lng < west || lng > east)
+            {
+                continue;
+            }
+
+            // Encourage items closer to the box center without requiring extra configuration.
+            double closenessBoost = 0.0;
+            if (latSpan > 0.0 || lonSpan > 0.0)
+            {
+                double latDelta = Math.Abs(lat - latCenter) / (latSpan == 0.0 ? 1.0 : latSpan);
+                double lonDelta = Math.Abs(lng - lonCenter) / (lonSpan == 0.0 ? 1.0 : lonSpan);
+                double normalizedDistance = (latDelta + lonDelta) / 2.0;
+                closenessBoost = Math.Max(0.0, 1.0 - normalizedDistance);
+            }
+
+            filteredScores[docId] = kv.Value + closenessBoost;
+        }
+
+        return filteredScores;
     }
 }

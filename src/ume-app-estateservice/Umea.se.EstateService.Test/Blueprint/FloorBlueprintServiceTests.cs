@@ -199,4 +199,45 @@ public class FloorBlueprintServiceTests
         cleaned.ShouldNotContain(" x=\"10\"");
         cleaned.ShouldNotContain(" y=\"20\"");
     }
+
+    [Fact]
+    public async Task GetBlueprintAsync_WhenSvg_NormalizesFontSizes()
+    {
+        string sourceSvg =
+            """
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+              <text font-size="0.4">Room A</text>
+              <text style="font-size:0.3">Room B</text>
+              <text style="font-size:0.5px">Room C</text>
+            </svg>
+            """;
+
+        FakePythagorasClient client = new()
+        {
+            OnGetFloorBlueprintAsync = (_, _, _, _) =>
+            {
+                byte[] payload = Encoding.UTF8.GetBytes(sourceSvg);
+                HttpResponseMessage response = new(HttpStatusCode.OK)
+                {
+                    Content = new ByteArrayContent(payload)
+                };
+                response.Content.Headers.ContentType = new MediaTypeHeaderValue("image/svg+xml");
+
+                return Task.FromResult(response);
+            }
+        };
+
+        PythagorasHandler handler = new(client);
+        FloorBlueprintHandler fbHandler = new(client, handler, NullLogger<FloorBlueprintHandler>.Instance);
+
+        FloorBlueprint result = await fbHandler.GetBlueprintAsync(7, BlueprintFormat.Svg, includeWorkspaceTexts: false);
+
+        result.Content.Position = 0;
+        using StreamReader reader = new(result.Content, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
+        string cleaned = await reader.ReadToEndAsync();
+
+        cleaned.ShouldContain("font-size=\"0.4px\"");
+        cleaned.ShouldContain("font-size:0.3px");
+        cleaned.ShouldContain("font-size:0.5px");
+    }
 }

@@ -128,7 +128,7 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
             Name = item.Name,
             Address = FormatAddress(item.Address),
             PopularName = item.PopularName,
-            Geo = MapGeoLocation(item.GeoLocation),
+            GeoLocation = MapGeoLocation(item.GeoLocation),
             RankScore = rankScore,
             UpdatedAt = item.UpdatedAt,
             Ancestors = []
