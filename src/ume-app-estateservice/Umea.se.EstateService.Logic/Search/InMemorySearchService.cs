@@ -618,7 +618,7 @@ public sealed class InMemorySearchService
         {
             int docId = kv.Key;
             PythagorasDocument document = _docs[docId];
-            GeoPoint? geo = document.Geo;
+            GeoPoint? geo = document.GeoLocation;
             if (geo is null ||
                 double.IsNaN(geo.Lat) ||
                 double.IsNaN(geo.Lng))
@@ -659,7 +659,7 @@ public sealed class InMemorySearchService
         {
             int docId = kv.Key;
             PythagorasDocument document = _docs[docId];
-            GeoPoint? geo = document.Geo;
+            GeoPoint? geo = document.GeoLocation;
             if (geo is null ||
                 double.IsNaN(geo.Lat) ||
                 double.IsNaN(geo.Lng))
