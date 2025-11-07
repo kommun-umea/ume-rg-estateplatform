@@ -1,10 +1,10 @@
 using System.Collections.Immutable;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 using Umea.se.EstateService.API.Controllers.Requests;
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.Shared.Models;
-using Umea.se.Toolkit.Auth;
 using QueryArgs = Umea.se.EstateService.Logic.Interfaces.QueryArgs;
 
 namespace Umea.se.EstateService.API.Controllers;
@@ -12,7 +12,7 @@ namespace Umea.se.EstateService.API.Controllers;
 [ApiController]
 [Produces("application/json")]
 [Route(ApiRoutes.Rooms)]
-[AuthorizeApiKey]
+[Authorize]
 public class RoomController(IPythagorasHandler pythagorasHandler) : ControllerBase
 {
     /// <summary>

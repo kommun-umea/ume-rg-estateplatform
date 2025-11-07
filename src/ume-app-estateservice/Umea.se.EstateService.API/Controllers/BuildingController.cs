@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
 using Swashbuckle.AspNetCore.Annotations;
@@ -6,7 +7,6 @@ using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.EstateService.Shared.Search;
-using Umea.se.Toolkit.Auth;
 using QueryArgs = Umea.se.EstateService.Logic.Interfaces.QueryArgs;
 
 namespace Umea.se.EstateService.API.Controllers;
@@ -14,7 +14,7 @@ namespace Umea.se.EstateService.API.Controllers;
 [ApiController]
 [Produces("application/json")]
 [Route(ApiRoutes.Buildings)]
-[AuthorizeApiKey]
+[Authorize]
 public class BuildingController(IPythagorasHandler pythagorasService, IIndexedPythagorasDocumentReader documentReader, IBuildingImageService buildingImageService) : ControllerBase
 {
     private readonly IIndexedPythagorasDocumentReader _documentReader = documentReader;
