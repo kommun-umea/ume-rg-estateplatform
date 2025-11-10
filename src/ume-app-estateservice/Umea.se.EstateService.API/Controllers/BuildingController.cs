@@ -7,6 +7,7 @@ using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.EstateService.Shared.Search;
+using Umea.se.EstateService.Shared.ValueObjects;
 using QueryArgs = Umea.se.EstateService.Logic.Interfaces.QueryArgs;
 
 namespace Umea.se.EstateService.API.Controllers;
@@ -138,6 +139,37 @@ public class BuildingController(IPythagorasHandler pythagorasService, IIndexedPy
         IReadOnlyList<BuildingInfoModel> buildings = await QueryBuildingsAsync(request, cancellationToken).ConfigureAwait(false);
         await EnrichBuildingStatisticsAsync(buildings, cancellationToken).ConfigureAwait(false);
         return Ok(buildings);
+    }
+
+    /// <summary>
+    /// Gets geolocations for all buildings from the cached search index.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <response code="200">Returns the list of building ids with their coordinates.</response>
+    [HttpGet("geolocations")]
+    [SwaggerOperation(
+        Summary = "Get building geolocations",
+        Description = "Retrieves every building with its ID and geo coordinates sourced from the cached Pythagoras documents."
+    )]
+    [SwaggerResponse(StatusCodes.Status200OK, "List of building geolocations", typeof(IReadOnlyList<BuildingLocationModel>))]
+    public async Task<ActionResult<IReadOnlyList<BuildingLocationModel>>> GetBuildingGeolocationsAsync(CancellationToken cancellationToken)
+    {
+        IReadOnlyCollection<PythagorasDocument> documents = await _documentReader
+            .GetIndexedDocumentsAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        BuildingLocationModel[] locations = documents
+            .Where(static document => document.Type == NodeType.Building)
+            .Select(static document => new BuildingLocationModel
+            {
+                Id = document.Id,
+                GeoLocation = document.GeoLocation is { } geo
+                    ? new GeoPointModel(geo.Lat, geo.Lng)
+                    : null
+            })
+            .ToArray();
+
+        return Ok(locations);
     }
 
     /// <summary>
