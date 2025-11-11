@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
 using Swashbuckle.AspNetCore.Annotations;
 using Umea.se.EstateService.API.Controllers.Requests;
+using Umea.se.EstateService.API.Results;
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.Shared.Models;
@@ -95,28 +96,13 @@ public class BuildingController(IPythagorasHandler pythagorasService, IIndexedPy
             return NotFound();
         }
 
-        HttpContext.Response.RegisterForDispose(image);
-
-        Stream imageStream = image.OpenContentStream();
-
-        FileStreamResult fileResult = File(
-            imageStream,
-            image.ContentType ?? "application/octet-stream",
-            fileDownloadName: image.FileName,
-            enableRangeProcessing: false);
-
-        if (image.ContentLength.HasValue)
-        {
-            HttpContext.Response.ContentLength = image.ContentLength.Value;
-        }
-
         Response.GetTypedHeaders().CacheControl = new CacheControlHeaderValue
         {
             Public = true,
             MaxAge = TimeSpan.FromHours(24)
         };
 
-        return fileResult;
+        return new StreamResourceActionResult(image);
     }
 
     /// <summary>
