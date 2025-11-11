@@ -1,6 +1,6 @@
-using System.Net;
 using Microsoft.Extensions.Logging;
 using Umea.se.EstateService.Logic.Interfaces;
+using Umea.se.EstateService.ServiceAccess.Common;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
@@ -30,39 +30,23 @@ public sealed class BuildingImageService(IPythagorasClient pythagorasClient, ILo
         GalleryImageFile selected = SelectPrimaryImage(images);
         GalleryImageVariant variant = MapVariant(size);
 
-        HttpResponseMessage response = await pythagorasClient
+        BinaryResourceResult? resource = await pythagorasClient
             .GetGalleryImageDataAsync(selected.Id, variant, cancellationToken)
             .ConfigureAwait(false);
 
-        if (response.StatusCode == HttpStatusCode.NotFound)
+        if (resource is null)
         {
             logger.LogInformation("Gallery image {ImageId} for building {BuildingId} returned 404.", selected.Id, buildingId);
-            response.Dispose();
             return null;
         }
 
-        try
-        {
-            response.EnsureSuccessStatusCode();
-        }
-        catch
-        {
-            response.Dispose();
-            throw;
-        }
-
-        Stream content = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-
-        string? contentType = response.Content.Headers.ContentType?.MediaType;
-        long? contentLength = response.Content.Headers.ContentLength;
-
         return new BuildingImageResult(
-            content,
-            contentType,
+            resource.Content,
+            resource.ContentType,
             selected.Name,
-            contentLength,
+            resource.Length,
             selected.Id,
-            response);
+            resource);
     }
 
     private static GalleryImageVariant MapVariant(BuildingImageSize size) => size switch

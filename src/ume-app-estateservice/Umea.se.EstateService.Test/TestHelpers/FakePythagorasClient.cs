@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Umea.se.EstateService.ServiceAccess.Common;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
@@ -120,9 +121,9 @@ public sealed class FakePythagorasClient : IPythagorasClient
         return CaptureAsync<GalleryImageFile>($"rest/v1/building/{buildingId}/galleryimagefile", query: null, cancellationToken);
     }
 
-    public Func<int, GalleryImageVariant, CancellationToken, Task<HttpResponseMessage>>? OnGetGalleryImageDataAsync { get; set; }
+    public Func<int, GalleryImageVariant, CancellationToken, Task<BinaryResourceResult?>>? OnGetGalleryImageDataAsync { get; set; }
 
-    public Task<HttpResponseMessage> GetGalleryImageDataAsync(int imageId, GalleryImageVariant variant, CancellationToken cancellationToken = default)
+    public Task<BinaryResourceResult?> GetGalleryImageDataAsync(int imageId, GalleryImageVariant variant, CancellationToken cancellationToken = default)
     {
         if (imageId <= 0)
         {
@@ -171,6 +172,7 @@ public sealed class FakePythagorasClient : IPythagorasClient
         NavigationFolderUiListDataRequests.Clear();
         _navigationFolderUiListDataResults.Clear();
         OnGetGalleryImageDataAsync = null;
+        OnGetFloorBlueprintAsync = null;
     }
 
     /// <summary>
@@ -236,9 +238,9 @@ public sealed class FakePythagorasClient : IPythagorasClient
         _calculatedPropertyResults.Enqueue(result);
     }
 
-    public Func<int, BlueprintFormat, IDictionary<int, IReadOnlyList<string>>?, CancellationToken, Task<HttpResponseMessage>>? OnGetFloorBlueprintAsync { get; set; }
+    public Func<int, BlueprintFormat, IDictionary<int, IReadOnlyList<string>>?, CancellationToken, Task<BinaryResourceResult?>>? OnGetFloorBlueprintAsync { get; set; }
 
-    public Task<HttpResponseMessage> GetFloorBlueprintAsync(
+    public Task<BinaryResourceResult?> GetFloorBlueprintAsync(
         int floorId,
         BlueprintFormat format,
         IDictionary<int, IReadOnlyList<string>>? workspaceTexts,

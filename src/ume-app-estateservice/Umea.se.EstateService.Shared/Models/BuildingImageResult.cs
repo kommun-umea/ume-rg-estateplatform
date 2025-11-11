@@ -2,7 +2,7 @@ namespace Umea.se.EstateService.Shared.Models;
 
 public sealed class BuildingImageResult : IDisposable, IAsyncDisposable
 {
-    private readonly HttpResponseMessage _response;
+    private readonly IAsyncDisposable _lifetime;
     private bool _disposed;
 
     public BuildingImageResult(
@@ -11,14 +11,14 @@ public sealed class BuildingImageResult : IDisposable, IAsyncDisposable
         string? fileName,
         long? contentLength,
         int imageId,
-        HttpResponseMessage response)
+        IAsyncDisposable lifetime)
     {
         Content = content ?? throw new ArgumentNullException(nameof(content));
         ContentType = contentType;
         FileName = fileName;
         ContentLength = contentLength;
         ImageId = imageId;
-        _response = response ?? throw new ArgumentNullException(nameof(response));
+        _lifetime = lifetime ?? throw new ArgumentNullException(nameof(lifetime));
     }
 
     public Stream Content { get; }
@@ -34,13 +34,18 @@ public sealed class BuildingImageResult : IDisposable, IAsyncDisposable
             return;
         }
 
-        _response.Dispose();
         _disposed = true;
+        _lifetime.DisposeAsync().AsTask().GetAwaiter().GetResult();
     }
 
     public ValueTask DisposeAsync()
     {
-        Dispose();
-        return ValueTask.CompletedTask;
+        if (_disposed)
+        {
+            return ValueTask.CompletedTask;
+        }
+
+        _disposed = true;
+        return _lifetime.DisposeAsync();
     }
 }

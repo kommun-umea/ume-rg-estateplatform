@@ -1,3 +1,4 @@
+using Umea.se.EstateService.ServiceAccess.Common;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 
@@ -15,7 +16,7 @@ public interface IPythagorasClient
     Task<IReadOnlyDictionary<int, CalculatedPropertyValueDto>> GetCalculatedPropertyValuesForEstateAsync(int estateId, CalculatedPropertyValueRequest? request = null, CancellationToken cancellationToken = default);
     Task<UiListDataResponse<BuildingInfo>> PostBuildingUiListDataAsync(BuildingUiListDataRequest request, CancellationToken cancellationToken = default);
     Task<UiListDataResponse<NavigationFolder>> PostNavigationFolderUiListDataAsync(NavigationFolderUiListDataRequest request, CancellationToken cancellationToken = default);
-    Task<HttpResponseMessage> GetFloorBlueprintAsync(int floorId, BlueprintFormat format, IDictionary<int, IReadOnlyList<string>>? workspaceTexts, CancellationToken cancellationToken = default);
+    Task<BinaryResourceResult?> GetFloorBlueprintAsync(int floorId, BlueprintFormat format, IDictionary<int, IReadOnlyList<string>>? workspaceTexts, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<GalleryImageFile>> GetBuildingGalleryImagesAsync(int buildingId, CancellationToken cancellationToken = default);
-    Task<HttpResponseMessage> GetGalleryImageDataAsync(int imageId, GalleryImageVariant variant, CancellationToken cancellationToken = default);
+    Task<BinaryResourceResult?> GetGalleryImageDataAsync(int imageId, GalleryImageVariant variant, CancellationToken cancellationToken = default);
 }
