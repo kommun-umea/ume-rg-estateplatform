@@ -4,5 +4,5 @@ namespace Umea.se.EstateService.Logic.Interfaces;
 
 public interface IBuildingImageService
 {
-    Task<BuildingImageResult?> GetPrimaryImageAsync(int buildingId, BuildingImageSize size, CancellationToken cancellationToken = default);
+    Task<IStreamResourceResult?> GetPrimaryImageAsync(int buildingId, BuildingImageSize size, CancellationToken cancellationToken = default);
 }

@@ -76,9 +76,9 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IP
             throw new KeyNotFoundException($"Blueprint for floor {floorId} was not found.");
         }
 
-        await using (resource.ConfigureAwait(false))
+        await using (resource)
         {
-            using Stream responseStream = resource.Content;
+            await using Stream responseStream = resource.OpenContentStream();
             MemoryStream buffer = new();
             await responseStream.CopyToAsync(buffer, cancellationToken).ConfigureAwait(false);
             buffer.Position = 0;

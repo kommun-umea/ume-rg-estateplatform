@@ -86,7 +86,7 @@ public class BuildingController(IPythagorasHandler pythagorasService, IIndexedPy
             return BadRequest("Building id must be positive.");
         }
 
-        BuildingImageResult? image = await _buildingImageService
+        IStreamResourceResult? image = await _buildingImageService
             .GetPrimaryImageAsync(buildingId, size, cancellationToken)
             .ConfigureAwait(false);
 
@@ -97,8 +97,10 @@ public class BuildingController(IPythagorasHandler pythagorasService, IIndexedPy
 
         HttpContext.Response.RegisterForDispose(image);
 
+        Stream imageStream = image.OpenContentStream();
+
         FileStreamResult fileResult = File(
-            image.Content,
+            imageStream,
             image.ContentType ?? "application/octet-stream",
             fileDownloadName: image.FileName,
             enableRangeProcessing: false);

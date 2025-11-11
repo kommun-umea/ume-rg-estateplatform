@@ -10,7 +10,7 @@ namespace Umea.se.EstateService.Logic.Handlers;
 
 public sealed class BuildingImageService(IPythagorasClient pythagorasClient, ILogger<BuildingImageService> logger) : IBuildingImageService
 {
-    public async Task<BuildingImageResult?> GetPrimaryImageAsync(int buildingId, BuildingImageSize size, CancellationToken cancellationToken = default)
+    public async Task<IStreamResourceResult?> GetPrimaryImageAsync(int buildingId, BuildingImageSize size, CancellationToken cancellationToken = default)
     {
         if (buildingId <= 0)
         {
@@ -40,12 +40,15 @@ public sealed class BuildingImageService(IPythagorasClient pythagorasClient, ILo
             return null;
         }
 
+        Stream content = resource.OpenContentStream();
+
         return new BuildingImageResult(
-            resource.Content,
+            content,
             resource.ContentType,
             selected.Name,
-            resource.Length,
+            resource.ContentLength,
             selected.Id,
+            resource,
             resource);
     }
 

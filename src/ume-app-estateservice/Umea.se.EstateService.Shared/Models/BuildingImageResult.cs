@@ -1,9 +1,9 @@
 namespace Umea.se.EstateService.Shared.Models;
 
-public sealed class BuildingImageResult : IDisposable, IAsyncDisposable
+public sealed class BuildingImageResult : DisposableStreamResult
 {
-    private readonly IAsyncDisposable _lifetime;
-    private bool _disposed;
+    private readonly IDisposable _lifetime;
+    private readonly IAsyncDisposable? _asyncLifetime;
 
     public BuildingImageResult(
         Stream content,
@@ -11,41 +11,28 @@ public sealed class BuildingImageResult : IDisposable, IAsyncDisposable
         string? fileName,
         long? contentLength,
         int imageId,
-        IAsyncDisposable lifetime)
+        IDisposable lifetime,
+        IAsyncDisposable? asyncLifetime = null)
+        : base(content, contentType, fileName, contentLength)
     {
-        Content = content ?? throw new ArgumentNullException(nameof(content));
-        ContentType = contentType;
-        FileName = fileName;
-        ContentLength = contentLength;
         ImageId = imageId;
         _lifetime = lifetime ?? throw new ArgumentNullException(nameof(lifetime));
+        _asyncLifetime = asyncLifetime;
     }
 
-    public Stream Content { get; }
-    public string? ContentType { get; }
-    public string? FileName { get; }
-    public long? ContentLength { get; }
     public int ImageId { get; }
 
-    public void Dispose()
+    protected override void DisposeManagedResources() => _lifetime.Dispose();
+
+    protected override async ValueTask DisposeManagedResourcesAsync()
     {
-        if (_disposed)
+        if (_asyncLifetime is not null)
         {
-            return;
+            await _asyncLifetime.DisposeAsync().ConfigureAwait(false);
         }
-
-        _disposed = true;
-        _lifetime.DisposeAsync().AsTask().GetAwaiter().GetResult();
-    }
-
-    public ValueTask DisposeAsync()
-    {
-        if (_disposed)
+        else
         {
-            return ValueTask.CompletedTask;
+            _lifetime.Dispose();
         }
-
-        _disposed = true;
-        return _lifetime.DisposeAsync();
     }
 }

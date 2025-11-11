@@ -1,34 +1,24 @@
 using System.Net;
 using System.Net.Http.Headers;
+using Umea.se.EstateService.Shared.Models;
 
 namespace Umea.se.EstateService.ServiceAccess.Common;
 
 /// <summary>
 /// Represents a streamed binary payload plus associated metadata.
 /// </summary>
-public sealed record BinaryResourceResult(
-    Stream Content,
-    string? ContentType,
-    string? FileName,
-    long? Length,
-    string? ETag,
-    IReadOnlyDictionary<string, string?> Headers) : IDisposable, IAsyncDisposable
+public sealed class BinaryResourceResult(Stream content,
+    string? contentType,
+    string? fileName,
+    long? length,
+    string? eTag,
+    IReadOnlyDictionary<string, string?> headers,
+    HttpResponseMessage? response = null)
+    : DisposableStreamResult(content, contentType, fileName, length)
 {
-    private readonly HttpResponseMessage? _response;
-    private bool _disposed;
-
-    public BinaryResourceResult(
-        Stream content,
-        string? contentType,
-        string? fileName,
-        long? length,
-        string? eTag,
-        IReadOnlyDictionary<string, string?> headers,
-        HttpResponseMessage? response)
-        : this(content, contentType, fileName, length, eTag, headers)
-    {
-        _response = response;
-    }
+    private readonly HttpResponseMessage? _response = response;
+    public string? ETag { get; } = eTag;
+    public IReadOnlyDictionary<string, string?> Headers { get; } = headers ?? throw new ArgumentNullException(nameof(headers));
 
     public static async Task<BinaryResourceResult?> CreateFromResponseAsync(HttpResponseMessage response, CancellationToken cancellationToken = default)
     {
@@ -83,27 +73,17 @@ public sealed record BinaryResourceResult(
             response);
     }
 
-    public void Dispose()
+    protected override void DisposeManagedResources() => _response?.Dispose();
+
+    protected override async ValueTask DisposeManagedResourcesAsync()
     {
-        if (_disposed)
+        if (_response is IAsyncDisposable asyncResponse)
         {
-            return;
+            await asyncResponse.DisposeAsync().ConfigureAwait(false);
         }
-
-        _disposed = true;
-        Content.Dispose();
-        _response?.Dispose();
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_disposed)
+        else
         {
-            return;
+            _response?.Dispose();
         }
-
-        _disposed = true;
-        await Content.DisposeAsync().ConfigureAwait(false);
-        _response?.Dispose();
     }
 }
