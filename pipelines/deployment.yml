@@ -12,7 +12,7 @@ resources:
     - repository: templates
       type: git
       name: Turkos/ume-pipeline-templates
-      ref: story/15222 #ÄNDRA DENNA TILL EN EGEN FÖR GITHUB TEMPLATES vid dev. GÄller för alla ställen där denna refereras in. Ändra till releasetag sedan.
+      ref: story/15222 #ÄNDRA DENNA TILL EN EGEN FÖR GITHUB TEMPLATES vid dev. GÄller för alla ställen där denna refereras in. Ändra till releasetag sedan när färdig.
 
 
 parameters:
