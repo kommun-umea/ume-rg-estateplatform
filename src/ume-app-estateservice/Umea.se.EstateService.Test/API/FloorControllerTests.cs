@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using Microsoft.AspNetCore.Http;
 using Umea.se.EstateService.API;
 using Umea.se.EstateService.ServiceAccess;
+using Umea.se.EstateService.ServiceAccess.Common;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.EstateService.Test.TestHelpers;
@@ -60,12 +61,7 @@ public class FloorControllerTests : ControllerTestCloud<TestApiFactory, Program,
         _fakeClient.OnGetFloorBlueprintAsync = (_, _, _, _) =>
         {
             byte[] pdfBytes = [0x25, 0x50, 0x44, 0x46]; // %PDF header
-            HttpResponseMessage httpResponse = new(System.Net.HttpStatusCode.OK)
-            {
-                Content = new ByteArrayContent(pdfBytes)
-            };
-            httpResponse.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/pdf");
-            return Task.FromResult(httpResponse);
+            return Task.FromResult<BinaryResourceResult?>(CreateResource(pdfBytes, "application/pdf"));
         };
 
         HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Floors}/10/blueprint?format=Pdf");
@@ -83,12 +79,7 @@ public class FloorControllerTests : ControllerTestCloud<TestApiFactory, Program,
         _fakeClient.OnGetFloorBlueprintAsync = (_, _, _, _) =>
         {
             byte[] svgBytes = "<svg></svg>"u8.ToArray();
-            HttpResponseMessage httpResponse = new(System.Net.HttpStatusCode.OK)
-            {
-                Content = new ByteArrayContent(svgBytes)
-            };
-            httpResponse.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/svg+xml");
-            return Task.FromResult(httpResponse);
+            return Task.FromResult<BinaryResourceResult?>(CreateResource(svgBytes, "image/svg+xml"));
         };
 
         HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Floors}/7/blueprint?format=Svg");
@@ -103,11 +94,7 @@ public class FloorControllerTests : ControllerTestCloud<TestApiFactory, Program,
     public async Task GetFloorBlueprintAsync_WhenServiceUnavailable_Returns502()
     {
         _fakeClient.Reset();
-        _fakeClient.OnGetFloorBlueprintAsync = (_, _, _, _) =>
-        {
-            HttpResponseMessage httpResponse = new(System.Net.HttpStatusCode.ServiceUnavailable);
-            return Task.FromResult(httpResponse);
-        };
+        _fakeClient.OnGetFloorBlueprintAsync = (_, _, _, _) => throw new HttpRequestException("service unavailable");
 
         HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Floors}/12/blueprint?format=Pdf");
 
@@ -118,14 +105,16 @@ public class FloorControllerTests : ControllerTestCloud<TestApiFactory, Program,
     public async Task GetFloorBlueprintAsync_WhenNotFound_Returns404()
     {
         _fakeClient.Reset();
-        _fakeClient.OnGetFloorBlueprintAsync = (_, _, _, _) =>
-        {
-            HttpResponseMessage httpResponse = new(System.Net.HttpStatusCode.NotFound);
-            return Task.FromResult(httpResponse);
-        };
+        _fakeClient.OnGetFloorBlueprintAsync = (_, _, _, _) => Task.FromResult<BinaryResourceResult?>(null);
 
         HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Floors}/42/blueprint?format=Svg");
 
         response.StatusCode.ShouldBe(System.Net.HttpStatusCode.NotFound);
+    }
+
+    private static BinaryResourceResult CreateResource(byte[] payload, string contentType, string? fileName = null)
+    {
+        MemoryStream stream = new(payload, writable: false);
+        return new BinaryResourceResult(stream, contentType, fileName, payload.Length, null, new Dictionary<string, string?>());
     }
 }

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Umea.se.EstateService.ServiceAccess.Common;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
@@ -173,7 +174,7 @@ public class BuildingControllerTests : ControllerTestCloud<TestApiFactory, Progr
             new GalleryImageFile { Id = 2, Name = "older.jpg", Updated = now.AddDays(-1) });
 
         byte[] expected = [1, 2, 3, 4];
-        _fakeClient.OnGetGalleryImageDataAsync = (imageId, variant, _) =>
+        _fakeClient.OnGetGalleryImageDataAsync = async (imageId, variant, _) =>
         {
             imageId.ShouldBe(1);
             variant.ShouldBe(GalleryImageVariant.Original);
@@ -184,7 +185,7 @@ public class BuildingControllerTests : ControllerTestCloud<TestApiFactory, Progr
             };
             response.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg");
             response.Content.Headers.ContentLength = expected.Length;
-            return Task.FromResult(response);
+            return await BinaryResourceResult.CreateFromResponseAsync(response, CancellationToken.None).ConfigureAwait(false);
         };
 
         HttpResponseMessage result = await _client.GetAsync($"{ApiRoutes.Buildings}/1/image");
@@ -215,7 +216,7 @@ public class BuildingControllerTests : ControllerTestCloud<TestApiFactory, Progr
         _fakeClient.Reset();
         _fakeClient.SetGetAsyncResult(new GalleryImageFile { Id = 5, Name = "thumb.jpg", Updated = DateTime.UtcNow });
 
-        _fakeClient.OnGetGalleryImageDataAsync = (imageId, variant, _) =>
+        _fakeClient.OnGetGalleryImageDataAsync = async (imageId, variant, _) =>
         {
             imageId.ShouldBe(5);
             variant.ShouldBe(GalleryImageVariant.Thumbnail);
@@ -224,7 +225,7 @@ public class BuildingControllerTests : ControllerTestCloud<TestApiFactory, Progr
                 Content = new ByteArrayContent([0x1])
             };
             response.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
-            return Task.FromResult(response);
+            return await BinaryResourceResult.CreateFromResponseAsync(response, CancellationToken.None).ConfigureAwait(false);
         };
 
         HttpResponseMessage result = await _client.GetAsync($"{ApiRoutes.Buildings}/1/image?size=thumbnail");

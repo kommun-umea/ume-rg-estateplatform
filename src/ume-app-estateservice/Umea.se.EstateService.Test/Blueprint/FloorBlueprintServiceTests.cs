@@ -1,10 +1,10 @@
 using System.Net;
-using System.Net.Http.Headers;
 using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
 using Umea.se.EstateService.Logic.Exceptions;
 using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Logic.Models;
+using Umea.se.EstateService.ServiceAccess.Common;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.Test.TestHelpers;
@@ -19,19 +19,7 @@ public class FloorBlueprintServiceTests
         FakePythagorasClient client = new()
         {
             OnGetFloorBlueprintAsync = (_, _, _, _) =>
-            {
-                HttpResponseMessage response = new(HttpStatusCode.OK)
-                {
-                    Content = new ByteArrayContent([1, 2, 3])
-                };
-                response.Content.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
-                response.Content.Headers.ContentDisposition = new ContentDispositionHeaderValue("attachment")
-                {
-                    FileName = "source.pdf"
-                };
-
-                return Task.FromResult(response);
-            }
+                Task.FromResult<BinaryResourceResult?>(CreateResource([1, 2, 3], "application/pdf", "source.pdf"))
         };
 
         PythagorasHandler handler = new(client);
@@ -68,19 +56,7 @@ public class FloorBlueprintServiceTests
         FakePythagorasClient client = new()
         {
             OnGetFloorBlueprintAsync = (_, _, _, _) =>
-            {
-                HttpResponseMessage response = new(HttpStatusCode.OK)
-                {
-                    Content = new ByteArrayContent([])
-                };
-                response.Content.Headers.ContentType = new MediaTypeHeaderValue("image/svg+xml");
-                response.Content.Headers.ContentDisposition = new ContentDispositionHeaderValue("attachment")
-                {
-                    FileName = "floor"
-                };
-
-                return Task.FromResult(response);
-            }
+                Task.FromResult<BinaryResourceResult?>(CreateResource([], "image/svg+xml", "floor"))
         };
 
         PythagorasHandler handler = new(client);
@@ -113,14 +89,7 @@ public class FloorBlueprintServiceTests
             OnGetFloorBlueprintAsync = (_, _, texts, _) =>
             {
                 capturedTexts = texts;
-
-                HttpResponseMessage response = new(HttpStatusCode.OK)
-                {
-                    Content = new ByteArrayContent([1])
-                };
-                response.Content.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
-
-                return Task.FromResult(response);
+                return Task.FromResult<BinaryResourceResult?>(CreateResource([1], "application/pdf"));
             }
         };
 
@@ -168,17 +137,7 @@ public class FloorBlueprintServiceTests
             OnGetFloorBlueprintAsync = (_, _, _, _) =>
             {
                 byte[] payload = Encoding.UTF8.GetBytes(sourceSvg);
-                HttpResponseMessage response = new(HttpStatusCode.OK)
-                {
-                    Content = new ByteArrayContent(payload)
-                };
-                response.Content.Headers.ContentType = new MediaTypeHeaderValue("image/svg+xml");
-                response.Content.Headers.ContentDisposition = new ContentDispositionHeaderValue("attachment")
-                {
-                    FileName = "sample.svg"
-                };
-
-                return Task.FromResult(response);
+                return Task.FromResult<BinaryResourceResult?>(CreateResource(payload, "image/svg+xml", "sample.svg"));
             }
         };
 
@@ -217,13 +176,7 @@ public class FloorBlueprintServiceTests
             OnGetFloorBlueprintAsync = (_, _, _, _) =>
             {
                 byte[] payload = Encoding.UTF8.GetBytes(sourceSvg);
-                HttpResponseMessage response = new(HttpStatusCode.OK)
-                {
-                    Content = new ByteArrayContent(payload)
-                };
-                response.Content.Headers.ContentType = new MediaTypeHeaderValue("image/svg+xml");
-
-                return Task.FromResult(response);
+                return Task.FromResult<BinaryResourceResult?>(CreateResource(payload, "image/svg+xml"));
             }
         };
 
@@ -239,5 +192,11 @@ public class FloorBlueprintServiceTests
         cleaned.ShouldContain("font-size=\"0.4px\"");
         cleaned.ShouldContain("font-size:0.3px");
         cleaned.ShouldContain("font-size:0.5px");
+    }
+
+    private static BinaryResourceResult CreateResource(byte[] payload, string contentType, string? fileName = null)
+    {
+        MemoryStream stream = new(payload, writable: false);
+        return new BinaryResourceResult(stream, contentType, fileName, payload.Length, null, new Dictionary<string, string?>());
     }
 }
