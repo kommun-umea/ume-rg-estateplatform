@@ -18,9 +18,6 @@ public class SearchHandler(
     private InMemorySearchService? _searchService;
     private IReadOnlyList<PythagorasDocument>? _indexedDocuments;
 
-    public Task<ICollection<PythagorasDocument>> GetPythagorasDocumentsAsync()
-        => _documentProvider.GetDocumentsAsync();
-
     public int GetDocumentCount() => _searchService?.DocumentCount ?? 0;
 
     public async Task<IReadOnlyList<SearchResult>> SearchAsync(
@@ -84,7 +81,7 @@ public class SearchHandler(
     private async Task<InMemorySearchService> BuildSearchServiceAsync(CancellationToken _)
     {
         ICollection<PythagorasDocument> documents = await _documentProvider.GetDocumentsAsync().ConfigureAwait(false);
-        List<PythagorasDocument> snapshot = new(documents);
+        List<PythagorasDocument> snapshot = [.. documents];
         IEnumerable<PythagorasDocument> documentsToIndex = _excludeRooms
             ? snapshot.Where(static doc => doc.Type != NodeType.Room)
             : snapshot;
@@ -124,16 +121,14 @@ public class SearchHandler(
     public async Task<IReadOnlyCollection<PythagorasDocument>> GetIndexedDocumentsAsync(CancellationToken cancellationToken = default)
     {
         await EnsureSearchServiceAsync(cancellationToken).ConfigureAwait(false);
-        return _indexedDocuments ?? Array.Empty<PythagorasDocument>();
+        return _indexedDocuments ?? [];
     }
 
     public async Task<IReadOnlyDictionary<int, PythagorasDocument>> GetBuildingDocumentsByIdsAsync(IEnumerable<int> buildingIds, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(buildingIds);
 
-        HashSet<int> idSet = buildingIds
-            .Where(static id => id > 0)
-            .ToHashSet();
+        HashSet<int> idSet = [.. buildingIds.Where(static id => id > 0)];
 
         if (idSet.Count == 0)
         {
@@ -158,11 +153,11 @@ public class SearchHandler(
     {
         if (estateId <= 0)
         {
-            return Array.Empty<PythagorasDocument>();
+            return [];
         }
 
         IReadOnlyCollection<PythagorasDocument> documents = await GetIndexedDocumentsAsync(cancellationToken).ConfigureAwait(false);
-        List<PythagorasDocument> result = new();
+        List<PythagorasDocument> result = [];
 
         foreach (PythagorasDocument document in documents)
         {

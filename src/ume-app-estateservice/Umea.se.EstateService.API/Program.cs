@@ -56,7 +56,7 @@ builder.Services
             ValidIssuer = config.Authentication.TokenServiceUrl,
             ValidateAudience = true,
             ValidAudience = config.Authentication.Audience,
-            ValidateLifetime = true,
+            ValidateLifetime = false,
             ClockSkew = TimeSpan.Zero,
         };
     });

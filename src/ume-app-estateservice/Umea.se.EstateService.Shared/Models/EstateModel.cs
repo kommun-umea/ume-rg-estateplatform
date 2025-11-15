@@ -13,7 +13,7 @@ public sealed class EstateModel : ISearchable
     public decimal NetArea { get; init; }
     public GeoPointModel? GeoLocation { get; init; }
     public AddressModel? Address { get; init; }
-    public BuildingModel[]? Buildings { get; init; }
+    public BuildingModel[]? Buildings { get; set; }
     public int BuildingCount { get; init; }
     public EstateExtendedPropertiesModel? ExtendedProperties { get; init; }
     public DateTimeOffset UpdatedAt => DateTime.Now;

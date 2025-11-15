@@ -31,9 +31,6 @@ public class PythagorasBuildingMapperTests
 
         model.Id.ShouldBe(dto.Id);
         model.Uid.ShouldBe(dto.Uid);
-        model.Version.ShouldBe(dto.Version);
-        model.Created.ShouldBe(dto.Created);
-        model.Updated.ShouldBe(dto.Updated);
         model.Name.ShouldBe(dto.Name);
         model.PopularName.ShouldBe(dto.PopularName);
 

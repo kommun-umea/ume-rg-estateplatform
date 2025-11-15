@@ -1,4 +1,4 @@
-﻿namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
+﻿namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Api.Request;
 
 /// <summary>
 /// Represents optional query parameters for the calculated property value endpoint.

@@ -6,9 +6,12 @@ using Umea.se.EstateService.ServiceAccess;
 using Umea.se.EstateService.Test.TestHelpers;
 using Umea.se.TestToolkit.TestInfrastructure;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
+using Umea.se.EstateService.Logic.Data.Entities;
+using Xunit;
 
 namespace Umea.se.EstateService.Test.API;
 
+[Collection("DataStoreTests")]
 public class EstateControllerTests : ControllerTestCloud<TestApiFactory, Program, HttpClientNames>
 {
     private readonly HttpClient _client;
@@ -21,15 +24,26 @@ public class EstateControllerTests : ControllerTestCloud<TestApiFactory, Program
         _fakeClient = WebAppFactory.FakeClient;
 
         MockManager.SetupUser(user => user.WithSsNo("1234567890"));
+
+        // Ensure a clean data store snapshot before each test.
+        DataStoreSeeder.Clear(WebAppFactory.GetDataStore());
     }
 
     [Fact]
     public async Task GetEstateBuildingsAsync_ReturnsFilteredBuildingsByEstateId()
     {
-        _fakeClient.Reset();
-        _fakeClient.SetGetAsyncResult(
-            new BuildingInfo { Id = 10, Name = "Building A" },
-            new BuildingInfo { Id = 11, Name = "Building B" });
+        DataStoreSeeder.Seed(
+            WebAppFactory.GetDataStore(),
+            estates:
+            [
+                new EstateEntity { Id = 123, Name = "Estate 123", PopularName = "Estate 123" }
+            ],
+            buildings:
+            [
+                new BuildingEntity { Id = 10, EstateId = 123, Name = "Building A", PopularName = "Building A" },
+                new BuildingEntity { Id = 11, EstateId = 123, Name = "Building B", PopularName = "Building B" },
+                new BuildingEntity { Id = 20, EstateId = 999, Name = "Other Estate Building", PopularName = "Other Estate Building" }
+            ]);
 
         HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Estates}/123/buildings");
         response.EnsureSuccessStatusCode();
@@ -39,36 +53,37 @@ public class EstateControllerTests : ControllerTestCloud<TestApiFactory, Program
 
         buildings.Count.ShouldBe(2);
         buildings.Select(b => b.Id).ShouldBe([10, 11]);
-        string decodedQuery = Uri.UnescapeDataString(_fakeClient.LastQueryString ?? string.Empty);
-        decodedQuery.ShouldContain("navigationFolderId=123");
-        _fakeClient.LastEndpoint.ShouldBe("rest/v1/building/info");
     }
 
     [Fact]
     public async Task GetEstateBuildingsAsync_WithZeroResults_ReturnsEmptyList()
     {
-        _fakeClient.Reset();
-        _fakeClient.SetGetAsyncResult(Array.Empty<BuildingInfo>());
+        // No buildings seeded for estate 456 -> should return empty list.
+        DataStoreSeeder.Seed(
+            WebAppFactory.GetDataStore(),
+            estates:
+            [
+                new EstateEntity { Id = 456, Name = "Estate 456", PopularName = "Estate 456" }
+            ]);
 
         HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Estates}/456/buildings");
         response.EnsureSuccessStatusCode();
 
         IReadOnlyList<BuildingInfoModel>? buildings = await response.Content.ReadFromJsonAsync<IReadOnlyList<BuildingInfoModel>>();
         buildings.ShouldNotBeNull();
-
         buildings.ShouldBeEmpty();
-        string decodedQuery = Uri.UnescapeDataString(_fakeClient.LastQueryString ?? string.Empty);
-        decodedQuery.ShouldContain("navigationFolderId=456");
-        _fakeClient.LastEndpoint.ShouldBe("rest/v1/building/info");
     }
 
     [Fact]
     public async Task GetEstatesAsync_ReturnsEstatesWithDefaultPaging()
     {
-        _fakeClient.Reset();
-        _fakeClient.SetGetAsyncResult(
-            new NavigationFolder { Id = 1, Name = "Estate One", TypeId = (int)NavigationFolderType.Estate },
-            new NavigationFolder { Id = 2, Name = "Estate Two", TypeId = (int)NavigationFolderType.Estate });
+        DataStoreSeeder.Seed(
+            WebAppFactory.GetDataStore(),
+            estates:
+            [
+                new EstateEntity { Id = 1, Name = "Estate One", PopularName = "Estate One" },
+                new EstateEntity { Id = 2, Name = "Estate Two", PopularName = "Estate Two" }
+            ]);
 
         HttpResponseMessage response = await _client.GetAsync(ApiRoutes.Estates);
         response.EnsureSuccessStatusCode();
@@ -77,21 +92,17 @@ public class EstateControllerTests : ControllerTestCloud<TestApiFactory, Program
         estates.ShouldNotBeNull();
         estates.Count.ShouldBe(2);
         estates.Select(e => e.Id).ShouldBe([1, 2]);
-
-        string decodedQuery = Uri.UnescapeDataString(_fakeClient.LastQueryString ?? string.Empty);
-        decodedQuery.ShouldContain("pN[]=EQ:typeId");
-        decodedQuery.ShouldContain($"pV[]={(int)NavigationFolderType.Estate}");
-        decodedQuery.ShouldContain("navigationId=2");
-        decodedQuery.ShouldContain("includeAscendantBuildings=True");
-        _fakeClient.LastEndpoint.ShouldBe("rest/v1/navigationfolder/info");
     }
 
     [Fact]
     public async Task GetEstatesAsync_WithIncludeBuildingsFalse_DoesNotIncludeBuildings()
     {
-        _fakeClient.Reset();
-        _fakeClient.SetGetAsyncResult(
-            new NavigationFolder { Id = 3, Name = "Estate Three", TypeId = (int)NavigationFolderType.Estate });
+        DataStoreSeeder.Seed(
+            WebAppFactory.GetDataStore(),
+            estates:
+            [
+                new EstateEntity { Id = 3, Name = "Estate Three", PopularName = "Estate Three" }
+            ]);
 
         HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Estates}?includeBuildings=false");
         response.EnsureSuccessStatusCode();
@@ -99,18 +110,18 @@ public class EstateControllerTests : ControllerTestCloud<TestApiFactory, Program
         IReadOnlyList<EstateModel>? estates = await response.Content.ReadFromJsonAsync<IReadOnlyList<EstateModel>>();
         estates.ShouldNotBeNull();
         estates.ShouldHaveSingleItem();
-
-        string decodedQuery = Uri.UnescapeDataString(_fakeClient.LastQueryString ?? string.Empty);
-        decodedQuery.ShouldContain("includeAscendantBuildings=False");
-        _fakeClient.LastEndpoint.ShouldBe("rest/v1/navigationfolder/info");
     }
 
     [Fact]
     public async Task GetEstatesAsync_WithSearchTerm_AppliesGeneralSearch()
     {
-        _fakeClient.Reset();
-        _fakeClient.SetGetAsyncResult(
-            new NavigationFolder { Id = 4, Name = "Alpha Estate", TypeId = (int)NavigationFolderType.Estate });
+        DataStoreSeeder.Seed(
+            WebAppFactory.GetDataStore(),
+            estates:
+            [
+                new EstateEntity { Id = 4, Name = "Alpha Estate", PopularName = "Alpha Estate" },
+                new EstateEntity { Id = 5, Name = "Beta Estate", PopularName = "Beta Estate" }
+            ]);
 
         HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Estates}?searchTerm=alpha");
         response.EnsureSuccessStatusCode();
@@ -119,38 +130,34 @@ public class EstateControllerTests : ControllerTestCloud<TestApiFactory, Program
         estates.ShouldNotBeNull();
         estates.ShouldHaveSingleItem();
         estates[0].Name.ShouldBe("Alpha Estate");
-
-        string decodedQuery = Uri.UnescapeDataString(_fakeClient.LastQueryString ?? string.Empty);
-        decodedQuery.ShouldContain("generalSearch=alpha");
-        _fakeClient.LastEndpoint.ShouldBe("rest/v1/navigationfolder/info");
     }
 
     [Fact]
     public async Task GetEstatesAsync_WithPagingParameters_AppliesSkipAndTake()
     {
-        _fakeClient.Reset();
-        _fakeClient.SetGetAsyncResult(
-            new NavigationFolder { Id = 5, Name = "Estate Five", TypeId = (int)NavigationFolderType.Estate });
+        DataStoreSeeder.Seed(
+            WebAppFactory.GetDataStore(),
+            estates: Enumerable.Range(1, 20)
+                .Select(i => new EstateEntity { Id = i, Name = $"Estate {i}", PopularName = $"Estate {i}" }));
 
         HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Estates}?limit=10&offset=5");
         response.EnsureSuccessStatusCode();
 
         IReadOnlyList<EstateModel>? estates = await response.Content.ReadFromJsonAsync<IReadOnlyList<EstateModel>>();
         estates.ShouldNotBeNull();
-
-        string decodedQuery = Uri.UnescapeDataString(_fakeClient.LastQueryString ?? string.Empty);
-        decodedQuery.ShouldContain("firstResult=5");
-        decodedQuery.ShouldContain("maxResults=10");
-        _fakeClient.LastEndpoint.ShouldBe("rest/v1/navigationfolder/info");
+        // Offset 5, limit 10 -> 10 estates starting from Id 6
+        estates.Select(e => e.Id).ShouldBe(Enumerable.Range(6, 10).ToArray());
     }
 
     [Fact]
     public async Task GetEstateAsync_WhenFound_ReturnsEstateWithProperties()
     {
-        _fakeClient.Reset();
-        _fakeClient.SetGetAsyncResult(
-            new NavigationFolder { Id = 100, Name = "Test Estate", TypeId = (int)NavigationFolderType.Estate });
-        _fakeClient.SetCalculatedPropertyValuesResult(new Dictionary<int, CalculatedPropertyValueDto>());
+        DataStoreSeeder.Seed(
+            WebAppFactory.GetDataStore(),
+            estates:
+            [
+                new EstateEntity { Id = 100, Name = "Test Estate", PopularName = "Test Estate" }
+            ]);
 
         HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Estates}/100");
         response.EnsureSuccessStatusCode();
@@ -159,19 +166,11 @@ public class EstateControllerTests : ControllerTestCloud<TestApiFactory, Program
         estate.ShouldNotBeNull();
         estate.Id.ShouldBe(100);
         estate.Name.ShouldBe("Test Estate");
-
-        _fakeClient.EndpointsCalled.ShouldBe([
-            "rest/v1/navigationfolder/info",
-            "rest/v1/navigationfolder/100/property/calculatedvalue"
-        ]);
     }
 
     [Fact]
     public async Task GetEstateAsync_WhenNotFound_Returns404()
     {
-        _fakeClient.Reset();
-        _fakeClient.SetGetAsyncResult(Array.Empty<NavigationFolder>());
-
         HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Estates}/999");
 
         response.StatusCode.ShouldBe(System.Net.HttpStatusCode.NotFound);

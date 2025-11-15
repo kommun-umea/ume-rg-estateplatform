@@ -5,7 +5,6 @@ using Swashbuckle.AspNetCore.Annotations;
 using Umea.se.EstateService.API.Controllers.Requests;
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.Shared.Models;
-using QueryArgs = Umea.se.EstateService.Logic.Interfaces.QueryArgs;
 
 namespace Umea.se.EstateService.API.Controllers;
 
@@ -13,7 +12,7 @@ namespace Umea.se.EstateService.API.Controllers;
 [Produces("application/json")]
 [Route(ApiRoutes.Rooms)]
 [Authorize]
-public class RoomController(IPythagorasHandler pythagorasHandler) : ControllerBase
+public class RoomController(IPythagorasHandlerV2 pythagorasHandlerV2) : ControllerBase
 {
     /// <summary>
     /// Retrieves a specific room.
@@ -31,8 +30,8 @@ public class RoomController(IPythagorasHandler pythagorasHandler) : ControllerBa
     [SwaggerResponse(StatusCodes.Status404NotFound, "Room not found.")]
     public async Task<ActionResult<RoomModel>> GetRoomAsync(int roomId, [FromQuery] RoomDetailsRequest request, CancellationToken cancellationToken)
     {
-        IReadOnlyList<RoomModel> rooms = await pythagorasHandler
-            .GetRoomsAsync([roomId], buildingId: null, null, queryArgs: null, cancellationToken)
+        IReadOnlyList<RoomModel> rooms = await pythagorasHandlerV2
+            .GetRoomsAsync([roomId], buildingId: null, floorId: null, queryArgs: null, cancellationToken)
             .ConfigureAwait(false);
 
         RoomModel? room = rooms.Count > 0 ? rooms[0] : null;
@@ -70,7 +69,9 @@ public class RoomController(IPythagorasHandler pythagorasHandler) : ControllerBa
                 searchTerm: request.SearchTerm)
             : null;
 
-        IReadOnlyList<RoomModel> rooms = await pythagorasHandler.GetRoomsAsync(roomIds, request.BuildingId, null, queryArgs, cancellationToken);
+        IReadOnlyList<RoomModel> rooms = await pythagorasHandlerV2
+            .GetRoomsAsync(roomIds, request.BuildingId, floorId: null, queryArgs: queryArgs, cancellationToken)
+            .ConfigureAwait(false);
 
         return Ok(rooms);
     }

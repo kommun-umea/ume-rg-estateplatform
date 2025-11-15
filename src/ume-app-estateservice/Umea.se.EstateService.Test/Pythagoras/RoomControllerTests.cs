@@ -8,9 +8,12 @@ using Umea.se.EstateService.API;
 using Umea.se.EstateService.ServiceAccess;
 using Umea.se.EstateService.Test.TestHelpers;
 using Umea.se.TestToolkit.TestInfrastructure;
+using Umea.se.EstateService.Logic.Data.Entities;
+using Xunit;
 
 namespace Umea.se.EstateService.Test.Pythagoras;
 
+[Collection("DataStoreTests")]
 public class RoomControllerTests : ControllerTestCloud<TestApiFactory, Program, HttpClientNames>
 {
     private readonly HttpClient _client;
@@ -23,13 +26,29 @@ public class RoomControllerTests : ControllerTestCloud<TestApiFactory, Program, 
         _fakeClient = WebAppFactory.FakeClient;
 
         MockManager.SetupUser(user => user.WithName("Integration Tester").WithActualAuthorization());
+
+        // Ensure clean datastore before each Pythagoras room test
+        DataStoreSeeder.Clear(WebAppFactory.GetDataStore());
     }
 
     [Fact]
     public async Task GetRoomsAsync_ReturnsRooms()
     {
-        _fakeClient.Reset();
-        _fakeClient.SetGetAsyncResult(new Workspace { Id = 11, Name = "WS" });
+        DataStoreSeeder.Seed(
+            WebAppFactory.GetDataStore(),
+            rooms:
+            [
+                new RoomEntity
+                {
+                    Id = 11,
+                    BuildingId = 1,
+                    Name = "WS",
+                    PopularName = "WS",
+                    GrossArea = 10,
+                    NetArea = 9,
+                    Capacity = 1
+                }
+            ]);
 
         HttpResponseMessage response = await _client.GetAsync(ApiRoutes.Rooms);
 
@@ -37,41 +56,102 @@ public class RoomControllerTests : ControllerTestCloud<TestApiFactory, Program, 
         IReadOnlyList<RoomModel>? rooms = await response.Content.ReadFromJsonAsync<IReadOnlyList<RoomModel>>();
         rooms.ShouldNotBeNull();
         rooms.ShouldHaveSingleItem().Id.ShouldBe(11);
-        _fakeClient.LastEndpoint.ShouldBe("rest/v1/workspace/info");
-        _fakeClient.LastQueryString.ShouldBe("maxResults=50");
     }
 
     [Fact]
     public async Task GetRoomsAsync_WithIds_BuildsIdsOnlyQuery()
     {
-        _fakeClient.Reset();
-        _fakeClient.SetGetAsyncResult(new Workspace { Id = 11, Name = "WS" });
+        DataStoreSeeder.Seed(
+            WebAppFactory.GetDataStore(),
+            rooms:
+            [
+                new RoomEntity
+                {
+                    Id = 1,
+                    BuildingId = 1,
+                    Name = "WS-1",
+                    PopularName = "WS-1",
+                    GrossArea = 10,
+                    NetArea = 9,
+                    Capacity = 1
+                },
+                new RoomEntity
+                {
+                    Id = 2,
+                    BuildingId = 1,
+                    Name = "WS-2",
+                    PopularName = "WS-2",
+                    GrossArea = 20,
+                    NetArea = 18,
+                    Capacity = 2
+                },
+                new RoomEntity
+                {
+                    Id = 99,
+                    BuildingId = 1,
+                    Name = "Other",
+                    PopularName = "Other",
+                    GrossArea = 5,
+                    NetArea = 4,
+                    Capacity = 1
+                }
+            ]);
 
         HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Rooms}?ids=1&ids=2");
 
         response.EnsureSuccessStatusCode();
-        string decodedQuery = Uri.UnescapeDataString(_fakeClient.LastQueryString ?? string.Empty);
-        decodedQuery.ShouldContain("id[]=1");
-        decodedQuery.ShouldContain("id[]=2");
-        decodedQuery.ShouldNotContain("generalSearch");
+        IReadOnlyList<RoomModel>? rooms = await response.Content.ReadFromJsonAsync<IReadOnlyList<RoomModel>>();
+        rooms.ShouldNotBeNull();
+        rooms.Select(r => r.Id).ShouldBe([1, 2]);
     }
 
     [Fact]
     public async Task GetRoomsAsync_WithSearchAndBuildingId_AppliesFilters()
     {
-        _fakeClient.Reset();
-        _fakeClient.SetGetAsyncResult(new Workspace { Id = 11, Name = "WS" });
+        DataStoreSeeder.Seed(
+            WebAppFactory.GetDataStore(),
+            rooms:
+            [
+                new RoomEntity
+                {
+                    Id = 21,
+                    BuildingId = 42,
+                    Name = "Lab 1",
+                    PopularName = "Lab 1",
+                    GrossArea = 10,
+                    NetArea = 9,
+                    Capacity = 1
+                },
+                new RoomEntity
+                {
+                    Id = 22,
+                    BuildingId = 42,
+                    Name = "Lab 2",
+                    PopularName = "Lab 2",
+                    GrossArea = 20,
+                    NetArea = 18,
+                    Capacity = 2
+                },
+                new RoomEntity
+                {
+                    Id = 23,
+                    BuildingId = 99,
+                    Name = "Other",
+                    PopularName = "Other",
+                    GrossArea = 5,
+                    NetArea = 4,
+                    Capacity = 1
+                }
+            ]);
 
-        string url = $"{ApiRoutes.Rooms}?searchTerm=lab&buildingId=42&limit=10&offset=5";
+        // Offset 0 so both matching lab rooms are included after filtering.
+        string url = $"{ApiRoutes.Rooms}?searchTerm=lab&buildingId=42&limit=10&offset=0";
         HttpResponseMessage response = await _client.GetAsync(url);
 
         response.EnsureSuccessStatusCode();
-        string decodedQuery = Uri.UnescapeDataString(_fakeClient.LastQueryString ?? string.Empty);
-        decodedQuery.ShouldContain("generalSearch=lab");
-        decodedQuery.ShouldContain("firstResult=5");
-        decodedQuery.ShouldContain("maxResults=10");
-        decodedQuery.ShouldContain("pN[]=EQ:buildingId");
-        decodedQuery.ShouldContain("pV[]=42");
+        IReadOnlyList<RoomModel>? rooms = await response.Content.ReadFromJsonAsync<IReadOnlyList<RoomModel>>();
+        rooms.ShouldNotBeNull();
+        rooms.Select(r => r.Id).ShouldBe([21, 22]);
     }
 
     [Fact]

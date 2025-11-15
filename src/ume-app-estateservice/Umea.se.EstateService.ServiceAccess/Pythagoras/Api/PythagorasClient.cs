@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Api.Request;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.Toolkit.ExternalService;

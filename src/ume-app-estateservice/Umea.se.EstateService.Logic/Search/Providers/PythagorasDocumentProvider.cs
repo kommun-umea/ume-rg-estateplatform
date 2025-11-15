@@ -130,7 +130,6 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
             PopularName = item.PopularName,
             GeoLocation = MapGeoLocation(item.GeoLocation),
             RankScore = rankScore,
-            UpdatedAt = item.UpdatedAt,
             Ancestors = []
         };
     }

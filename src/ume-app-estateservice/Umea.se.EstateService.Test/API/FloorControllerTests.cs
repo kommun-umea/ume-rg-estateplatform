@@ -6,9 +6,12 @@ using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.EstateService.Test.TestHelpers;
 using Umea.se.TestToolkit.TestInfrastructure;
+using Umea.se.EstateService.Logic.Data.Entities;
+using Xunit;
 
 namespace Umea.se.EstateService.Test.API;
 
+[Collection("DataStoreTests")]
 public class FloorControllerTests : ControllerTestCloud<TestApiFactory, Program, HttpClientNames>
 {
     private readonly HttpClient _client;
@@ -21,13 +24,27 @@ public class FloorControllerTests : ControllerTestCloud<TestApiFactory, Program,
         _fakeClient = WebAppFactory.FakeClient;
 
         MockManager.SetupUser(user => user.WithActualAuthorization());
+
+        // Ensure clean datastore for each floor test
+        DataStoreSeeder.Clear(WebAppFactory.GetDataStore());
     }
 
     [Fact]
     public async Task GetFloorAsync_WhenFound_ReturnsFloor()
     {
-        _fakeClient.Reset();
-        _fakeClient.SetGetAsyncResult(new Floor { Id = 1655, Name = "Test Floor", Uid = Guid.NewGuid() });
+        DataStoreSeeder.Seed(
+            WebAppFactory.GetDataStore(),
+            floors:
+            [
+                new FloorEntity
+                {
+                    Id = 1655,
+                    Uid = Guid.NewGuid(),
+                    BuildingId = 1,
+                    Name = "Test Floor",
+                    PopularName = "Test Floor"
+                }
+            ]);
 
         HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Floors}/1655");
         response.EnsureSuccessStatusCode();
@@ -36,18 +53,11 @@ public class FloorControllerTests : ControllerTestCloud<TestApiFactory, Program,
         floor.ShouldNotBeNull();
         floor.Id.ShouldBe(1655);
         floor.Name.ShouldBe("Test Floor");
-
-        string decodedQuery = Uri.UnescapeDataString(_fakeClient.LastQueryString ?? string.Empty);
-        decodedQuery.ShouldContain("floorIds[]=1655");
-        _fakeClient.LastEndpoint.ShouldBe("rest/v1/floor/info");
     }
 
     [Fact]
     public async Task GetFloorAsync_WhenMissing_Returns404()
     {
-        _fakeClient.Reset();
-        _fakeClient.SetGetAsyncResult(Array.Empty<Floor>());
-
         HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Floors}/999");
 
         response.StatusCode.ShouldBe(System.Net.HttpStatusCode.NotFound);

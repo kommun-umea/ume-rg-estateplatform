@@ -2,7 +2,7 @@ namespace Umea.se.EstateService.Logic.Options;
 
 public sealed class SearchOptions
 {
-    public const string SectionName = "SearchIndex";
+    public const string SectionName = "EstateData";
 
     /// <summary>
     /// When true, room documents are excluded from the search index.

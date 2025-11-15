@@ -1,3 +1,4 @@
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Api.Request;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 

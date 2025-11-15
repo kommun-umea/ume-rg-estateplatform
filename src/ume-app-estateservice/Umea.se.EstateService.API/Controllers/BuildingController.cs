@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
 using Swashbuckle.AspNetCore.Annotations;
@@ -6,8 +6,6 @@ using Umea.se.EstateService.API.Controllers.Requests;
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.Shared.Models;
-using Umea.se.EstateService.Shared.Search;
-using Umea.se.EstateService.Shared.ValueObjects;
 using QueryArgs = Umea.se.EstateService.Logic.Interfaces.QueryArgs;
 
 namespace Umea.se.EstateService.API.Controllers;
@@ -16,46 +14,45 @@ namespace Umea.se.EstateService.API.Controllers;
 [Produces("application/json")]
 [Route(ApiRoutes.Buildings)]
 [Authorize]
-public class BuildingController(IPythagorasHandler pythagorasService, IIndexedPythagorasDocumentReader documentReader, IBuildingImageService buildingImageService) : ControllerBase
+public class BuildingController(IPythagorasHandlerV2 pythagorasHandlerV2, IBuildingImageService buildingImageService) : ControllerBase
 {
-    private readonly IIndexedPythagorasDocumentReader _documentReader = documentReader;
-    private readonly IBuildingImageService _buildingImageService = buildingImageService;
-
     /// <summary>
-    /// Gets details for a specific building.
+    /// Gets a list of buildings.
     /// </summary>
-    /// <param name="buildingId">The ID of the building.</param>
+    /// <summary>
+    /// Gets a list of buildings.
+    /// </summary>
+    /// <remarks>
+    /// Returns building information using the standard limit/offset paging model.
+    /// </remarks>
+    /// <param name="request">Query parameters for paging and filtering.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <response code="200">Returns the requested building.</response>
-    /// <response code="400">If the buildingId is not valid.</response>
-    /// <response code="404">If the building does not exist.</response>
-    [HttpGet("{buildingId:int}")]
+    /// <response code="200">Returns the list of buildings.</response>
+    [HttpGet]
     [SwaggerOperation(
-        Summary = "Get a building",
-        Description = "Retrieves a single building including its extended properties."
+        Summary = "Get buildings",
+        Description = "Retrieves buildings using limit/offset paging and optional estate filtering."
     )]
-    [SwaggerResponse(StatusCodes.Status200OK, "The building", typeof(BuildingInfoModel))]
-    [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid buildingId")]
-    [SwaggerResponse(StatusCodes.Status404NotFound, "Building not found")]
-    public async Task<ActionResult<BuildingInfoModel>> GetBuildingByIdAsync(int buildingId, CancellationToken cancellationToken = default)
+    [SwaggerResponse(StatusCodes.Status200OK, "List of buildings", typeof(IReadOnlyList<BuildingInfoModel>))]
+    public async Task<ActionResult<IReadOnlyList<BuildingInfoModel>>> GetBuildingsAsync(
+        [FromQuery] BuildingListRequest request,
+        CancellationToken cancellationToken)
     {
-        if (buildingId <= 0)
-        {
-            return BadRequest("Building id must be positive.");
-        }
+        QueryArgs queryArgs = QueryArgs.Create(
+            skip: request.Offset > 0 ? request.Offset : null,
+            take: request.Limit > 0 ? request.Limit : null,
+            searchTerm: request.SearchTerm);
 
-        BuildingInfoModel? building = await pythagorasService
-            .GetBuildingByIdAsync(buildingId, BuildingIncludeOptions.Ascendants | BuildingIncludeOptions.ExtendedProperties, cancellationToken)
+        IReadOnlyList<BuildingInfoModel> buildings = await pythagorasHandlerV2
+            .GetBuildingsAsync(
+                buildingIds: null,
+                estateId: request.EstateId,
+                includeOptions: BuildingIncludeOptions.None,
+                queryArgs: queryArgs,
+                cancellationToken)
             .ConfigureAwait(false);
 
-        if (building is null)
-        {
-            return NotFound();
-        }
-
-        await EnrichBuildingStatisticsAsync([building], cancellationToken).ConfigureAwait(false);
-
-        return Ok(building);
+        return Ok(buildings);
     }
 
     /// <summary>
@@ -86,7 +83,7 @@ public class BuildingController(IPythagorasHandler pythagorasService, IIndexedPy
             return BadRequest("Building id must be positive.");
         }
 
-        BuildingImageResult? image = await _buildingImageService
+        BuildingImageResult? image = await buildingImageService
             .GetPrimaryImageAsync(buildingId, size, cancellationToken)
             .ConfigureAwait(false);
 
@@ -118,30 +115,6 @@ public class BuildingController(IPythagorasHandler pythagorasService, IIndexedPy
     }
 
     /// <summary>
-    /// Gets a list of buildings.
-    /// </summary>
-    /// <remarks>
-    /// Returns building information using the standard limit/offset paging model.
-    /// </remarks>
-    /// <param name="request">Query parameters for paging and filtering.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <response code="200">Returns the list of buildings.</response>
-    [HttpGet]
-    [SwaggerOperation(
-        Summary = "Get buildings",
-        Description = "Retrieves buildings using limit/offset paging, search, and optional estate filtering."
-    )]
-    [SwaggerResponse(StatusCodes.Status200OK, "List of buildings", typeof(IReadOnlyList<BuildingInfoModel>))]
-    public async Task<ActionResult<IReadOnlyList<BuildingInfoModel>>> GetBuildingsAsync(
-        [FromQuery] BuildingListRequest request,
-        CancellationToken cancellationToken)
-    {
-        IReadOnlyList<BuildingInfoModel> buildings = await QueryBuildingsAsync(request, cancellationToken).ConfigureAwait(false);
-        await EnrichBuildingStatisticsAsync(buildings, cancellationToken).ConfigureAwait(false);
-        return Ok(buildings);
-    }
-
-    /// <summary>
     /// Gets geolocations for all buildings from the cached search index.
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -154,20 +127,9 @@ public class BuildingController(IPythagorasHandler pythagorasService, IIndexedPy
     [SwaggerResponse(StatusCodes.Status200OK, "List of building geolocations", typeof(IReadOnlyList<BuildingLocationModel>))]
     public async Task<ActionResult<IReadOnlyList<BuildingLocationModel>>> GetBuildingGeolocationsAsync(CancellationToken cancellationToken)
     {
-        IReadOnlyCollection<PythagorasDocument> documents = await _documentReader
-            .GetIndexedDocumentsAsync(cancellationToken)
+        IReadOnlyList<BuildingLocationModel> locations = await pythagorasHandlerV2
+            .GetBuildingGeolocationsAsync(cancellationToken)
             .ConfigureAwait(false);
-
-        BuildingLocationModel[] locations = documents
-            .Where(static document => document.Type == NodeType.Building)
-            .Select(static document => new BuildingLocationModel
-            {
-                Id = document.Id,
-                GeoLocation = document.GeoLocation is { } geo
-                    ? new GeoPointModel(geo.Lat, geo.Lng)
-                    : null
-            })
-            .ToArray();
 
         return Ok(locations);
     }
@@ -191,12 +153,17 @@ public class BuildingController(IPythagorasHandler pythagorasService, IIndexedPy
         [FromQuery] BuildingRoomsRequest request,
         CancellationToken cancellationToken)
     {
+        if (buildingId <= 0)
+        {
+            return BadRequest("Building id must be positive.");
+        }
+
         QueryArgs queryArgs = QueryArgs.Create(
             skip: request.Offset > 0 ? request.Offset : null,
             take: request.Limit > 0 ? request.Limit : null,
             searchTerm: request.SearchTerm);
 
-        IReadOnlyList<RoomModel> rooms = await pythagorasService
+        IReadOnlyList<RoomModel> rooms = await pythagorasHandlerV2
             .GetBuildingWorkspacesAsync(buildingId, request.FloorId, queryArgs, cancellationToken)
             .ConfigureAwait(false);
 
@@ -222,63 +189,58 @@ public class BuildingController(IPythagorasHandler pythagorasService, IIndexedPy
         [FromQuery] BuildingFloorsRequest request,
         CancellationToken cancellationToken)
     {
+        if (buildingId <= 0)
+        {
+            return BadRequest("Building id must be positive.");
+        }
+
         QueryArgs queryArgs = QueryArgs.Create(
             skip: request.Offset > 0 ? request.Offset : null,
             take: request.Limit > 0 ? request.Limit : null,
             searchTerm: request.SearchTerm);
 
-        IReadOnlyList<FloorInfoModel> floors = await pythagorasService
+        IReadOnlyList<FloorInfoModel> floors = await pythagorasHandlerV2
             .GetBuildingFloorsAsync(buildingId, request.IncludeRooms, floorsQueryArgs: queryArgs, roomsQueryArgs: null, cancellationToken)
             .ConfigureAwait(false);
 
         return Ok(floors);
     }
 
-    private async Task<IReadOnlyList<BuildingInfoModel>> QueryBuildingsAsync(
-        BuildingListRequest request,
-        CancellationToken cancellationToken)
+    /// <summary>
+    /// Gets details for a specific building.
+    /// </summary>
+    /// <param name="buildingId">The ID of the building.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <response code="200">Returns the requested building.</response>
+    /// <response code="400">If the buildingId is not valid.</response>
+    /// <response code="404">If the building does not exist.</response>
+    [HttpGet("{buildingId:int}")]
+    [SwaggerOperation(
+        Summary = "Get a building",
+        Description = "Retrieves a single building including its extended properties."
+    )]
+    [SwaggerResponse(StatusCodes.Status200OK, "The building", typeof(BuildingInfoModel))]
+    [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid buildingId")]
+    [SwaggerResponse(StatusCodes.Status404NotFound, "Building not found")]
+    public async Task<ActionResult<BuildingInfoModel>> GetBuildingByIdAsync(int buildingId, CancellationToken cancellationToken = default)
     {
-        QueryArgs queryArgs = QueryArgs.Create(
-            skip: request.Offset > 0 ? request.Offset : null,
-            take: request.Limit > 0 ? request.Limit : null,
-            searchTerm: request.SearchTerm);
-
-        return await pythagorasService.GetBuildingsAsync(buildingIds: null, estateId: request.EstateId, includeOptions: BuildingIncludeOptions.None, queryArgs: queryArgs, cancellationToken).ConfigureAwait(false);
-    }
-
-    private async Task EnrichBuildingStatisticsAsync(IEnumerable<BuildingInfoModel> buildings, CancellationToken cancellationToken)
-    {
-        if (buildings is null)
+        if (buildingId <= 0)
         {
-            return;
+            return BadRequest("Building id must be positive.");
         }
 
-        int[] ids = [.. buildings
-            .Select(static building => building.Id)
-            .Where(static id => id > 0)
-            .Distinct()];
-
-        if (ids.Length == 0)
-        {
-            return;
-        }
-
-        IReadOnlyDictionary<int, PythagorasDocument> docs = await _documentReader
-            .GetBuildingDocumentsByIdsAsync(ids, cancellationToken)
+        BuildingInfoModel? building = await pythagorasHandlerV2
+            .GetBuildingByIdAsync(
+                buildingId,
+                BuildingIncludeOptions.Ascendants | BuildingIncludeOptions.ExtendedProperties,
+                cancellationToken)
             .ConfigureAwait(false);
 
-        if (docs.Count == 0)
+        if (building is null)
         {
-            return;
+            return NotFound();
         }
 
-        foreach (BuildingInfoModel building in buildings)
-        {
-            if (docs.TryGetValue(building.Id, out PythagorasDocument? doc))
-            {
-                building.NumFloors = doc.NumFloors;
-                building.NumRooms = doc.NumRooms;
-            }
-        }
+        return Ok(building);
     }
 }

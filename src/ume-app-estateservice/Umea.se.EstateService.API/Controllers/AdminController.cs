@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
+using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.Logic.HostedServices;
 using Umea.se.Toolkit.Auth;
 
@@ -9,13 +10,13 @@ namespace Umea.se.EstateService.API.Controllers;
 [Produces("application/json")]
 [Route(ApiRoutes.Admin)]
 [AuthorizeApiKey]
-public sealed class AdminController(SearchIndexRefreshService refreshService) : ControllerBase
+public sealed class AdminController(ISearchRefreshOrchestrator searchRefreshOrchestrator) : ControllerBase
 {
     /// <summary>
-    /// Triggers a manual refresh of the search index.
+    /// Triggers a manual refresh of the data store and search index.
     /// </summary>
     /// <remarks>
-    /// Starts a background refresh of the search index. If a refresh is already running, the request is accepted but no new refresh is started.
+    /// Starts a background refresh of the data store and search index. If a refresh is already running, the request is accepted but no new refresh is started.
     /// </remarks>
     /// <returns>
     /// 202 Accepted with a message indicating whether the refresh was started or already running.
@@ -24,19 +25,19 @@ public sealed class AdminController(SearchIndexRefreshService refreshService) : 
     /// <response code="500">Unknown refresh status</response>
     [HttpPost("refresh-index")]
     [SwaggerOperation(
-        Summary = "Trigger manual search index refresh",
-        Description = "Starts a background refresh of the search index. If a refresh is already running, the request is accepted but no new refresh is started."
+        Summary = "Trigger manual search refresh",
+        Description = "Starts a background refresh of search-related data and the search index. If a refresh is already running, the request is accepted but no new refresh is started."
     )]
     [ProducesResponseType(typeof(object), StatusCodes.Status202Accepted)]
     [ProducesResponseType(typeof(object), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> RefreshIndex()
     {
-        RefreshStatus status = await refreshService.TriggerManualRefreshAsync().ConfigureAwait(false);
+        RefreshStatus status = await searchRefreshOrchestrator.TriggerManualRefreshAsync().ConfigureAwait(false);
 
         return status switch
         {
-            RefreshStatus.Started => Accepted(new { message = "Search index refresh started" }),
-            RefreshStatus.AlreadyRunning => Accepted(new { message = "Search index refresh already running" }),
+            RefreshStatus.Started => Accepted(new { message = "Search refresh started" }),
+            RefreshStatus.AlreadyRunning => Accepted(new { message = "Search refresh already running" }),
             _ => Problem(
                 statusCode: StatusCodes.Status500InternalServerError,
                 title: "Unknown refresh status",
@@ -62,7 +63,7 @@ public sealed class AdminController(SearchIndexRefreshService refreshService) : 
     [ProducesResponseType(typeof(SearchIndexInfo), StatusCodes.Status200OK)]
     public ActionResult<SearchIndexInfo> GetIndexInfo()
     {
-        SearchIndexInfo info = refreshService.GetIndexInfo();
+        SearchIndexInfo info = searchRefreshOrchestrator.GetIndexInfo();
         return Ok(info);
     }
 }

@@ -9,5 +9,4 @@ public interface ISearchable
     string? PopularName { get; }
     AddressModel? Address { get; }
     GeoPointModel? GeoLocation { get; }
-    DateTimeOffset UpdatedAt { get; }
 }

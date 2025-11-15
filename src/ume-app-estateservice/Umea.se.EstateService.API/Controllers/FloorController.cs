@@ -1,6 +1,5 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Net.Http.Headers;
 using Swashbuckle.AspNetCore.Annotations;
 using Umea.se.EstateService.API.Controllers.Requests;
 using Umea.se.EstateService.Logic.Exceptions;
@@ -14,13 +13,10 @@ namespace Umea.se.EstateService.API.Controllers;
 [Produces("application/json")]
 [Route(ApiRoutes.Floors)]
 [Authorize]
-public sealed class FloorController(
-    IFloorBlueprintService blueprintService,
-    IPythagorasHandler pythagorasHandler,
-    ILogger<FloorController> logger) : ControllerBase
+public sealed class FloorController(IFloorBlueprintService blueprintService, IPythagorasHandlerV2 pythagorasHandlerV2, ILogger<FloorController> logger) : ControllerBase
 {
     private readonly IFloorBlueprintService _blueprintService = blueprintService;
-    private readonly IPythagorasHandler _pythagorasHandler = pythagorasHandler;
+    private readonly IPythagorasHandlerV2 _pythagorasHandlerV2 = pythagorasHandlerV2;
     private readonly ILogger<FloorController> _logger = logger;
 
     /// <summary>
@@ -40,7 +36,7 @@ public sealed class FloorController(
         int floorId,
         CancellationToken cancellationToken)
     {
-        IReadOnlyList<FloorInfoModel> floors = await _pythagorasHandler
+        IReadOnlyList<FloorInfoModel> floors = await _pythagorasHandlerV2
             .GetFloorsAsync([floorId], queryArgs: null, cancellationToken)
             .ConfigureAwait(false);
 
@@ -88,10 +84,13 @@ public sealed class FloorController(
 
         try
         {
-            FloorBlueprint blueprint = await _blueprintService.GetBlueprintAsync(floorId, request.Format, request.IncludeWorkspaceTexts, cancellationToken).ConfigureAwait(false);
+            FloorBlueprint blueprint = await _blueprintService
+                .GetBlueprintAsync(floorId, request.Format, request.IncludeWorkspaceTexts, cancellationToken)
+                .ConfigureAwait(false);
+
             blueprint.Content.Position = 0;
 
-            Response.GetTypedHeaders().CacheControl = new CacheControlHeaderValue
+            Response.GetTypedHeaders().CacheControl = new Microsoft.Net.Http.Headers.CacheControlHeaderValue
             {
                 Public = true,
                 MaxAge = TimeSpan.FromHours(24)

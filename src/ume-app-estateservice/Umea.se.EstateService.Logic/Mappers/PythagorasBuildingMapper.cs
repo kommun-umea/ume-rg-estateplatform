@@ -14,9 +14,6 @@ public static class PythagorasBuildingMapper
         {
             Id = dto.Id,
             Uid = dto.Uid,
-            Version = dto.Version,
-            Created = dto.Created,
-            Updated = dto.Updated,
             Name = dto.Name ?? string.Empty,
             PopularName = dto.PopularName ?? string.Empty,
             GeoLocation = ToModel(dto.GeoLocation),
