@@ -1,20 +1,29 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 using Umea.se.EstateService.API.Controllers.Requests;
 using Umea.se.EstateService.Logic.Interfaces;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
-using Umea.se.Toolkit.Auth;
+using Umea.se.EstateService.Shared.Search;
+using QueryArgs = Umea.se.EstateService.Logic.Interfaces.QueryArgs;
 
 namespace Umea.se.EstateService.API.Controllers;
 
 [ApiController]
 [Produces("application/json")]
 [Route(ApiRoutes.Estates)]
-[AuthorizeApiKey]
-public class EstateController(IPythagorasHandler pythagorasService) : ControllerBase
+[Authorize]
+public class EstateController : ControllerBase
 {
+    private readonly IPythagorasHandler _pythagorasService;
+    private readonly IIndexedPythagorasDocumentReader _documentReader;
+
+    public EstateController(IPythagorasHandler pythagorasService, IIndexedPythagorasDocumentReader documentReader)
+    {
+        _pythagorasService = pythagorasService;
+        _documentReader = documentReader;
+    }
+
     /// <summary>
     /// Gets a specific estate.
     /// </summary>
@@ -34,7 +43,7 @@ public class EstateController(IPythagorasHandler pythagorasService) : Controller
         [FromQuery] EstateDetailsRequest request,
         CancellationToken cancellationToken)
     {
-        EstateModel? estate = await pythagorasService
+        EstateModel? estate = await _pythagorasService
             .GetEstateByIdAsync(estateId, request.IncludeBuildings, cancellationToken)
             .ConfigureAwait(false);
 
@@ -63,10 +72,13 @@ public class EstateController(IPythagorasHandler pythagorasService) : Controller
         [FromQuery] EstateListRequest request,
         CancellationToken cancellationToken)
     {
-        PythagorasQuery<NavigationFolder> query = BuildQuery(request);
+        QueryArgs queryArgs = QueryArgs.Create(
+            skip: request.Offset > 0 ? request.Offset : null,
+            take: request.Limit > 0 ? request.Limit : null,
+            searchTerm: request.SearchTerm);
 
-        IReadOnlyList<EstateModel> estates = await pythagorasService
-            .GetEstatesWithBuildingsAsync(query, cancellationToken);
+        IReadOnlyList<EstateModel> estates = await _pythagorasService
+            .GetEstatesWithBuildingsAsync(request.IncludeBuildings, queryArgs, cancellationToken);
 
         return Ok(estates);
     }
@@ -95,26 +107,53 @@ public class EstateController(IPythagorasHandler pythagorasService) : Controller
             return BadRequest("Estate id must be positive.");
         }
 
-        PythagorasQuery<BuildingInfo> query = new PythagorasQuery<BuildingInfo>()
-            .ApplyGeneralSearch(request)
-            .ApplyPaging(request);
+        QueryArgs queryArgs = QueryArgs.Create(
+            skip: request.Offset > 0 ? request.Offset : null,
+            take: request.Limit > 0 ? request.Limit : null,
+            searchTerm: request.SearchTerm);
 
-        IReadOnlyList<BuildingInfoModel> buildings = await pythagorasService
-            .GetBuildingsAsync(query.WithQueryParameter("navigationFolderId", estateId), cancellationToken);
+        IReadOnlyList<BuildingInfoModel> buildings = await _pythagorasService
+            .GetBuildingsAsync(buildingIds: null, estateId: estateId, includeOptions: ServiceAccess.Pythagoras.Enum.BuildingIncludeOptions.None, queryArgs: queryArgs, cancellationToken);
+
+        await EnrichBuildingStatisticsAsync(buildings, cancellationToken).ConfigureAwait(false);
 
         return Ok(buildings);
     }
 
-    private static PythagorasQuery<NavigationFolder> BuildQuery(EstateListRequest request)
+    private async Task EnrichBuildingStatisticsAsync(IEnumerable<BuildingInfoModel> buildings, CancellationToken cancellationToken)
     {
-        PythagorasQuery<NavigationFolder> query = new PythagorasQuery<NavigationFolder>()
-            .ApplyGeneralSearch(request);
-
-        if (request.IncludeBuildings)
+        if (buildings is null)
         {
-            query = query.WithQueryParameter("includeAscendantBuildings", true);
+            return;
         }
 
-        return query.ApplyPaging(request);
+        int[] ids = buildings
+            .Select(static building => building.Id)
+            .Where(static id => id > 0)
+            .Distinct()
+            .ToArray();
+
+        if (ids.Length == 0)
+        {
+            return;
+        }
+
+        IReadOnlyDictionary<int, PythagorasDocument> docs = await _documentReader
+            .GetBuildingDocumentsByIdsAsync(ids, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (docs.Count == 0)
+        {
+            return;
+        }
+
+        foreach (BuildingInfoModel building in buildings)
+        {
+            if (docs.TryGetValue(building.Id, out PythagorasDocument? doc))
+            {
+                building.NumFloors = doc.NumFloors;
+                building.NumRooms = doc.NumRooms;
+            }
+        }
     }
 }

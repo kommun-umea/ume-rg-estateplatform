@@ -7,7 +7,6 @@ using Umea.se.EstateService.Logic.Models;
 using Umea.se.EstateService.Logic.Exceptions;
 using Umea.se.EstateService.Logic.Helpers;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.Shared.Models;
 
@@ -41,11 +40,8 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IP
         {
             _logger.LogInformation("Workspace text enrichment requested for floor {FloorId}. Fetching room data.", floorId);
 
-            PythagorasQuery<Workspace> query = new PythagorasQuery<Workspace>()
-                .Where(workspace => workspace.FloorId, (int?)floorId);
-
             IReadOnlyList<RoomModel> rooms = await _pythagorasHandler
-                .GetRoomsAsync(query, cancellationToken)
+                .GetRoomsAsync(roomIds: null, buildingId: null, floorId: floorId, queryArgs: null, cancellationToken)
                 .ConfigureAwait(false);
 
             if (rooms.Count > 0)
@@ -138,6 +134,7 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IP
             XDocument document = XDocument.Load(source);
             SvgCleaner.RemoveNodes(document, _nodesToRemove);
             document = SvgCleaner.CropSvgToContent(document);
+            document = SvgCleaner.NormalizeFontSizes(document);
 
             MemoryStream cleaned = new();
             document.Save(cleaned, SaveOptions.DisableFormatting | SaveOptions.OmitDuplicateNamespaces);

@@ -1,4 +1,5 @@
 ﻿using System.Text.Json.Serialization;
+using Umea.se.EstateService.Shared.ValueObjects;
 
 namespace Umea.se.EstateService.Shared.Search;
 
@@ -10,12 +11,19 @@ public sealed class PythagorasDocument
     public NodeType Type { get; set; }
     public string Name { get; set; } = default!;
     public string? PopularName { get; set; }
-    public string? Address { get; set; }
+    public AddressModel? Address { get; set; }
+    [JsonIgnore]
+    public string? AddressSearchText => FormatAddress(Address);
     public List<string>? Aliases { get; set; }
     public List<Ancestor> Ancestors { get; set; } = [];
     public string? Path => string.Join(" > ", Ancestors.Select(a => a.Name + " " + a.PopularName).Append(Name + " " + PopularName));
     [JsonPropertyName("_geo")]
-    public GeoPoint? Geo { get; set; }
+    public GeoPoint? LegacyGeo
+    {
+        get => GeoLocation;
+        set => GeoLocation = value;
+    }
+    public GeoPoint? GeoLocation { get; set; }
     public string? ThumbnailUrl { get; set; }
     [JsonIgnore]
     public double RankScore { get; set; }
@@ -40,4 +48,22 @@ public sealed class PythagorasDocument
     public IReadOnlyDictionary<string, string>? ExtendedProperties { get; set; }
     [JsonIgnore]
     public DocumentKey Key => new(Type, Id);
+
+    private static string? FormatAddress(AddressModel? address)
+    {
+        if (address is null)
+        {
+            return null;
+        }
+
+        string[] parts =
+        [
+            address.Street,
+            address.ZipCode,
+            address.City
+        ];
+
+        string formatted = string.Join(' ', parts.Where(static p => !string.IsNullOrWhiteSpace(p)));
+        return string.IsNullOrWhiteSpace(formatted) ? null : formatted;
+    }
 }

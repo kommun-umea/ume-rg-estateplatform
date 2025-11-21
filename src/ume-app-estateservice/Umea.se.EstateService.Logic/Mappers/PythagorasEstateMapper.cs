@@ -1,3 +1,4 @@
+using Umea.se.EstateService.Logic.Helpers;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.EstateService.Shared.ValueObjects;
@@ -50,10 +51,10 @@ public static class PythagorasEstateMapper
         }
 
         return new AddressModel(
-            dto.AddressStreet ?? string.Empty,
-            dto.AddressZipCode ?? string.Empty,
-            dto.AddressCity ?? string.Empty,
-            dto.AddressCountry ?? string.Empty,
-            dto.AddressExtra ?? string.Empty);
+            StringHelper.Trim(dto.AddressStreet),
+            StringHelper.Trim(dto.AddressZipCode),
+            StringHelper.Trim(dto.AddressCity),
+            StringHelper.Trim(dto.AddressCountry),
+            StringHelper.Trim(dto.AddressExtra));
     }
 }
