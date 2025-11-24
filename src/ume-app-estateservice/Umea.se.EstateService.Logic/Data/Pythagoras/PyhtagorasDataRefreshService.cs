@@ -1,5 +1,4 @@
 ﻿using System.Collections.Immutable;
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Umea.se.EstateService.Logic.Data.Entities;
 using Umea.se.EstateService.Logic.Data.Mappers;
@@ -25,14 +24,6 @@ public sealed class PythagorasDataRefreshService(IPythagorasClient pythagorasCli
         public required IReadOnlyList<Floor> Floors { get; init; }
         public required IReadOnlyList<Workspace> Workspaces { get; init; }
     }
-
-#if DEBUG
-    private const string CachePath = "DebugDataCache";
-    private readonly string EstatesCachePath = Path.Combine(CachePath, "estates.json");
-    private readonly string BuildingsCachePath = Path.Combine(CachePath, "buildings.json");
-    private readonly string FloorsCachePath = Path.Combine(CachePath, "floors.json");
-    private readonly string WorkspacesCachePath = Path.Combine(CachePath, "workspaces.json");
-#endif
 
     /// <inheritdoc />
     public async Task RefreshDataAsync(CancellationToken cancellationToken = default)
@@ -146,63 +137,11 @@ public sealed class PythagorasDataRefreshService(IPythagorasClient pythagorasCli
 
     private async Task<PythagorasData> FetchDataAsync(CancellationToken cancellationToken)
     {
-#if DEBUG
-        if (CanReadFromCache())
-        {
-            logger.LogInformation("DEBUG MODE: Reading data from local cache");
-            return await ReadDataFromCacheAsync(cancellationToken);
-        }
-#endif
-
         PythagorasData data = await FetchDataSequentiallyAsync(cancellationToken).ConfigureAwait(false);
-
-#if DEBUG
-        logger.LogInformation("DEBUG MODE: Saving data to local cache");
-        await SaveDataToCacheAsync(data, cancellationToken);
-#endif
 
         return data;
     }
 
-#if DEBUG
-    private bool CanReadFromCache()
-    {
-        return File.Exists(EstatesCachePath)
-            && File.Exists(BuildingsCachePath)
-            && File.Exists(FloorsCachePath)
-            && File.Exists(WorkspacesCachePath);
-    }
-
-    private async Task SaveDataToCacheAsync(PythagorasData data, CancellationToken cancellationToken)
-    {
-        Directory.CreateDirectory(CachePath);
-
-        JsonSerializerOptions options = new() { WriteIndented = true };
-
-        await File.WriteAllTextAsync(EstatesCachePath, JsonSerializer.Serialize(data.Estates, options), cancellationToken);
-        await File.WriteAllTextAsync(BuildingsCachePath, JsonSerializer.Serialize(data.Buildings, options), cancellationToken);
-        await File.WriteAllTextAsync(FloorsCachePath, JsonSerializer.Serialize(data.Floors, options), cancellationToken);
-        await File.WriteAllTextAsync(WorkspacesCachePath, JsonSerializer.Serialize(data.Workspaces, options), cancellationToken);
-    }
-
-    private async Task<PythagorasData> ReadDataFromCacheAsync(CancellationToken cancellationToken)
-    {
-        JsonSerializerOptions options = new() { PropertyNameCaseInsensitive = true };
-
-        string estatesJson = await File.ReadAllTextAsync(EstatesCachePath, cancellationToken);
-        string buildingsJson = await File.ReadAllTextAsync(BuildingsCachePath, cancellationToken);
-        string floorsJson = await File.ReadAllTextAsync(FloorsCachePath, cancellationToken);
-        string workspacesJson = await File.ReadAllTextAsync(WorkspacesCachePath, cancellationToken);
-
-        return new PythagorasData
-        {
-            Estates = JsonSerializer.Deserialize<IReadOnlyList<NavigationFolder>>(estatesJson, options)!,
-            Buildings = JsonSerializer.Deserialize<IReadOnlyList<BuildingInfo>>(buildingsJson, options)!,
-            Floors = JsonSerializer.Deserialize<IReadOnlyList<Floor>>(floorsJson, options)!,
-            Workspaces = JsonSerializer.Deserialize<IReadOnlyList<Workspace>>(workspacesJson, options)!
-        };
-    }
-#endif
     /// <summary>
     /// Builds a lookup dictionary mapping building IDs to their estate IDs.
     /// Extracts the relationships from the estate DTOs that include their buildings.

@@ -1,12 +1,10 @@
 using System.Net.Http.Json;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.EstateService.API;
 using Umea.se.EstateService.ServiceAccess;
 using Umea.se.EstateService.Test.TestHelpers;
 using Umea.se.TestToolkit.TestInfrastructure;
 using Umea.se.EstateService.Logic.Data.Entities;
-using Xunit;
 
 namespace Umea.se.EstateService.Test.Pythagoras;
 

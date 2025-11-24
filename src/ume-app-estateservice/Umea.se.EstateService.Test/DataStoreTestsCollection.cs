@@ -1,5 +1,3 @@
-using Xunit;
-
 namespace Umea.se.EstateService.Test;
 
 /// <summary>
