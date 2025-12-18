@@ -80,6 +80,7 @@ public static class PythagorasBuildingInfoMapper
             return null;
         }
 
+        string? blueprintAvailable = TryGetOutputValue(properties, PropertyCategoryId.BlueprintAvailable);
         string? externalOwner = TryGetOutputValue(properties, PropertyCategoryId.ExternalOwner);
         string? propertyDesignation = TryGetOutputValue(properties, PropertyCategoryId.PropertyDesignation);
         string? yearOfConstruction = TryGetOutputValue(properties, PropertyCategoryId.YearOfConstruction);
@@ -97,7 +98,8 @@ public static class PythagorasBuildingInfoMapper
             };
         }
 
-        bool hasData = externalOwner is not null
+        bool hasData = blueprintAvailable is not null
+            || externalOwner is not null
             || propertyDesignation is not null
             || yearOfConstruction is not null
             || noticeBoard is not null;
@@ -109,6 +111,7 @@ public static class PythagorasBuildingInfoMapper
 
         return new BuildingExtendedPropertiesModel
         {
+            BlueprintAvailable = blueprintAvailable == "Ja",
             ExternalOwner = externalOwner,
             PropertyDesignation = propertyDesignation,
             NoticeBoard = noticeBoard,

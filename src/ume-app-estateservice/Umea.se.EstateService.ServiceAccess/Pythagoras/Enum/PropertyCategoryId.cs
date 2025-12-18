@@ -2,6 +2,7 @@
 
 public enum PropertyCategoryId
 {
+    BlueprintAvailable = 13,
     PropertyDesignation = 56,
     MunicipalityArea = 209,
     OperationalArea = 208,
