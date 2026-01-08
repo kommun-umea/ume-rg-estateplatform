@@ -25,7 +25,7 @@ public class SearchHandler(
 
     public async Task<IReadOnlyList<SearchResult>> SearchAsync(
         string? query,
-        IReadOnlyCollection<AutocompleteType> types,
+        SearchFilter filter,
         int limit,
         GeoFilter? geoFilter = null,
         CancellationToken cancellationToken = default)
@@ -38,11 +38,12 @@ public class SearchHandler(
 
         InMemorySearchService service = await EnsureSearchServiceAsync(cancellationToken).ConfigureAwait(false);
 
-        IReadOnlyCollection<NodeType>? filterByTypes = BuildNodeTypeFilter(types);
+        IReadOnlyCollection<NodeType>? filterByTypes = BuildNodeTypeFilter(filter.Types);
 
         QueryOptions options = new(
             MaxResults: Math.Max(limit, 1),
             FilterByTypes: filterByTypes,
+            FilterByBusinessTypes: filter.BusinessTypeIds,
             GeoFilter: geoFilter);
 
         IEnumerable<SearchResult> results = service.Search(query ?? string.Empty, options);

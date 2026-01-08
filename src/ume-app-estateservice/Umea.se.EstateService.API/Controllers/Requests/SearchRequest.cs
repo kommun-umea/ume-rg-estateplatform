@@ -15,6 +15,9 @@ public sealed record SearchRequest : IValidatableObject
     [FromQuery(Name = "type")]
     public HashSet<AutocompleteType> Type { get; init; } = [AutocompleteType.Any];
 
+    [FromQuery(Name = "businessTypeId")]
+    public List<int> BusinessTypeIds { get; init; } = [];
+
     [FromQuery(Name = "query")]
     public string? Query { get; init; } = string.Empty;
 

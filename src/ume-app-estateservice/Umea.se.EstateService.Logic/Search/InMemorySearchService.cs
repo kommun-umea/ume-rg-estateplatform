@@ -499,6 +499,12 @@ public sealed class InMemorySearchService
             .ThenBy(kv2 => options.PreferEstatesOnTie ? (_docs[kv2.Key].Type == NodeType.Estate ? 0 : 1) : 0)
             .ThenBy(kv2 => _docs[kv2.Key].PopularName ?? _docs[kv2.Key].Name);
 
+        // Apply business type filter
+        if(options.FilterByBusinessTypes is { Count: > 0} filterBusinessTypes)
+        {
+            sortedDocs = sortedDocs.Where(kv2 => _docs[kv2.Key].BusinessType?.Id is int id && filterBusinessTypes.Contains(id));
+        }
+
         // Apply type filter before taking MaxResults
         if (options.FilterByTypes is { Count: > 0 } filterTypes)
         {

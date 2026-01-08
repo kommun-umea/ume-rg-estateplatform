@@ -110,6 +110,9 @@ public sealed class FakePythagorasClient : IPythagorasClient
     public Task<IReadOnlyList<Floor>> GetFloorsAsync(PythagorasQuery<Floor>? query = null, CancellationToken cancellationToken = default)
         => CaptureAsync("rest/v1/floor/info", query, cancellationToken);
 
+    public Task<IReadOnlyList<BusinessType>> GetBusinessTypesAsync(PythagorasQuery<BusinessType>? query = null, CancellationToken cancellationToken = default)
+        => CaptureAsync("rest/v1/businesstype", query, cancellationToken);
+
     public Task<IReadOnlyList<GalleryImageFile>> GetBuildingGalleryImagesAsync(int buildingId, CancellationToken cancellationToken = default)
     {
         if (buildingId <= 0)

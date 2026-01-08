@@ -71,6 +71,12 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : Ext
         return QueryAsync("rest/v1/floor/info", query, cancellationToken);
     }
 
+    public Task<IReadOnlyList<BusinessType>> GetBusinessTypesAsync(PythagorasQuery<BusinessType>? query = null, CancellationToken cancellationToken = default)
+    {
+        query ??= new PythagorasQuery<BusinessType>();
+        return QueryAsync("rest/v1/businesstype", query, cancellationToken);
+    }
+
     public Task<IReadOnlyDictionary<int, CalculatedPropertyValueDto>> GetBuildingCalculatedPropertyValuesAsync(int buildingId, CalculatedPropertyValueRequest? request = null, CancellationToken cancellationToken = default)
     {
         if (buildingId <= 0)

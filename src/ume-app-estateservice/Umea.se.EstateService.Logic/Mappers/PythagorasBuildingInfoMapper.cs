@@ -21,6 +21,7 @@ public static class PythagorasBuildingInfoMapper
             GeoLocation = CreateGeoPoint(dto),
             GrossArea = dto.Grossarea ?? 0m,
             NetArea = dto.Netarea ?? 0m,
+            BusinessType = CreateBusinessType(dto),
             SumGrossFloorArea = dto.SumGrossFloorarea ?? 0m,
             NumPlacedPersons = dto.NumPlacedPersons,
             Address = CreateAddress(dto),
@@ -35,6 +36,20 @@ public static class PythagorasBuildingInfoMapper
         return dtos.Count == 0
             ? []
             : dtos.Select(b => ToModel(b, null)).ToArray();
+    }
+
+    private static BusinessTypeModel? CreateBusinessType(BuildingInfo dto)
+    {
+        if(dto.BusinessTypeId is null || string.IsNullOrWhiteSpace(dto.BusinessTypeName))
+        {
+            return null;
+        }
+
+        return new BusinessTypeModel
+        {
+            Id = dto.BusinessTypeId.Value,
+            Name = dto.BusinessTypeName
+        };
     }
 
     private static GeoPointModel? CreateGeoPoint(BuildingInfo dto)

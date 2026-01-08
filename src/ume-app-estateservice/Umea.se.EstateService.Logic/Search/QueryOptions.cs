@@ -9,6 +9,7 @@ public sealed record QueryOptions(
     int MaxResults = 50,
     bool PreferEstatesOnTie = true,
     IReadOnlyCollection<NodeType>? FilterByTypes = null,
+    IReadOnlyList<int>? FilterByBusinessTypes = null,
     bool EnableContains = true,
     GeoFilter? GeoFilter = null
 );

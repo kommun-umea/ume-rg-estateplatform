@@ -16,6 +16,7 @@ public sealed class BuildingInfoModel : ISearchable
     public int NumPlacedPersons { get; init; }
     public int? NumFloors { get; set; }
     public int? NumRooms { get; set; }
+    public BusinessTypeModel? BusinessType { get; set; }
     public AddressModel? Address { get; init; }
     public BuildingAscendantModel? Estate { get; set; }
     public BuildingAscendantModel? Region { get; set; }

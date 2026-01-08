@@ -3,7 +3,6 @@ using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.Logic.Options;
 using Umea.se.EstateService.Logic.Search;
-using Umea.se.EstateService.Shared.Autocomplete;
 using Umea.se.EstateService.Shared.Search;
 
 namespace Umea.se.EstateService.Test.Search;
@@ -20,10 +19,10 @@ public class SearchHandlerIndexingTests
 
         handler.GetDocumentCount().ShouldBe(2);
 
-        IReadOnlyList<SearchResult> buildingResults = await handler.SearchAsync("Building", Array.Empty<AutocompleteType>(), 10);
+        IReadOnlyList<SearchResult> buildingResults = await handler.SearchAsync("Building", new SearchFilter(), 10);
         buildingResults.ShouldContain(result => result.Item.Type == NodeType.Building);
 
-        IReadOnlyList<SearchResult> roomResults = await handler.SearchAsync("Room", Array.Empty<AutocompleteType>(), 10);
+        IReadOnlyList<SearchResult> roomResults = await handler.SearchAsync("Room", new SearchFilter(), 10);
         roomResults.ShouldBeEmpty();
     }
 
@@ -37,7 +36,7 @@ public class SearchHandlerIndexingTests
 
         handler.GetDocumentCount().ShouldBe(3);
 
-        IReadOnlyList<SearchResult> roomResults = await handler.SearchAsync("Room", Array.Empty<AutocompleteType>(), 10);
+        IReadOnlyList<SearchResult> roomResults = await handler.SearchAsync("Room", new SearchFilter(), 10);
         roomResults.ShouldContain(result => result.Item.Type == NodeType.Room);
     }
 

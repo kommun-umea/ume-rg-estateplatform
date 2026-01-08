@@ -413,6 +413,15 @@ public class PythagorasHandler(IPythagorasClient pythagorasClient) : IPythagoras
         return PythagorasFloorInfoMapper.ToModel(payload);
     }
 
+    public async Task<IReadOnlyList<BusinessTypeModel>> GetBusinessTypesAsync(CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<BusinessType> payload = await pythagorasClient
+            .GetBusinessTypesAsync(null, cancellationToken)
+            .ConfigureAwait(false);
+
+        return PythagorasBusinessTypeMapper.ToModel(payload);
+    }
+
     private async Task<IReadOnlyDictionary<PropertyCategoryId, CalculatedPropertyValueDto>> GetBuildingCalculatedPropertyValuesInternalAsync(int buildingId, CalculatedPropertyValueRequest? request = null, CancellationToken cancellationToken = default)
     {
         ValidatePositiveId(buildingId, nameof(buildingId));

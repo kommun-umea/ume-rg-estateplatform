@@ -36,15 +36,19 @@ public class SearchController(SearchHandler searchHandler) : ControllerBase
         [FromQuery][SwaggerParameter("Search request parameters.", Required = true)] SearchRequest req,
         CancellationToken cancellationToken)
     {
-        IReadOnlyCollection<AutocompleteType> types = req.Type is { Count: > 0 }
-            ? req.Type
-            : Array.Empty<AutocompleteType>();
-
         string? query = req.Query?.Trim();
+
+        SearchFilter filter = new()
+        {
+            Types = req.Type is { Count: > 0 }
+                ? req.Type
+                : Array.Empty<AutocompleteType>(),
+            BusinessTypeIds = req.BusinessTypeIds
+        };
 
         IReadOnlyList<SearchResult> results = await searchHandler.SearchAsync(
             query,
-            types,
+            filter,
             req.Limit,
             req.GeoFilter,
             cancellationToken)

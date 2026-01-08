@@ -241,6 +241,7 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
         {
             doc.Address = buildingInfo.Address;
             doc.GrossArea = buildingInfo.GrossArea;
+            doc.BusinessType = buildingInfo.BusinessType;
             doc.ExtendedProperties = CreateBuildingExtendedProperties(buildingInfo.ExtendedProperties);
         }
 
