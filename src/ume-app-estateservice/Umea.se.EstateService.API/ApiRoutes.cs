@@ -9,6 +9,7 @@ public class ApiRoutes : ApiRoutesBase
     public const string Rooms = $"{RoutePrefixV1}/rooms";
     public const string Floors = $"{RoutePrefixV1}/floors";
     public const string Search = $"{RoutePrefixV1}/search";
+    public const string BusinessTypes = $"{RoutePrefixV1}/businessTypes";
     public const string Admin = $"{RoutePrefixV1}/admin";
     public const string EstateBuildings = $"{Estates}/{{estateId:int}}/buildings";
 }

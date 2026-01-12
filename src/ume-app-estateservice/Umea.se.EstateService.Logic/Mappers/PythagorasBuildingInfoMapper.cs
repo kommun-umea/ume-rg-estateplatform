@@ -1,3 +1,4 @@
+using Umea.se.EstateService.Logic.Helpers;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.Shared.Models;
@@ -20,6 +21,7 @@ public static class PythagorasBuildingInfoMapper
             GeoLocation = CreateGeoPoint(dto),
             GrossArea = dto.Grossarea ?? 0m,
             NetArea = dto.Netarea ?? 0m,
+            BusinessType = CreateBusinessType(dto),
             SumGrossFloorArea = dto.SumGrossFloorarea ?? 0m,
             NumPlacedPersons = dto.NumPlacedPersons,
             Address = CreateAddress(dto),
@@ -34,6 +36,20 @@ public static class PythagorasBuildingInfoMapper
         return dtos.Count == 0
             ? []
             : dtos.Select(b => ToModel(b, null)).ToArray();
+    }
+
+    private static BusinessTypeModel? CreateBusinessType(BuildingInfo dto)
+    {
+        if(dto.BusinessTypeId is null || string.IsNullOrWhiteSpace(dto.BusinessTypeName))
+        {
+            return null;
+        }
+
+        return new BusinessTypeModel
+        {
+            Id = dto.BusinessTypeId.Value,
+            Name = dto.BusinessTypeName
+        };
     }
 
     private static GeoPointModel? CreateGeoPoint(BuildingInfo dto)
@@ -63,11 +79,11 @@ public static class PythagorasBuildingInfoMapper
         }
 
         return new AddressModel(
-            dto.AddressStreet ?? string.Empty,
-            dto.AddressZipCode ?? string.Empty,
-            dto.AddressCity ?? string.Empty,
-            dto.AddressCountry ?? string.Empty,
-            dto.AddressExtra ?? string.Empty);
+            StringHelper.Trim(dto.AddressStreet),
+            StringHelper.Trim(dto.AddressZipCode),
+            StringHelper.Trim(dto.AddressCity),
+            StringHelper.Trim(dto.AddressCountry),
+            StringHelper.Trim(dto.AddressExtra));
     }
 
     public static BuildingExtendedPropertiesModel? ToExtendedPropertiesModel(IReadOnlyDictionary<PropertyCategoryId, CalculatedPropertyValueDto> properties)
@@ -79,6 +95,7 @@ public static class PythagorasBuildingInfoMapper
             return null;
         }
 
+        string? blueprintAvailable = TryGetOutputValue(properties, PropertyCategoryId.BlueprintAvailable);
         string? externalOwner = TryGetOutputValue(properties, PropertyCategoryId.ExternalOwner);
         string? propertyDesignation = TryGetOutputValue(properties, PropertyCategoryId.PropertyDesignation);
         string? yearOfConstruction = TryGetOutputValue(properties, PropertyCategoryId.YearOfConstruction);
@@ -88,15 +105,28 @@ public static class PythagorasBuildingInfoMapper
 
         if (!string.IsNullOrEmpty(noticeBoardText))
         {
-            noticeBoard = new BuildingNoticeBoardModel
+            DateTime? startDate = DateTime.TryParse(
+                    TryGetOutputValue(properties, PropertyCategoryId.NoticeBoardStartDate),
+                    out DateTime sd) ? sd : null;
+
+            DateTime? endDate = DateTime.TryParse(
+                    TryGetOutputValue(properties, PropertyCategoryId.NoticeBoardEndDate),
+                    out DateTime ed) ? ed : null;
+
+            bool isActive = endDate is null || endDate >= DateTime.Today;
+            if (isActive)
             {
-                Text = noticeBoardText,
-                StartDate = DateTime.TryParse(TryGetOutputValue(properties, PropertyCategoryId.NoticeBoardStartDate), out DateTime startDate) ? startDate : null,
-                EndDate = DateTime.TryParse(TryGetOutputValue(properties, PropertyCategoryId.NoticeBoardEndDate), out DateTime endDate) ? endDate : null
-            };
+                noticeBoard = new BuildingNoticeBoardModel
+                {
+                    Text = noticeBoardText,
+                    StartDate = startDate,
+                    EndDate = endDate
+                };
+            }
         }
 
-        bool hasData = externalOwner is not null
+        bool hasData = blueprintAvailable is not null
+            || externalOwner is not null
             || propertyDesignation is not null
             || yearOfConstruction is not null
             || noticeBoard is not null;
@@ -108,6 +138,7 @@ public static class PythagorasBuildingInfoMapper
 
         return new BuildingExtendedPropertiesModel
         {
+            BlueprintAvailable = blueprintAvailable == "Ja",
             ExternalOwner = externalOwner,
             PropertyDesignation = propertyDesignation,
             NoticeBoard = noticeBoard,

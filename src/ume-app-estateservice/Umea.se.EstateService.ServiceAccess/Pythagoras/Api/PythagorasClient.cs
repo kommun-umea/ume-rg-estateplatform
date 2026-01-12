@@ -7,13 +7,18 @@ using Umea.se.Toolkit.ExternalService;
 
 namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 
-public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
-    : ExternalServiceBase(HttpClientNames.Pythagoras, httpClientFactory), IPythagorasClient
+public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : ExternalServiceBase(HttpClientNames.Pythagoras, httpClientFactory), IPythagorasClient
 {
+    private const string PythagorasApplicationName = "se.pythagoras.pythagorasweb";
+
     private static readonly JsonSerializerOptions _serializerOptions = new(JsonSerializerDefaults.Web)
     {
         PropertyNameCaseInsensitive = true,
-        NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString
+        NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString,
+        Converters =
+        {
+            new UnixMillisDateTimeConverter()
+        }
     };
 
     protected override string PingUrl => "";
@@ -64,6 +69,12 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
     {
         query ??= new PythagorasQuery<Floor>();
         return QueryAsync("rest/v1/floor/info", query, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<BusinessType>> GetBusinessTypesAsync(PythagorasQuery<BusinessType>? query = null, CancellationToken cancellationToken = default)
+    {
+        query ??= new PythagorasQuery<BusinessType>();
+        return QueryAsync("rest/v1/businesstype", query, cancellationToken);
     }
 
     public Task<IReadOnlyDictionary<int, CalculatedPropertyValueDto>> GetBuildingCalculatedPropertyValuesAsync(int buildingId, CalculatedPropertyValueRequest? request = null, CancellationToken cancellationToken = default)
@@ -194,7 +205,7 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory)
     {
         response.EnsureSuccessStatusCode();
 
-        await using Stream contentStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        using Stream contentStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         return await JsonSerializer.DeserializeAsync<T>(contentStream, _serializerOptions, cancellationToken).ConfigureAwait(false);
     }
 
@@ -351,5 +362,40 @@ where TValue : class
         string queryString = request?.BuildQueryString() ?? string.Empty;
 
         return QueryDictionaryAsync<CalculatedPropertyValueDto>(requestPath, queryString, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<GalleryImageFile>> GetBuildingGalleryImagesAsync(int buildingId, CancellationToken cancellationToken = default)
+    {
+        if (buildingId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
+        }
+
+        string endpoint = $"rest/v1/building/{buildingId}/galleryimagefile";
+        PythagorasQuery<GalleryImageFile> query = new();
+
+        return QueryAsync(endpoint, query, cancellationToken);
+    }
+
+    public Task<HttpResponseMessage> GetGalleryImageDataAsync(int imageId, GalleryImageVariant variant, CancellationToken cancellationToken = default)
+    {
+        if (imageId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(imageId), "Image id must be positive.");
+        }
+
+        string segment = variant switch
+        {
+            GalleryImageVariant.Thumbnail => "thumbnail/data",
+            GalleryImageVariant.Original => "data",
+            _ => throw new ArgumentOutOfRangeException(nameof(variant), variant, "Unsupported gallery image variant.")
+        };
+
+        string endpoint = $"rest/v1/galleryimagefile/{imageId}/{segment}";
+        string queryString = FormQueryParameter("pyApp", PythagorasApplicationName);
+        string requestUri = BuildRequestUri(NormalizeEndpoint(endpoint), queryString);
+
+        HttpRequestMessage request = new(HttpMethod.Get, requestUri);
+        return HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
     }
 }

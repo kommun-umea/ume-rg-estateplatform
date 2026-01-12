@@ -128,7 +128,7 @@ public sealed class InMemorySearchService
             IndexField(Field.Name, it.Name, createNgrams: true);
             IndexField(Field.PopularName, it.PopularName, createNgrams: true);
             IndexField(Field.Path, it.Path);
-            IndexField(Field.Address, it.Address);
+            IndexField(Field.Address, it.AddressSearchText);
             foreach (Ancestor a in it.Ancestors ?? [])
             {
                 IndexField(Field.AncestorName, a.Name);
@@ -499,6 +499,12 @@ public sealed class InMemorySearchService
             .ThenBy(kv2 => options.PreferEstatesOnTie ? (_docs[kv2.Key].Type == NodeType.Estate ? 0 : 1) : 0)
             .ThenBy(kv2 => _docs[kv2.Key].PopularName ?? _docs[kv2.Key].Name);
 
+        // Apply business type filter
+        if(options.FilterByBusinessTypes is { Count: > 0} filterBusinessTypes)
+        {
+            sortedDocs = sortedDocs.Where(kv2 => _docs[kv2.Key].BusinessType?.Id is int id && filterBusinessTypes.Contains(id));
+        }
+
         // Apply type filter before taking MaxResults
         if (options.FilterByTypes is { Count: > 0 } filterTypes)
         {
@@ -522,24 +528,172 @@ public sealed class InMemorySearchService
         string normalizedQuery = TextNormalizer.Normalize(query ?? string.Empty).Trim();
         string[] qTokens = [.. TextNormalizer.Tokenize(query)];
 
-        if (qTokens.Length == 0)
+        bool hasQuery = qTokens.Length > 0;
+
+        Dictionary<int, double> docScores;
+        Dictionary<int, Dictionary<string, string>> matchedPerDoc;
+
+        if (hasQuery)
+        {
+            List<HashSet<string>> termCandidates = ExpandQueryTokens(qTokens, options);
+
+            HashSet<int> candidateDocIds = FindCandidateDocuments(termCandidates);
+            if (candidateDocIds.Count == 0)
+            {
+                return [];
+            }
+
+            (docScores, matchedPerDoc) =
+                ScoreDocuments(termCandidates, candidateDocIds, qTokens, normalizedQuery);
+
+            ApplyProximityBonus(docScores, matchedPerDoc);
+        }
+        else
+        {
+            docScores = new Dictionary<int, double>(_docs.Count);
+            matchedPerDoc = [];
+
+            for (int docId = 0; docId < _docs.Count; docId++)
+            {
+                double baseScore = _typeBaseBoost.TryGetValue(_docs[docId].Type, out double boost) ? boost : 0.0;
+                docScores[docId] = baseScore;
+            }
+        }
+
+        (Dictionary<int, double> filteredScores, Dictionary<int, Dictionary<string, string>> filteredMatches) =
+            ApplyGeospatialFilter(docScores, matchedPerDoc, options);
+        if (filteredScores.Count == 0)
         {
             return [];
         }
 
-        List<HashSet<string>> termCandidates = ExpandQueryTokens(qTokens, options);
-
-        HashSet<int> candidateDocIds = FindCandidateDocuments(termCandidates);
-        if (candidateDocIds.Count == 0)
-        {
-            return [];
-        }
-
-        (Dictionary<int, double> docScores, Dictionary<int, Dictionary<string, string>> matchedPerDoc) =
-            ScoreDocuments(termCandidates, candidateDocIds, qTokens, normalizedQuery);
-
-        ApplyProximityBonus(docScores, matchedPerDoc);
+        docScores = filteredScores;
+        matchedPerDoc = filteredMatches;
 
         return ComposeResults(docScores, matchedPerDoc, options);
+    }
+
+    private (Dictionary<int, double> Scores, Dictionary<int, Dictionary<string, string>> Matches) ApplyGeospatialFilter(
+        Dictionary<int, double> docScores,
+        Dictionary<int, Dictionary<string, string>> matchedPerDoc,
+        QueryOptions options)
+    {
+        if (options.GeoFilter is not { } geoFilter)
+        {
+            return (docScores, matchedPerDoc);
+        }
+
+        Dictionary<int, double> filteredScores = geoFilter switch
+        {
+            GeoRadiusFilter radiusFilter => ApplyRadiusFilter(docScores, radiusFilter),
+            GeoBoundingBoxFilter boxFilter => ApplyBoundingBoxFilter(docScores, boxFilter),
+            _ => []
+        };
+
+        if (filteredScores.Count == 0)
+        {
+            return (filteredScores, []);
+        }
+
+        Dictionary<int, Dictionary<string, string>> filteredMatches = matchedPerDoc.Count == 0
+            ? matchedPerDoc
+            : new Dictionary<int, Dictionary<string, string>>(matchedPerDoc.Count);
+
+        if (matchedPerDoc.Count > 0)
+        {
+            foreach (KeyValuePair<int, Dictionary<string, string>> entry in matchedPerDoc)
+            {
+                if (filteredScores.ContainsKey(entry.Key))
+                {
+                    filteredMatches[entry.Key] = entry.Value;
+                }
+            }
+        }
+
+        return (filteredScores, filteredMatches);
+    }
+
+    private Dictionary<int, double> ApplyRadiusFilter(Dictionary<int, double> docScores, GeoRadiusFilter radiusFilter)
+    {
+        double latitude = radiusFilter.Coordinate.Latitude;
+        double longitude = radiusFilter.Coordinate.Longitude;
+        int radiusMeters = radiusFilter.RadiusMeters;
+
+        Dictionary<int, double> filteredScores = new(docScores.Count);
+        foreach (KeyValuePair<int, double> kv in docScores)
+        {
+            int docId = kv.Key;
+            PythagorasDocument document = _docs[docId];
+            GeoPoint? geo = document.GeoLocation;
+            if (geo is null ||
+                double.IsNaN(geo.Lat) ||
+                double.IsNaN(geo.Lng))
+            {
+                continue;
+            }
+
+            double distance = GeoHelper.CalculateDistanceInMeters(latitude, longitude, geo.Lat, geo.Lng);
+            if (double.IsNaN(distance) || distance > radiusMeters)
+            {
+                continue;
+            }
+
+            double closenessBoost = radiusMeters > 0
+                ? Math.Max(0.0, (radiusMeters - distance) / radiusMeters)
+                : 0.0;
+
+            filteredScores[docId] = kv.Value + closenessBoost;
+        }
+
+        return filteredScores;
+    }
+
+    private Dictionary<int, double> ApplyBoundingBoxFilter(Dictionary<int, double> docScores, GeoBoundingBoxFilter boxFilter)
+    {
+        double south = boxFilter.SouthWest.Latitude;
+        double west = boxFilter.SouthWest.Longitude;
+        double north = boxFilter.NorthEast.Latitude;
+        double east = boxFilter.NorthEast.Longitude;
+
+        double latSpan = north - south;
+        double lonSpan = east - west;
+        double latCenter = south + latSpan / 2.0;
+        double lonCenter = west + lonSpan / 2.0;
+
+        Dictionary<int, double> filteredScores = new(docScores.Count);
+        foreach (KeyValuePair<int, double> kv in docScores)
+        {
+            int docId = kv.Key;
+            PythagorasDocument document = _docs[docId];
+            GeoPoint? geo = document.GeoLocation;
+            if (geo is null ||
+                double.IsNaN(geo.Lat) ||
+                double.IsNaN(geo.Lng))
+            {
+                continue;
+            }
+
+            double lat = geo.Lat;
+            double lng = geo.Lng;
+
+            if (lat < south || lat > north || lng < west || lng > east)
+            {
+                continue;
+            }
+
+            // Encourage items closer to the box center without requiring extra configuration.
+            double closenessBoost = 0.0;
+            if (latSpan > 0.0 || lonSpan > 0.0)
+            {
+                double latDelta = Math.Abs(lat - latCenter) / (latSpan == 0.0 ? 1.0 : latSpan);
+                double lonDelta = Math.Abs(lng - lonCenter) / (lonSpan == 0.0 ? 1.0 : lonSpan);
+                double normalizedDistance = (latDelta + lonDelta) / 2.0;
+                closenessBoost = Math.Max(0.0, 1.0 - normalizedDistance);
+            }
+
+            filteredScores[docId] = kv.Value + closenessBoost;
+        }
+
+        return filteredScores;
     }
 }

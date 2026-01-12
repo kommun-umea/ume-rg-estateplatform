@@ -1,6 +1,4 @@
 using Umea.se.EstateService.Logic.Interfaces;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Interfaces;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.EstateService.Shared.Search;
@@ -23,7 +21,7 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
     private async Task<IReadOnlyDictionary<int, BuildingInfoModel>> LoadBuildingInfosAsync()
     {
         IReadOnlyList<BuildingInfoModel> buildings = await pythagorasHandler
-            .GetBuildingsWithPropertiesAsync(cancellationToken: default)
+            .GetBuildingsAsync(buildingIds: null, estateId: null, includeOptions: ServiceAccess.Pythagoras.Enum.BuildingIncludeOptions.ExtendedProperties, queryArgs: null, cancellationToken: default)
             .ConfigureAwait(false);
         if (buildings.Count == 0)
         {
@@ -87,9 +85,7 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
     {
         ArgumentNullException.ThrowIfNull(workspaceStats);
 
-        PythagorasQuery<Workspace> query = new();
-
-        IReadOnlyList<RoomModel> workspaces = await pythagorasHandler.GetRoomsAsync(query).ConfigureAwait(false);
+        IReadOnlyList<RoomModel> workspaces = await pythagorasHandler.GetRoomsAsync().ConfigureAwait(false);
 
         foreach (RoomModel workspace in workspaces)
         {
@@ -102,7 +98,7 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
                 PythagorasDocument.DocumentKey buildingKey = new(NodeType.Building, buildingId);
                 if (buildingInfos.TryGetValue(buildingId, out BuildingInfoModel? buildingInfo))
                 {
-                    doc.Address = FormatAddress(buildingInfo.Address);
+                    doc.Address = buildingInfo.Address;
                 }
 
                 if (docs.TryGetValue(buildingKey, out PythagorasDocument? buildingDoc))
@@ -130,31 +126,13 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
             Id = item.Id,
             Type = nodeType,
             Name = item.Name,
-            Address = FormatAddress(item.Address),
+            Address = item.Address,
             PopularName = item.PopularName,
-            Geo = MapGeoLocation(item.GeoLocation),
+            GeoLocation = MapGeoLocation(item.GeoLocation),
             RankScore = rankScore,
             UpdatedAt = item.UpdatedAt,
             Ancestors = []
         };
-    }
-
-    private static string? FormatAddress(AddressModel? address)
-    {
-        if (address is null)
-        {
-            return null;
-        }
-
-        string[] parts =
-        [
-            address.Street,
-            address.ZipCode,
-            address.City
-        ];
-
-        string formatted = string.Join(' ', parts.Where(static p => !string.IsNullOrWhiteSpace(p)));
-        return string.IsNullOrWhiteSpace(formatted) ? null : formatted;
     }
 
     private static Shared.Search.GeoPoint? MapGeoLocation(GeoPointModel? geoLocationModel)
@@ -261,8 +239,9 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
 
         if (buildingInfo is not null)
         {
-            doc.Address = FormatAddress(buildingInfo.Address);
+            doc.Address = buildingInfo.Address;
             doc.GrossArea = buildingInfo.GrossArea;
+            doc.BusinessType = buildingInfo.BusinessType;
             doc.ExtendedProperties = CreateBuildingExtendedProperties(buildingInfo.ExtendedProperties);
         }
 

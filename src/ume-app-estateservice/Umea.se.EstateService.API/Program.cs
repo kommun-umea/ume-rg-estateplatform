@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 using Umea.se.EstateService.API;
 using Umea.se.EstateService.Logic;
 using Umea.se.EstateService.ServiceAccess;
@@ -34,7 +36,7 @@ builder.Services
     .AddLogicDependencies()
     .AddServiceAccessDependencies()
     .AddSharedDependencies()
-    ;
+;
 
 builder.Services.AddDefaultHttpClient(HttpClientNames.Pythagoras, options =>
 {
@@ -42,10 +44,22 @@ builder.Services.AddDefaultHttpClient(HttpClientNames.Pythagoras, options =>
     options.DefaultRequestHeaders.Add("api_key", config.PythagorasApiKey);
 });
 
-builder.Services.AddAuthentication(options =>
-{
-
-});
+builder.Services
+    .AddAuthorization()
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
+    {
+        options.Authority = config.Authentication.TokenServiceUrl;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = config.Authentication.TokenServiceUrl,
+            ValidateAudience = true,
+            ValidAudience = config.Authentication.Audience,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero,
+        };
+    });
 
 // Swagger
 if (!builder.Environment.IsEnvironment("IntegrationTest"))

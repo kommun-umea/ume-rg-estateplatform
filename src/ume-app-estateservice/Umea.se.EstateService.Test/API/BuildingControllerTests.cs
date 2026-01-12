@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
@@ -156,7 +157,80 @@ public class BuildingControllerTests : ControllerTestCloud<TestApiFactory, Progr
 
         _fakeClient.EndpointsCalled.ShouldBe([
             "rest/v1/building/info",
+            "rest/v1/building/1/property/calculatedvalue",
             "rest/v1/building/1/node/ascendant"
         ]);
+    }
+
+    [Fact]
+    public async Task GetBuildingImageAsync_ReturnsFirstImage()
+    {
+        _fakeClient.Reset();
+
+        DateTime now = DateTime.UtcNow;
+        _fakeClient.SetGetAsyncResult(
+            new GalleryImageFile { Id = 1, Name = "latest.jpg", Updated = now },
+            new GalleryImageFile { Id = 2, Name = "older.jpg", Updated = now.AddDays(-1) });
+
+        byte[] expected = [1, 2, 3, 4];
+        _fakeClient.OnGetGalleryImageDataAsync = (imageId, variant, _) =>
+        {
+            imageId.ShouldBe(1);
+            variant.ShouldBe(GalleryImageVariant.Original);
+
+            HttpResponseMessage response = new(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(expected)
+            };
+            response.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg");
+            response.Content.Headers.ContentLength = expected.Length;
+            return Task.FromResult(response);
+        };
+
+        HttpResponseMessage result = await _client.GetAsync($"{ApiRoutes.Buildings}/1/image");
+        result.StatusCode.ShouldBe(HttpStatusCode.OK);
+        result.Content.Headers.ContentType.ShouldNotBeNull();
+        result.Content.Headers.ContentType!.MediaType.ShouldBe("image/jpeg");
+
+        byte[] payload = await result.Content.ReadAsByteArrayAsync();
+        payload.ShouldBe(expected);
+
+        _fakeClient.EndpointsCalled.ShouldContain("rest/v1/building/1/galleryimagefile");
+    }
+
+    [Fact]
+    public async Task GetBuildingImageAsync_NoImages_ReturnsNotFound()
+    {
+        _fakeClient.Reset();
+        _fakeClient.SetGetAsyncResult(Array.Empty<GalleryImageFile>());
+
+        HttpResponseMessage result = await _client.GetAsync($"{ApiRoutes.Buildings}/1/image");
+
+        result.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task GetBuildingImageAsync_ThumbnailRequestsThumbnailVariant()
+    {
+        _fakeClient.Reset();
+        _fakeClient.SetGetAsyncResult(new GalleryImageFile { Id = 5, Name = "thumb.jpg", Updated = DateTime.UtcNow });
+
+        _fakeClient.OnGetGalleryImageDataAsync = (imageId, variant, _) =>
+        {
+            imageId.ShouldBe(5);
+            variant.ShouldBe(GalleryImageVariant.Thumbnail);
+            HttpResponseMessage response = new(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent([0x1])
+            };
+            response.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+            return Task.FromResult(response);
+        };
+
+        HttpResponseMessage result = await _client.GetAsync($"{ApiRoutes.Buildings}/1/image?size=thumbnail");
+
+        result.StatusCode.ShouldBe(HttpStatusCode.OK);
+        result.Content.Headers.ContentType.ShouldNotBeNull();
+        result.Content.Headers.ContentType!.MediaType.ShouldBe("image/png");
     }
 }

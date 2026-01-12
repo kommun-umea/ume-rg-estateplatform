@@ -110,6 +110,36 @@ public sealed class FakePythagorasClient : IPythagorasClient
     public Task<IReadOnlyList<Floor>> GetFloorsAsync(PythagorasQuery<Floor>? query = null, CancellationToken cancellationToken = default)
         => CaptureAsync("rest/v1/floor/info", query, cancellationToken);
 
+    public Task<IReadOnlyList<BusinessType>> GetBusinessTypesAsync(PythagorasQuery<BusinessType>? query = null, CancellationToken cancellationToken = default)
+        => CaptureAsync("rest/v1/businesstype", query, cancellationToken);
+
+    public Task<IReadOnlyList<GalleryImageFile>> GetBuildingGalleryImagesAsync(int buildingId, CancellationToken cancellationToken = default)
+    {
+        if (buildingId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
+        }
+
+        return CaptureAsync<GalleryImageFile>($"rest/v1/building/{buildingId}/galleryimagefile", query: null, cancellationToken);
+    }
+
+    public Func<int, GalleryImageVariant, CancellationToken, Task<HttpResponseMessage>>? OnGetGalleryImageDataAsync { get; set; }
+
+    public Task<HttpResponseMessage> GetGalleryImageDataAsync(int imageId, GalleryImageVariant variant, CancellationToken cancellationToken = default)
+    {
+        if (imageId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(imageId), "Image id must be positive.");
+        }
+
+        if (OnGetGalleryImageDataAsync is null)
+        {
+            throw new NotSupportedException("Configure OnGetGalleryImageDataAsync before calling this method.");
+        }
+
+        return OnGetGalleryImageDataAsync(imageId, variant, cancellationToken);
+    }
+
     private Task<IReadOnlyList<T>> CaptureAsync<T>(string endpoint, PythagorasQuery<T>? query, CancellationToken cancellationToken) where T : class, IPythagorasDto
     {
         PythagorasQuery<T>? originalQuery = query;
@@ -143,6 +173,7 @@ public sealed class FakePythagorasClient : IPythagorasClient
         _buildingUiListDataResults.Clear();
         NavigationFolderUiListDataRequests.Clear();
         _navigationFolderUiListDataResults.Clear();
+        OnGetGalleryImageDataAsync = null;
     }
 
     /// <summary>
@@ -273,6 +304,9 @@ public sealed class FakePythagorasClient : IPythagorasClient
     private Task<IReadOnlyDictionary<int, CalculatedPropertyValueDto>> CaptureCalculatedPropertyValuesAsync(string endpoint, int entityId, CalculatedPropertyValueRequest? request, CancellationToken cancellationToken)
     {
         CalculatedPropertyRequests.Add(new CalculatedPropertyRequestCapture(endpoint, entityId, request, cancellationToken));
+
+        // Also add to general Requests list so it appears in EndpointsCalled
+        Requests.Add(new RequestCapture(typeof(CalculatedPropertyValueDto), endpoint, request, null, cancellationToken));
 
         if (_calculatedPropertyResults.Count > 0)
         {

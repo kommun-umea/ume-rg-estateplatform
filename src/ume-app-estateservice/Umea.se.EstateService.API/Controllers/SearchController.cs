@@ -1,18 +1,20 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 using Umea.se.EstateService.API.Controllers.Requests;
 using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Logic.Search;
 using Umea.se.EstateService.Shared.Autocomplete;
+using Umea.se.EstateService.Shared.Models;
 using Umea.se.EstateService.Shared.Search;
-using Umea.se.Toolkit.Auth;
+using Umea.se.EstateService.Shared.ValueObjects;
 
 namespace Umea.se.EstateService.API.Controllers;
 
 [ApiController]
 [Produces("application/json")]
 [Route(ApiRoutes.Search)]
-[AuthorizeApiKey]
+[Authorize]
 public class SearchController(SearchHandler searchHandler) : ControllerBase
 {
     /// <summary>
@@ -33,22 +35,78 @@ public class SearchController(SearchHandler searchHandler) : ControllerBase
     [SwaggerResponse(StatusCodes.Status200OK, "A list of matching Pythagoras documents.", typeof(ICollection<PythagorasDocument>))]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid request parameters.")]
     public async Task<ActionResult<ICollection<PythagorasDocument>>> Search(
-        [FromQuery][SwaggerParameter("Search request parameters.", Required = true)] AutocompleteRequest req,
+        [FromQuery][SwaggerParameter("Search request parameters.", Required = true)] SearchRequest req,
         CancellationToken cancellationToken)
     {
-        IReadOnlyCollection<AutocompleteType> types = req.Type is { Count: > 0 }
-            ? req.Type
-            : Array.Empty<AutocompleteType>();
+        string? query = req.Query?.Trim();
+
+        SearchFilter filter = new()
+        {
+            Types = req.Type is { Count: > 0 }
+                ? req.Type
+                : Array.Empty<AutocompleteType>(),
+            BusinessTypeIds = req.BusinessTypeIds
+        };
 
         IReadOnlyList<SearchResult> results = await searchHandler.SearchAsync(
-            req.Query,
-            types,
+            query,
+            filter,
             req.Limit,
+            req.GeoFilter,
             cancellationToken)
             .ConfigureAwait(false);
 
         List<PythagorasDocument> documents = [.. results.Select(result => result.Item)];
 
         return Ok(documents);
+    }
+
+    /// <summary>
+    /// Search for building geo locations by query and filters.
+    /// </summary>
+    /// <remarks>
+    /// Returns a list of matching building geo locations based on the provided query and filters.
+    /// </remarks>
+    /// <param name="req">The search request parameters.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <response code="200">Returns a list of matching geo locations.</response>
+    /// <response code="400">If the request parameters are invalid.</response>
+    [HttpGet("geolocations")]
+    [SwaggerOperation(
+        Summary = "Search for geo locations",
+        Description = "Search for building geo locations using a query string and filters."
+    )]
+    [SwaggerResponse(StatusCodes.Status200OK, "A list of matching geo locations.", typeof(ICollection<BuildingLocationModel>))]
+    [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid request parameters.")]
+    public async Task<ActionResult<ICollection<BuildingLocationModel>>> SearchGeoLocation(
+        [FromQuery][SwaggerParameter("Search request parameters.", Required = true)] SearchRequest req,
+        CancellationToken cancellationToken)
+    {
+        string? query = req.Query?.Trim();
+
+        SearchFilter filter = new()
+        {
+            Types = [AutocompleteType.Building], // Geo locations only exist for buildings
+            BusinessTypeIds = req.BusinessTypeIds
+        };
+
+        IReadOnlyList<SearchResult> results = await searchHandler.SearchAsync(
+            query,
+            filter,
+            limit: 10000,
+            req.GeoFilter,
+            cancellationToken);
+
+        List<BuildingLocationModel> locations = results
+           .Select(result => new BuildingLocationModel
+           {
+               Id = result.Item.Id,
+               GeoLocation = result.Item.GeoLocation is { } geo
+                   ? new GeoPointModel(geo.Lat, geo.Lng)
+                   : null
+           })
+           .ToList();
+
+        return Ok(locations);
     }
 }

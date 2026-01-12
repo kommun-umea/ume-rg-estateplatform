@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
 using Swashbuckle.AspNetCore.Annotations;
@@ -5,17 +6,14 @@ using Umea.se.EstateService.API.Controllers.Requests;
 using Umea.se.EstateService.Logic.Exceptions;
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.Logic.Models;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
-using Umea.se.Toolkit.Auth;
 
 namespace Umea.se.EstateService.API.Controllers;
 
 [ApiController]
 [Produces("application/json")]
 [Route(ApiRoutes.Floors)]
-[AuthorizeApiKey]
+[Authorize]
 public sealed class FloorController(
     IFloorBlueprintService blueprintService,
     IPythagorasHandler pythagorasHandler,
@@ -42,11 +40,8 @@ public sealed class FloorController(
         int floorId,
         CancellationToken cancellationToken)
     {
-        PythagorasQuery<Floor> query = new PythagorasQuery<Floor>()
-            .WithQueryParameterValues("floorIds[]", [floorId]);
-
         IReadOnlyList<FloorInfoModel> floors = await _pythagorasHandler
-            .GetFloorsAsync(query, cancellationToken)
+            .GetFloorsAsync([floorId], queryArgs: null, cancellationToken)
             .ConfigureAwait(false);
 
         if (floors.Count == 0)

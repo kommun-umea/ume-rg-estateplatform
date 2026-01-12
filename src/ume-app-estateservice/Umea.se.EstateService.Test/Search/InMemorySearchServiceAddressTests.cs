@@ -1,5 +1,6 @@
 using Umea.se.EstateService.Logic.Search;
 using Umea.se.EstateService.Shared.Search;
+using Umea.se.EstateService.Shared.ValueObjects;
 
 namespace Umea.se.EstateService.Test.Search;
 
@@ -16,7 +17,7 @@ public class InMemorySearchServiceAddressTests
             Type = NodeType.Building,
             Name = "Library",
             PopularName = "Central Library",
-            Address = "Skolgatan 31A 901 84 Umeå",
+            Address = new AddressModel("Skolgatan 31A", "901 84", "Umeå", string.Empty, string.Empty),
             Ancestors = [],
             UpdatedAt = now,
             RankScore = 1
@@ -28,7 +29,7 @@ public class InMemorySearchServiceAddressTests
             Type = NodeType.Room,
             Name = "Conference Room",
             PopularName = "Conf A",
-            Address = "Skolgatan 31A 901 84 Umeå",
+            Address = new AddressModel("Skolgatan 31A", "901 84", "Umeå", string.Empty, string.Empty),
             Ancestors =
             [
                 new Ancestor
@@ -88,7 +89,7 @@ public class InMemorySearchServiceAddressTests
             Type = NodeType.Building,
             Name = "458-01, -09, -18, -19",
             PopularName = "Stadshuset norra flygeln, kuben, länken",
-            Address = "SKOLGATAN 31, 903 25 UMEÅ",
+            Address = new AddressModel("SKOLGATAN 31", "903 25", "UMEÅ", string.Empty, string.Empty),
             Ancestors = [],
             UpdatedAt = now,
             RankScore = 2

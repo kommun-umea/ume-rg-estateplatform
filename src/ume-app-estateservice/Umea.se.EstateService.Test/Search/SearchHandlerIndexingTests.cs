@@ -3,7 +3,6 @@ using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.Logic.Options;
 using Umea.se.EstateService.Logic.Search;
-using Umea.se.EstateService.Shared.Autocomplete;
 using Umea.se.EstateService.Shared.Search;
 
 namespace Umea.se.EstateService.Test.Search;
@@ -20,10 +19,10 @@ public class SearchHandlerIndexingTests
 
         handler.GetDocumentCount().ShouldBe(2);
 
-        IReadOnlyList<SearchResult> buildingResults = await handler.SearchAsync("Building", Array.Empty<AutocompleteType>(), 10);
+        IReadOnlyList<SearchResult> buildingResults = await handler.SearchAsync("Building", new SearchFilter(), 10);
         buildingResults.ShouldContain(result => result.Item.Type == NodeType.Building);
 
-        IReadOnlyList<SearchResult> roomResults = await handler.SearchAsync("Room", Array.Empty<AutocompleteType>(), 10);
+        IReadOnlyList<SearchResult> roomResults = await handler.SearchAsync("Room", new SearchFilter(), 10);
         roomResults.ShouldBeEmpty();
     }
 
@@ -37,8 +36,45 @@ public class SearchHandlerIndexingTests
 
         handler.GetDocumentCount().ShouldBe(3);
 
-        IReadOnlyList<SearchResult> roomResults = await handler.SearchAsync("Room", Array.Empty<AutocompleteType>(), 10);
+        IReadOnlyList<SearchResult> roomResults = await handler.SearchAsync("Room", new SearchFilter(), 10);
         roomResults.ShouldContain(result => result.Item.Type == NodeType.Room);
+    }
+
+    [Fact]
+    public async Task GetIndexedDocumentsAsync_ReturnsSnapshotWithAllDocuments()
+    {
+        List<PythagorasDocument> documents = CreateDocuments();
+        SearchHandler handler = CreateHandler(documents, excludeRooms: true);
+
+        IReadOnlyCollection<PythagorasDocument> indexed = await handler.GetIndexedDocumentsAsync();
+
+        indexed.Count.ShouldBe(documents.Count);
+        indexed.ShouldContain(doc => doc.Type == NodeType.Room);
+    }
+
+    [Fact]
+    public async Task GetBuildingDocumentsByIdsAsync_ReturnsRequestedBuildings()
+    {
+        List<PythagorasDocument> documents = CreateDocuments();
+        SearchHandler handler = CreateHandler(documents, excludeRooms: true);
+
+        IReadOnlyDictionary<int, PythagorasDocument> result = await handler.GetBuildingDocumentsByIdsAsync([2], CancellationToken.None);
+
+        result.Count.ShouldBe(1);
+        result.Keys.ShouldContain(2);
+        result[2].NumFloors.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task GetBuildingsForEstateAsync_FiltersByEstateId()
+    {
+        List<PythagorasDocument> documents = CreateDocuments();
+        SearchHandler handler = CreateHandler(documents, excludeRooms: true);
+
+        IReadOnlyList<PythagorasDocument> result = await handler.GetBuildingsForEstateAsync(1, CancellationToken.None);
+
+        result.Count.ShouldBe(1);
+        result[0].Id.ShouldBe(2);
     }
 
     private static SearchHandler CreateHandler(ICollection<PythagorasDocument> documents, bool excludeRooms)
