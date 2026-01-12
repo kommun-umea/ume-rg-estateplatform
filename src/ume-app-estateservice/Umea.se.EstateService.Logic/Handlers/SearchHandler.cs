@@ -30,11 +30,6 @@ public class SearchHandler(
         GeoFilter? geoFilter = null,
         CancellationToken cancellationToken = default)
     {
-        bool hasGeo = geoFilter is not null;
-        if (string.IsNullOrWhiteSpace(query) && !hasGeo)
-        {
-            return [];
-        }
 
         InMemorySearchService service = await EnsureSearchServiceAsync(cancellationToken).ConfigureAwait(false);
 

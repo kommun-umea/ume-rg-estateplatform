@@ -6,19 +6,6 @@ namespace Umea.se.EstateService.Test.API.Controllers.Requests;
 public class SearchRequestTests
 {
     [Fact]
-    public void Validate_ReturnsError_WhenQueryMissingAndNoGeoParameters()
-    {
-        SearchRequest request = new()
-        {
-            Query = string.Empty
-        };
-
-        IList<ValidationResult> results = Validate(request);
-
-        results.ShouldContain(result => result.MemberNames.Contains(nameof(SearchRequest.Query)));
-    }
-
-    [Fact]
     public void Validate_AllowsGeoOnlySearch()
     {
         SearchRequest request = new()
@@ -48,22 +35,6 @@ public class SearchRequestTests
         IList<ValidationResult> results = Validate(request);
 
         results.ShouldContain(result => result.MemberNames.Contains(nameof(SearchRequest.Latitude)));
-    }
-
-    [Fact]
-    public void Validate_ReturnsError_ForShortQuery()
-    {
-        SearchRequest request = new()
-        {
-            Query = "a",
-            Latitude = 63.8258,
-            Longitude = 20.2630,
-            RadiusMeters = 1_000
-        };
-
-        IList<ValidationResult> results = Validate(request);
-
-        results.ShouldContain(result => result.MemberNames.Contains(nameof(SearchRequest.Query)));
     }
 
     [Fact]

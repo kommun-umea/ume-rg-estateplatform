@@ -8,7 +8,6 @@ namespace Umea.se.EstateService.API.Controllers.Requests;
 
 public sealed record SearchRequest : IValidatableObject
 {
-    public const int MinQueryLength = 2;
     public const int MaxLimit = 1000;
     public const int MaxRadiusMeters = 50_000;
 
@@ -79,8 +78,6 @@ public sealed record SearchRequest : IValidatableObject
                 [nameof(Type)]);
         }
 
-        bool hasQuery = !string.IsNullOrWhiteSpace(Query);
-        string trimmedQuery = Query?.Trim() ?? string.Empty;
         bool hasLatitude = Latitude.HasValue;
         bool hasLongitude = Longitude.HasValue;
         bool hasRadius = RadiusMeters.HasValue;
@@ -191,19 +188,6 @@ public sealed record SearchRequest : IValidatableObject
                         [nameof(WestLongitude), nameof(EastLongitude)]);
                 }
             }
-        }
-
-        if (hasQuery && trimmedQuery.Length < MinQueryLength)
-        {
-            yield return new ValidationResult(
-                $"Query must be at least {MinQueryLength} characters when provided.",
-                [nameof(Query)]);
-        }
-        else if (!hasQuery && !hasGeo && !hasGeoBox)
-        {
-            yield return new ValidationResult(
-                "Query must be provided unless geospatial parameters are specified.",
-                [nameof(Query)]);
         }
     }
 }
