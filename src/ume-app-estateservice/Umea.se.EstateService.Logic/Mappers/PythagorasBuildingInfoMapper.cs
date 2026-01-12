@@ -105,12 +105,24 @@ public static class PythagorasBuildingInfoMapper
 
         if (!string.IsNullOrEmpty(noticeBoardText))
         {
-            noticeBoard = new BuildingNoticeBoardModel
+            DateTime? startDate = DateTime.TryParse(
+                    TryGetOutputValue(properties, PropertyCategoryId.NoticeBoardStartDate),
+                    out DateTime sd) ? sd : null;
+
+            DateTime? endDate = DateTime.TryParse(
+                    TryGetOutputValue(properties, PropertyCategoryId.NoticeBoardEndDate),
+                    out DateTime ed) ? ed : null;
+
+            bool isActive = endDate is null || endDate >= DateTime.Today;
+            if (isActive)
             {
-                Text = noticeBoardText,
-                StartDate = DateTime.TryParse(TryGetOutputValue(properties, PropertyCategoryId.NoticeBoardStartDate), out DateTime startDate) ? startDate : null,
-                EndDate = DateTime.TryParse(TryGetOutputValue(properties, PropertyCategoryId.NoticeBoardEndDate), out DateTime endDate) ? endDate : null
-            };
+                noticeBoard = new BuildingNoticeBoardModel
+                {
+                    Text = noticeBoardText,
+                    StartDate = startDate,
+                    EndDate = endDate
+                };
+            }
         }
 
         bool hasData = blueprintAvailable is not null
