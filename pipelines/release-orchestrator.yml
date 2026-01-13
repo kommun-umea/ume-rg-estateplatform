@@ -1,0 +1,30 @@
+name: $(buildName)_$(Date:yyyy-MM-ddTHH.mm.ss)
+
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: ubuntu-latest
+
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: Turkos/ume-pipeline-templates
+      ref: refs/tags/release/v251202T0847-15470
+
+variables:
+  - template: pipelines/general/template-default-pipeline-variables.yml@templates
+    parameters:
+      environment: prod
+
+  - template: pipelines/release/template-release-orchestrator-variables.yml@templates
+
+stages:
+  - template: pipelines/release/template-release-orchestrator.yml@templates
+    parameters:
+      templateRepoAlias: templates
+      environment: $(environment)
+      githubRepository: ume-rg-estateplatform
