@@ -96,7 +96,6 @@ public static class PythagorasBuildingInfoMapper
         }
 
         string? blueprintAvailable = TryGetOutputValue(properties, PropertyCategoryId.BlueprintAvailable);
-        string? externalOwner = TryGetOutputValue(properties, PropertyCategoryId.ExternalOwner);
         string? propertyDesignation = TryGetOutputValue(properties, PropertyCategoryId.PropertyDesignation);
         string? yearOfConstruction = TryGetOutputValue(properties, PropertyCategoryId.YearOfConstruction);
 
@@ -125,11 +124,13 @@ public static class PythagorasBuildingInfoMapper
             }
         }
 
+        ExternalOwnerInfoModel? externalOwnerInfo = GetExternalOwnerInfo(properties);
+
         bool hasData = blueprintAvailable is not null
-            || externalOwner is not null
             || propertyDesignation is not null
             || yearOfConstruction is not null
-            || noticeBoard is not null;
+            || noticeBoard is not null
+            || externalOwnerInfo is not null;
 
         if (!hasData)
         {
@@ -139,10 +140,32 @@ public static class PythagorasBuildingInfoMapper
         return new BuildingExtendedPropertiesModel
         {
             BlueprintAvailable = blueprintAvailable == "Ja",
-            ExternalOwner = externalOwner,
             PropertyDesignation = propertyDesignation,
             NoticeBoard = noticeBoard,
-            YearOfConstruction = yearOfConstruction
+            YearOfConstruction = yearOfConstruction,
+            ExternalOwnerInfo = externalOwnerInfo
+        };
+    }
+
+    private static ExternalOwnerInfoModel? GetExternalOwnerInfo(IReadOnlyDictionary<PropertyCategoryId, CalculatedPropertyValueDto> properties)
+    {
+
+        string? externalStatus = TryGetOutputValue(properties, PropertyCategoryId.BuildingExternalStatus);
+        string? externalOwnerName = TryGetOutputValue(properties, PropertyCategoryId.BuildingExternalOwnerName);
+        string? externalOwnerNote = TryGetOutputValue(properties, PropertyCategoryId.BuildingExternalOwnerNote);
+
+        if (string.IsNullOrEmpty(externalStatus) &&
+            string.IsNullOrEmpty(externalOwnerName) &&
+            string.IsNullOrEmpty(externalOwnerNote))
+        {
+            return null;
+        }
+
+        return new ExternalOwnerInfoModel
+        {
+            Status = externalStatus,
+            Name = externalOwnerName,
+            Note = externalOwnerNote,
         };
     }
 

@@ -3,10 +3,10 @@
 public sealed class BuildingExtendedPropertiesModel
 {
     public bool? BlueprintAvailable { get; init; }
-    public string? ExternalOwner { get; init; }
     public string? PropertyDesignation { get; init; }
     public string? OperationsGroupValue { get; init; }
     public BuildingNoticeBoardModel? NoticeBoard { get; init; }
+    public ExternalOwnerInfoModel? ExternalOwnerInfo { get; init; }
     public string? YearOfConstruction { get; set; }
 }
 

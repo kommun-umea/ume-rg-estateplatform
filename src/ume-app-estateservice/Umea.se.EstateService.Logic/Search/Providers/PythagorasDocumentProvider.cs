@@ -162,7 +162,7 @@ public class PythagorasDocumentProvider(IPythagorasHandler pythagorasHandler) : 
 
         return MapExtendedProperties(
             ("yearOfConstruction", source.YearOfConstruction),
-            ("externalOwner", source.ExternalOwner));
+            ("externalOwner", source.ExternalOwnerInfo?.Name));
     }
 
     private static Dictionary<string, string>? CreateEstateExtendedProperties(EstateExtendedPropertiesModel? source)

@@ -19,7 +19,12 @@ public static class PythagorasEstatePropertyMapper
         string? municipalityArea = TryGetOutputValue(properties, PropertyCategoryId.MunicipalityArea);
         string? propertyDesignation = TryGetOutputValue(properties, PropertyCategoryId.PropertyDesignation);
 
-        if (operationalArea is null && municipalityArea is null && propertyDesignation is null)
+        ExternalOwnerInfoModel? externalOwnerInfo = GetExternalOwnerInfo(properties);
+
+        if (operationalArea is null &&
+            municipalityArea is null &&
+            propertyDesignation is null &&
+            externalOwnerInfo is null)
         {
             return null;
         }
@@ -28,7 +33,8 @@ public static class PythagorasEstatePropertyMapper
         {
             OperationalArea = operationalArea,
             MunicipalityArea = municipalityArea,
-            PropertyDesignation = propertyDesignation
+            PropertyDesignation = propertyDesignation,
+            ExternalOwnerInfo = externalOwnerInfo,
         };
     }
 
@@ -63,6 +69,29 @@ public static class PythagorasEstatePropertyMapper
         return normalized.Count == 0
             ? null
             : ToExtendedPropertiesModel(normalized);
+    }
+
+    private static ExternalOwnerInfoModel? GetExternalOwnerInfo(IReadOnlyDictionary<PropertyCategoryId, CalculatedPropertyValueDto> properties)
+    {
+
+        string? externalStatus = TryGetOutputValue(properties, PropertyCategoryId.EstateExternalStatus);
+        string? externalOwnerName = TryGetOutputValue(properties, PropertyCategoryId.EstateExternalOwnerName);
+        string? externalOwnerNote = TryGetOutputValue(properties, PropertyCategoryId.EstateExternalOwnerNote);
+
+        if (string.IsNullOrEmpty(externalStatus) &&
+             string.IsNullOrEmpty(externalOwnerName) &&
+             string.IsNullOrEmpty(externalOwnerNote))
+        {
+            return null;
+        }
+
+        return new ExternalOwnerInfoModel
+        {
+            Status = externalStatus,
+            Name = externalOwnerName,
+            Note = externalOwnerNote,
+        };
+
     }
 
     private static string? TryGetOutputValue(IReadOnlyDictionary<PropertyCategoryId, CalculatedPropertyValueDto> properties, PropertyCategoryId key)
