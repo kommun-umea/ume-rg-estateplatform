@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using Umea.se.EstateService.ServiceAccess.Common;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.Toolkit.ExternalService;
@@ -271,7 +272,7 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : Ext
     }
 
     private static string FormQueryParameter(string name, string value) => $"{Uri.EscapeDataString(name)}={Uri.EscapeDataString(value)}";
-    public Task<HttpResponseMessage> GetFloorBlueprintAsync(int floorId, BlueprintFormat format, IDictionary<int, IReadOnlyList<string>>? workspaceTexts, CancellationToken cancellationToken = default)
+    public async Task<BinaryResourceResult?> GetFloorBlueprintAsync(int floorId, BlueprintFormat format, IDictionary<int, IReadOnlyList<string>>? workspaceTexts, CancellationToken cancellationToken = default)
     {
         if (floorId <= 0)
         {
@@ -291,7 +292,11 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : Ext
             Content = BuildBlueprintContent(payload)
         };
 
-        return HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        HttpResponseMessage response = await HttpClient
+            .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+            .ConfigureAwait(false);
+
+        return await BinaryResourceResult.CreateFromResponseAsync(response, cancellationToken).ConfigureAwait(false);
     }
 
     private static FormUrlEncodedContent BuildBlueprintContent(FloorBlueprintRequestPayload payload)
@@ -377,7 +382,7 @@ where TValue : class
         return QueryAsync(endpoint, query, cancellationToken);
     }
 
-    public Task<HttpResponseMessage> GetGalleryImageDataAsync(int imageId, GalleryImageVariant variant, CancellationToken cancellationToken = default)
+    public async Task<BinaryResourceResult?> GetGalleryImageDataAsync(int imageId, GalleryImageVariant variant, CancellationToken cancellationToken = default)
     {
         if (imageId <= 0)
         {
@@ -396,6 +401,10 @@ where TValue : class
         string requestUri = BuildRequestUri(NormalizeEndpoint(endpoint), queryString);
 
         HttpRequestMessage request = new(HttpMethod.Get, requestUri);
-        return HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        HttpResponseMessage response = await HttpClient
+            .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+            .ConfigureAwait(false);
+
+        return await BinaryResourceResult.CreateFromResponseAsync(response, cancellationToken).ConfigureAwait(false);
     }
 }

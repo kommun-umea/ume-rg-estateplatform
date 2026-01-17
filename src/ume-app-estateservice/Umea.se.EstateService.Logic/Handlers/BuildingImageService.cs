@@ -1,6 +1,6 @@
-using System.Net;
 using Microsoft.Extensions.Logging;
 using Umea.se.EstateService.Logic.Interfaces;
+using Umea.se.EstateService.ServiceAccess.Common;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
@@ -10,7 +10,7 @@ namespace Umea.se.EstateService.Logic.Handlers;
 
 public sealed class BuildingImageService(IPythagorasClient pythagorasClient, ILogger<BuildingImageService> logger) : IBuildingImageService
 {
-    public async Task<BuildingImageResult?> GetPrimaryImageAsync(int buildingId, BuildingImageSize size, CancellationToken cancellationToken = default)
+    public async Task<IStreamResourceResult?> GetPrimaryImageAsync(int buildingId, BuildingImageSize size, CancellationToken cancellationToken = default)
     {
         if (buildingId <= 0)
         {
@@ -30,39 +30,26 @@ public sealed class BuildingImageService(IPythagorasClient pythagorasClient, ILo
         GalleryImageFile selected = SelectPrimaryImage(images);
         GalleryImageVariant variant = MapVariant(size);
 
-        HttpResponseMessage response = await pythagorasClient
+        BinaryResourceResult? resource = await pythagorasClient
             .GetGalleryImageDataAsync(selected.Id, variant, cancellationToken)
             .ConfigureAwait(false);
 
-        if (response.StatusCode == HttpStatusCode.NotFound)
+        if (resource is null)
         {
             logger.LogInformation("Gallery image {ImageId} for building {BuildingId} returned 404.", selected.Id, buildingId);
-            response.Dispose();
             return null;
         }
 
-        try
-        {
-            response.EnsureSuccessStatusCode();
-        }
-        catch
-        {
-            response.Dispose();
-            throw;
-        }
-
-        Stream content = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-
-        string? contentType = response.Content.Headers.ContentType?.MediaType;
-        long? contentLength = response.Content.Headers.ContentLength;
+        Stream content = resource.OpenContentStream();
 
         return new BuildingImageResult(
             content,
-            contentType,
+            resource.ContentType,
             selected.Name,
-            contentLength,
+            resource.ContentLength,
             selected.Id,
-            response);
+            resource,
+            resource);
     }
 
     private static GalleryImageVariant MapVariant(BuildingImageSize size) => size switch

@@ -1,11 +1,10 @@
-using System.Net;
-using System.Net.Http.Headers;
 using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.Logic.Models;
 using Umea.se.EstateService.Logic.Exceptions;
 using Umea.se.EstateService.Logic.Helpers;
+using Umea.se.EstateService.ServiceAccess.Common;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.Shared.Models;
@@ -58,10 +57,10 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IP
             }
         }
 
-        HttpResponseMessage response;
+        BinaryResourceResult? resource;
         try
         {
-            response = await _pythagorasClient
+            resource = await _pythagorasClient
                 .GetFloorBlueprintAsync(floorId, format, workspaceTexts, cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -71,36 +70,15 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IP
             throw new FloorBlueprintUnavailableException("Pythagoras HTTP request failed.", ex);
         }
 
-        using (response)
+        if (resource is null)
         {
-            if (!response.IsSuccessStatusCode)
-            {
-                string errorDescription = await ReadErrorBodyAsync(response, cancellationToken).ConfigureAwait(false);
+            _logger.LogWarning("Blueprint not found for floor {FloorId} in Pythagoras.", floorId);
+            throw new KeyNotFoundException($"Blueprint for floor {floorId} was not found.");
+        }
 
-                if (response.StatusCode == HttpStatusCode.NotFound)
-                {
-                    _logger.LogWarning(
-                        "Blueprint not found for floor {FloorId} in Pythagoras. Body: {Body}",
-                        floorId,
-                        errorDescription);
-
-                    throw new KeyNotFoundException($"Blueprint for floor {floorId} was not found.");
-                }
-
-                _logger.LogWarning(
-                    "Blueprint request returned {StatusCode} for floor {FloorId}. Body: {Body}",
-                    (int)response.StatusCode,
-                    floorId,
-                    errorDescription);
-
-                string reason = string.IsNullOrWhiteSpace(response.ReasonPhrase)
-                    ? response.StatusCode.ToString()
-                    : response.ReasonPhrase;
-
-                throw new FloorBlueprintUnavailableException($"Pythagoras returned {(int)response.StatusCode} ({reason}). Body: {errorDescription}");
-            }
-
-            using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        await using (resource)
+        {
+            await using Stream responseStream = resource.OpenContentStream();
             MemoryStream buffer = new();
             await responseStream.CopyToAsync(buffer, cancellationToken).ConfigureAwait(false);
             buffer.Position = 0;
@@ -118,8 +96,8 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IP
                 }
             }
 
-            string contentType = ResolveContentType(format, response.Content.Headers.ContentType?.MediaType);
-            string resolvedFileName = TryResolveFileName(response.Content.Headers.ContentDisposition);
+            string contentType = ResolveContentType(format, resource.ContentType);
+            string resolvedFileName = resource.FileName ?? "blueprint";
             string fileName = EnsureFileName(resolvedFileName, floorId, format);
 
             return new FloorBlueprint(buffer, contentType, fileName);
@@ -182,62 +160,12 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IP
         return string.Empty;
     }
 
-    private static string TryResolveFileName(ContentDispositionHeaderValue? header)
-    {
-        if (header is null)
-        {
-            return "blueprint";
-        }
-
-        if (!string.IsNullOrWhiteSpace(header.FileNameStar))
-        {
-            return header.FileNameStar.Trim('"');
-        }
-
-        if (!string.IsNullOrWhiteSpace(header.FileName))
-        {
-            return header.FileName.Trim('"');
-        }
-
-        return "blueprint";
-    }
-
     private static string FormatToExtension(BlueprintFormat format) => format switch
     {
         BlueprintFormat.Pdf => "pdf",
         BlueprintFormat.Svg => "svg",
         _ => "file"
     };
-
-    private static async Task<string> ReadErrorBodyAsync(HttpResponseMessage response, CancellationToken cancellationToken)
-    {
-        try
-        {
-            string body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            return NormalizeErrorBody(body);
-        }
-        catch (Exception)
-        {
-            return "Failed to read error response body.";
-        }
-    }
-
-    private static string NormalizeErrorBody(string? body)
-    {
-        if (string.IsNullOrWhiteSpace(body))
-        {
-            return "No response body.";
-        }
-
-        string singleLine = body.ReplaceLineEndings(" ").Trim();
-        const int maxLength = 500;
-        if (singleLine.Length <= maxLength)
-        {
-            return singleLine;
-        }
-
-        return $"{singleLine[..maxLength]}…";
-    }
 
     private static string ResolveContentType(BlueprintFormat format, string? fallback)
     {
