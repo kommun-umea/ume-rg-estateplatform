@@ -16,4 +16,5 @@ public enum PropertyCategoryId
     NoticeBoardText = 239,
     NoticeBoardStartDate = 240,
     NoticeBoardEndDate = 241,
+    AdministrativeArea = 250,
 }

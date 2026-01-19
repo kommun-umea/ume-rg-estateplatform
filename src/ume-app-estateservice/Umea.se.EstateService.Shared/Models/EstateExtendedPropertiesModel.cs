@@ -6,6 +6,7 @@ namespace Umea.se.EstateService.Shared.Models;
 public sealed class EstateExtendedPropertiesModel
 {
     public string? OperationalArea { get; init; }
+    public string? AdministrativeArea { get; init; }
     public string? MunicipalityArea { get; init; }
     public string? PropertyDesignation { get; init; }
     public ExternalOwnerInfoModel? ExternalOwnerInfo { get; init; }

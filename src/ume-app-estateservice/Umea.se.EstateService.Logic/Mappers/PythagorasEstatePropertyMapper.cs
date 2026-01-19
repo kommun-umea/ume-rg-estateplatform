@@ -16,6 +16,7 @@ public static class PythagorasEstatePropertyMapper
         }
 
         string? operationalArea = TryGetOutputValue(properties, PropertyCategoryId.OperationalArea);
+        string? administrativeArea = TryGetOutputValue(properties, PropertyCategoryId.AdministrativeArea);
         string? municipalityArea = TryGetOutputValue(properties, PropertyCategoryId.MunicipalityArea);
         string? propertyDesignation = TryGetOutputValue(properties, PropertyCategoryId.PropertyDesignation);
 
@@ -32,6 +33,7 @@ public static class PythagorasEstatePropertyMapper
         return new EstateExtendedPropertiesModel
         {
             OperationalArea = operationalArea,
+            AdministrativeArea = administrativeArea,
             MunicipalityArea = municipalityArea,
             PropertyDesignation = propertyDesignation,
             ExternalOwnerInfo = externalOwnerInfo,
