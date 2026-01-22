@@ -8,6 +8,13 @@ public interface IPythagorasClient
     Task<IReadOnlyList<BuildingInfo>> GetBuildingsAsync(PythagorasQuery<BuildingInfo>? query = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<BuildingAscendant>> GetBuildingAscendantsAsync(int buildingId, PythagorasQuery<BuildingAscendant>? query = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Floor>> GetBuildingFloorsAsync(int buildingId, PythagorasQuery<Floor>? query = null, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<FileDocumentDirectory>> GetBuildingRootDirectories(int buildingId, PythagorasQuery<FileDocumentDirectory>? query = null, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<FileDocument>> GetBuildingRootDocuments(int buildingId, PythagorasQuery<FileDocument>? query = null, CancellationToken cancellationToken = default);
+    Task<FileDocumentDirectory?> GetDirectory(int directoryId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<FileDocumentDirectory>> GetChildDirectories(int directoryId, PythagorasQuery<FileDocumentDirectory>? query = null, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<FileDocument>> GetDirectoryDocuments(int directoryId, PythagorasQuery<FileDocument>? query = null, CancellationToken cancellationToken = default);
+    Task<(byte[] data, string contentType)> GetDocument(int documentId, CancellationToken cancellationToken = default);
+    Task<UiListDataResponse<FileDocument>> GetBuildingDocumentListAsync(int buildingId, int? maxResults = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Workspace>> GetWorkspacesAsync(PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<NavigationFolder>> GetNavigationFoldersAsync(PythagorasQuery<NavigationFolder>? query = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Floor>> GetFloorsAsync(PythagorasQuery<Floor>? query = null, CancellationToken cancellationToken = default);

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using System.Text;
 using System.Text.Json;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
@@ -51,6 +52,57 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : Ext
         string endpoint = $"rest/v1/building/{buildingId}/floor";
         query ??= new PythagorasQuery<Floor>();
         return QueryAsync(endpoint, query, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<FileDocumentDirectory>> GetBuildingRootDirectories(int buildingId, PythagorasQuery<FileDocumentDirectory>? query = null, CancellationToken cancellationToken = default)
+    {
+        query ??= new PythagorasQuery<FileDocumentDirectory>();
+        string endpoint = $"rest/v1/building/{buildingId}/documentfolder/info/root";
+        return QueryAsync(endpoint, query, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<FileDocument>> GetBuildingRootDocuments(int buildingId, PythagorasQuery<FileDocument>? query = null, CancellationToken cancellationToken = default)
+    {
+        query ??= new PythagorasQuery<FileDocument>();
+        string endpoint = $"rest/v1/building/{buildingId}/documentfile/root";
+        return QueryAsync(endpoint, query, cancellationToken);
+    }
+
+    public Task<FileDocumentDirectory?> GetDirectory(int directoryId, CancellationToken cancellationToken = default)
+    {
+        string endpoint = $"rest/v1/documentfolder/{directoryId}/info";
+        return GetAsync<FileDocumentDirectory>(endpoint, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<FileDocumentDirectory>> GetChildDirectories(int directoryId, PythagorasQuery<FileDocumentDirectory>? query = null, CancellationToken cancellationToken = default)
+    {
+        query ??= new PythagorasQuery<FileDocumentDirectory>();
+        string endpoint = $"rest/v1/documentfolder/{directoryId}/info/child";
+        return QueryAsync(endpoint, query, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<FileDocument>> GetDirectoryDocuments(int directoryId, PythagorasQuery<FileDocument>? query = null, CancellationToken cancellationToken = default)
+    {
+        query ??= new PythagorasQuery<FileDocument>();
+        string endpoint = $"rest/v1/documentfolder/{directoryId}/documentfile";
+        return QueryAsync(endpoint, query, cancellationToken);
+    }
+
+    public Task<(byte[] data, string contentType)> GetDocument(int documentId, CancellationToken cancellationToken = default)
+    {
+        string endpoint = $"rest/v1/documentfile/{documentId}/data";
+        return GetFileAsync(endpoint, cancellationToken);
+    }
+
+    public async Task<UiListDataResponse<FileDocument>> GetBuildingDocumentListAsync(int buildingId, int? maxResults = null, CancellationToken cancellationToken = default)
+    {
+        string endpoint = $"rest/v1/building/{buildingId}/documentfile/uilistdata";
+        string queryString = maxResults.HasValue ? $"maxResults={maxResults.Value}" : string.Empty;
+        string requestUri = BuildRequestUri(NormalizeEndpoint(endpoint), queryString);
+
+        using HttpResponseMessage response = await HttpClient.GetAsync(requestUri, cancellationToken).ConfigureAwait(false);
+        UiListDataResponse<FileDocument>? result = await ProcessResponseAsync<UiListDataResponse<FileDocument>>(response, cancellationToken).ConfigureAwait(false);
+        return result ?? new UiListDataResponse<FileDocument>();
     }
 
     public Task<IReadOnlyList<Workspace>> GetWorkspacesAsync(PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
@@ -170,10 +222,10 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : Ext
         where TDto : class, IPythagorasDto
     {
         ArgumentNullException.ThrowIfNull(query);
-        return await GetAsync<TDto>(endpoint, query.BuildAsQueryString(), cancellationToken).ConfigureAwait(false);
+        return await GetListAsync<TDto>(endpoint, query.BuildAsQueryString(), cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<IReadOnlyList<TDto>> GetAsync<TDto>(string endpoint, string queryString, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<TDto>> GetListAsync<TDto>(string endpoint, string queryString, CancellationToken cancellationToken)
     {
         string requestUri = BuildRequestUri(NormalizeEndpoint(endpoint), queryString);
 
@@ -181,6 +233,34 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : Ext
         List<TDto>? payload = await ProcessResponseAsync<List<TDto>>(response, cancellationToken).ConfigureAwait(false);
 
         return payload ?? [];
+    }
+
+    private async Task<TDto?> GetAsync<TDto>(string endpoint, CancellationToken cancellationToken)
+    {
+        string requestUri = NormalizeEndpoint(endpoint);
+
+        using HttpResponseMessage response = await HttpClient.GetAsync(requestUri, cancellationToken).ConfigureAwait(false);
+        if(response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return default;
+        }
+
+        TDto? payload = await ProcessResponseAsync<TDto>(response, cancellationToken).ConfigureAwait(false);
+
+        return payload;
+    }
+
+    private async Task<(byte[] data, string contentType)> GetFileAsync(string endpoint, CancellationToken cancellationToken)
+    {
+        string requestUri = NormalizeEndpoint(endpoint);
+
+        using HttpResponseMessage response = await HttpClient.GetAsync(requestUri, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        string contentType = response.Content.Headers.ContentType?.ToString() ?? "application/octet-stream";
+        byte[] data = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+
+        return (data, contentType);
     }
 
     private async Task<TResponse> PostAsync<TResponse>(string endpoint, string queryString, CancellationToken cancellationToken)

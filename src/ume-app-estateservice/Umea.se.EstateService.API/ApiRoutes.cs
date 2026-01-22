@@ -6,6 +6,7 @@ public class ApiRoutes : ApiRoutesBase
 {
     public const string Estates = $"{RoutePrefixV1}/estates";
     public const string Buildings = $"{RoutePrefixV1}/buildings";
+    public const string Documents = $"{RoutePrefixV1}/documents";
     public const string Rooms = $"{RoutePrefixV1}/rooms";
     public const string Floors = $"{RoutePrefixV1}/floors";
     public const string Search = $"{RoutePrefixV1}/search";

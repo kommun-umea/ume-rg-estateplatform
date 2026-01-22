@@ -158,7 +158,8 @@ public class BuildingControllerTests : ControllerTestCloud<TestApiFactory, Progr
         _fakeClient.EndpointsCalled.ShouldBe([
             "rest/v1/building/info",
             "rest/v1/building/1/property/calculatedvalue",
-            "rest/v1/building/1/node/ascendant"
+            "rest/v1/building/1/node/ascendant",
+            "rest/v1/building/1/documentfile/uilistdata"
         ]);
     }
 

@@ -101,6 +101,107 @@ public sealed class FakePythagorasClient : IPythagorasClient
         return CaptureAsync($"rest/v1/building/{buildingId}/floor", query, cancellationToken);
     }
 
+    public Task<IReadOnlyList<FileDocumentDirectory>> GetBuildingRootDirectories(int buildingId, PythagorasQuery<FileDocumentDirectory>? query = null, CancellationToken cancellationToken = default)
+    {
+        if (buildingId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
+        }
+
+        return CaptureAsync($"rest/v1/building/{buildingId}/documentfolder/info/root", query, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<FileDocument>> GetBuildingRootDocuments(int buildingId, PythagorasQuery<FileDocument>? query = null, CancellationToken cancellationToken = default)
+    {
+        if (buildingId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
+        }
+
+        return CaptureAsync($"rest/v1/building/{buildingId}/documentfile/root", query, cancellationToken);
+    }
+
+    private FileDocumentDirectory? _directoryResult;
+
+    public void SetDirectoryResult(FileDocumentDirectory? directory)
+    {
+        _directoryResult = directory;
+    }
+
+    public Task<FileDocumentDirectory?> GetDirectory(int directoryId, CancellationToken cancellationToken = default)
+    {
+        if (directoryId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(directoryId), "Directory id must be positive.");
+        }
+
+        Requests.Add(new RequestCapture(typeof(FileDocumentDirectory), $"rest/v1/documentfolder/{directoryId}/info", null, null, cancellationToken));
+        return Task.FromResult(_directoryResult);
+    }
+
+    public Task<IReadOnlyList<FileDocumentDirectory>> GetChildDirectories(int directoryId, PythagorasQuery<FileDocumentDirectory>? query = null, CancellationToken cancellationToken = default)
+    {
+        if (directoryId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(directoryId), "Directory id must be positive.");
+        }
+
+        return CaptureAsync($"rest/v1/documentfolder/{directoryId}/info/child", query, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<FileDocument>> GetDirectoryDocuments(int directoryId, PythagorasQuery<FileDocument>? query = null, CancellationToken cancellationToken = default)
+    {
+        if (directoryId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(directoryId), "Directory id must be positive.");
+        }
+
+        return CaptureAsync($"rest/v1/documentfolder/{directoryId}/documentfile", query, cancellationToken);
+    }
+
+    private (byte[] data, string contentType)? _documentResult;
+
+    public void SetDocumentResult(byte[] data, string contentType)
+    {
+        _documentResult = (data, contentType);
+    }
+
+    public Task<(byte[] data, string contentType)> GetDocument(int documentId, CancellationToken cancellationToken = default)
+    {
+        if (documentId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(documentId), "Document id must be positive.");
+        }
+
+        Requests.Add(new RequestCapture(typeof(FileDocument), $"rest/v1/documentfile/{documentId}/data", null, null, cancellationToken));
+
+        if (_documentResult.HasValue)
+        {
+            return Task.FromResult(_documentResult.Value);
+        }
+
+        return Task.FromResult<(byte[] data, string contentType)>(([], "application/octet-stream"));
+    }
+
+    private UiListDataResponse<FileDocument>? _buildingDocumentListResult;
+
+    public void SetBuildingDocumentListResult(UiListDataResponse<FileDocument> result)
+    {
+        _buildingDocumentListResult = result;
+    }
+
+    public Task<UiListDataResponse<FileDocument>> GetBuildingDocumentListAsync(int buildingId, int? maxResults = null, CancellationToken cancellationToken = default)
+    {
+        if (buildingId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(buildingId), "Building id must be positive.");
+        }
+
+        Requests.Add(new RequestCapture(typeof(FileDocument), $"rest/v1/building/{buildingId}/documentfile/uilistdata", null, $"maxResults={maxResults}", cancellationToken));
+
+        return Task.FromResult(_buildingDocumentListResult ?? new UiListDataResponse<FileDocument>());
+    }
+
     public Task<IReadOnlyList<Workspace>> GetWorkspacesAsync(PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
         => CaptureAsync("rest/v1/workspace/info", query, cancellationToken);
 
@@ -174,6 +275,9 @@ public sealed class FakePythagorasClient : IPythagorasClient
         NavigationFolderUiListDataRequests.Clear();
         _navigationFolderUiListDataResults.Clear();
         OnGetGalleryImageDataAsync = null;
+        _directoryResult = null;
+        _documentResult = null;
+        _buildingDocumentListResult = null;
     }
 
     /// <summary>
