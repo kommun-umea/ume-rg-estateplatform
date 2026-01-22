@@ -125,12 +125,14 @@ public static class PythagorasBuildingInfoMapper
         }
 
         ExternalOwnerInfoModel? externalOwnerInfo = GetExternalOwnerInfo(properties);
+        BuildingContactPersonsModel? contactPersons = GetBuildingContactPersons(properties);
 
         bool hasData = blueprintAvailable is not null
             || propertyDesignation is not null
             || yearOfConstruction is not null
             || noticeBoard is not null
-            || externalOwnerInfo is not null;
+            || externalOwnerInfo is not null
+            || contactPersons is not null;
 
         if (!hasData)
         {
@@ -143,7 +145,8 @@ public static class PythagorasBuildingInfoMapper
             PropertyDesignation = propertyDesignation,
             NoticeBoard = noticeBoard,
             YearOfConstruction = yearOfConstruction,
-            ExternalOwnerInfo = externalOwnerInfo
+            ExternalOwnerInfo = externalOwnerInfo,
+            ContactPersons = contactPersons,
         };
     }
 
@@ -166,6 +169,30 @@ public static class PythagorasBuildingInfoMapper
             Status = externalStatus,
             Name = externalOwnerName,
             Note = externalOwnerNote,
+        };
+    }
+    private static BuildingContactPersonsModel? GetBuildingContactPersons(IReadOnlyDictionary<PropertyCategoryId, CalculatedPropertyValueDto> properties)
+    {
+
+        string? propertyManager = TryGetOutputValue(properties, PropertyCategoryId.PropertyManager);
+        string? operationsManager = TryGetOutputValue(properties, PropertyCategoryId.OperationsManager);
+        string? operationCoordinator = TryGetOutputValue(properties, PropertyCategoryId.OperationCoordinator);
+        string? rentalAdministrator = TryGetOutputValue(properties, PropertyCategoryId.RentalAdministrator);
+
+        if (string.IsNullOrEmpty(propertyManager) &&
+            string.IsNullOrEmpty(operationsManager) &&
+            string.IsNullOrEmpty(operationCoordinator) &&
+            string.IsNullOrEmpty(rentalAdministrator))
+        {
+            return null;
+        }
+
+        return new BuildingContactPersonsModel
+        {
+            PropertyManager = propertyManager,
+            OperationsManager = operationsManager,
+            OperationCoordinator = operationCoordinator,
+            RentalAdministrator = rentalAdministrator,
         };
     }
 

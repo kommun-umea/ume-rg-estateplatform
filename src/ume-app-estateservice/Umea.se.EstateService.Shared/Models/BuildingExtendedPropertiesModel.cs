@@ -6,6 +6,7 @@ public sealed class BuildingExtendedPropertiesModel
     public string? PropertyDesignation { get; init; }
     public string? OperationsGroupValue { get; init; }
     public BuildingNoticeBoardModel? NoticeBoard { get; init; }
+    public BuildingContactPersonsModel? ContactPersons { get; init; }
     public ExternalOwnerInfoModel? ExternalOwnerInfo { get; init; }
     public string? YearOfConstruction { get; set; }
 }
