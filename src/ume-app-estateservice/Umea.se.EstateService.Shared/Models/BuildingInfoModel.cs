@@ -23,5 +23,6 @@ public sealed class BuildingInfoModel : ISearchable
     public BuildingAscendantModel? Region { get; set; }
     public BuildingAscendantModel? Organization { get; set; }
     public BuildingExtendedPropertiesModel? ExtendedProperties { get; init; }
+    public string? ImageUrl { get; set; }
     public DateTimeOffset UpdatedAt => DateTime.Now;
 }

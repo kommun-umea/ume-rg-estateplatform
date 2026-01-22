@@ -1,4 +1,7 @@
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Logic.HostedServices;
 using Umea.se.EstateService.Logic.Interfaces;
@@ -17,7 +20,23 @@ public static class DependencyInjectorLogic
         services.AddSingleton<IPythagorasDocumentProvider, PythagorasDocumentProvider>();
         services.AddSingleton<IFloorBlueprintService, FloorBlueprintHandler>();
         services.AddScoped<IBuildingImageService, BuildingImageService>();
+        services.AddMemoryCache(options =>
+        {
+            options.SizeLimit = 500 * 1024 * 1024; // 500 MB shared cache limit
+            options.CompactionPercentage = 0.25;
+        });
+        services.AddOptions<BuildingImageCacheOptions>()
+            .BindConfiguration(BuildingImageCacheOptions.SectionName);
+        services.AddSingleton<IBuildingImageMetadataCache>(sp =>
+        {
+            IMemoryCache cache = sp.GetRequiredService<IMemoryCache>();
+            ILogger<InMemoryBuildingImageMetadataCache> logger = sp.GetRequiredService<ILogger<InMemoryBuildingImageMetadataCache>>();
+            BuildingImageCacheOptions options = sp.GetRequiredService<IOptions<BuildingImageCacheOptions>>().Value;
+            return new InMemoryBuildingImageMetadataCache(cache, logger, options.MetadataExpirationHours);
+        });
+
         services.AddTransient<IFileDocumentHandler, FileDocumentHandler>();
+
         services.AddOptions<SearchOptions>()
             .BindConfiguration(SearchOptions.SectionName);
         services.AddOptions<SearchIndexRefreshOptions>()

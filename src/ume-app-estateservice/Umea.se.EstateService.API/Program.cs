@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Umea.se.EstateService.API;
+using Umea.se.Toolkit.Images;
 using Umea.se.EstateService.Logic;
 using Umea.se.EstateService.ServiceAccess;
 using Umea.se.EstateService.Shared;
@@ -29,6 +30,14 @@ else
 {
     builder.Logging.ClearProviders();
 }
+
+// ImageService must be registered before AddLogicDependencies (BuildingImageService depends on it)
+builder.Services.AddSingleton(new ImageServiceOptions
+{
+    CacheSizeMb = 500,
+    CacheLifetime = TimeSpan.FromHours(24),
+});
+builder.Services.AddSingleton<ImageService>();
 
 builder.Services
     .AddApplicationConfig(config)
@@ -90,7 +99,6 @@ app.UseAllowedOriginsCorsPolicy();
 
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapControllers();
 
 app.Run();

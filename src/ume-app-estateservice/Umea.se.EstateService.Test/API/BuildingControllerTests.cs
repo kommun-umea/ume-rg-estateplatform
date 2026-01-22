@@ -191,7 +191,7 @@ public class BuildingControllerTests : ControllerTestCloud<TestApiFactory, Progr
         HttpResponseMessage result = await _client.GetAsync($"{ApiRoutes.Buildings}/1/image");
         result.StatusCode.ShouldBe(HttpStatusCode.OK);
         result.Content.Headers.ContentType.ShouldNotBeNull();
-        result.Content.Headers.ContentType!.MediaType.ShouldBe("image/jpeg");
+        result.Content.Headers.ContentType!.MediaType.ShouldBe("image/webp");
 
         byte[] payload = await result.Content.ReadAsByteArrayAsync();
         payload.ShouldBe(expected);
@@ -208,30 +208,5 @@ public class BuildingControllerTests : ControllerTestCloud<TestApiFactory, Progr
         HttpResponseMessage result = await _client.GetAsync($"{ApiRoutes.Buildings}/1/image");
 
         result.StatusCode.ShouldBe(HttpStatusCode.NotFound);
-    }
-
-    [Fact]
-    public async Task GetBuildingImageAsync_ThumbnailRequestsThumbnailVariant()
-    {
-        _fakeClient.Reset();
-        _fakeClient.SetGetAsyncResult(new GalleryImageFile { Id = 5, Name = "thumb.jpg", Updated = DateTime.UtcNow });
-
-        _fakeClient.OnGetGalleryImageDataAsync = (imageId, variant, _) =>
-        {
-            imageId.ShouldBe(5);
-            variant.ShouldBe(GalleryImageVariant.Thumbnail);
-            HttpResponseMessage response = new(HttpStatusCode.OK)
-            {
-                Content = new ByteArrayContent([0x1])
-            };
-            response.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
-            return Task.FromResult(response);
-        };
-
-        HttpResponseMessage result = await _client.GetAsync($"{ApiRoutes.Buildings}/1/image?size=thumbnail");
-
-        result.StatusCode.ShouldBe(HttpStatusCode.OK);
-        result.Content.Headers.ContentType.ShouldNotBeNull();
-        result.Content.Headers.ContentType!.MediaType.ShouldBe("image/png");
     }
 }

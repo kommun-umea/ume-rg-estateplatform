@@ -12,4 +12,5 @@
   <Project Path="Umea.se.EstateService.ServiceAccess/Umea.se.EstateService.ServiceAccess.csproj" Id="906be054-766a-4b2b-8516-db2b65826786" />
   <Project Path="Umea.se.EstateService.Shared/Umea.se.EstateService.Shared.csproj" Id="3e8174fd-0020-449e-9665-f1410890e42f" />
   <Project Path="Umea.se.EstateService.Test/Umea.se.EstateService.Test.csproj" Id="6eb8ed9b-2216-4d9a-96df-17fb1caea924" />
+  <Project Path="Umea.se.Toolkit.Images/Umea.se.Toolkit.Images.csproj" />
 </Solution>

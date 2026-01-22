@@ -13,16 +13,10 @@ namespace Umea.se.EstateService.API.Controllers;
 [Produces("application/json")]
 [Route(ApiRoutes.Estates)]
 [Authorize]
-public class EstateController : ControllerBase
+public class EstateController(IPythagorasHandler pythagorasService, IIndexedPythagorasDocumentReader documentReader) : ControllerBase
 {
-    private readonly IPythagorasHandler _pythagorasService;
-    private readonly IIndexedPythagorasDocumentReader _documentReader;
-
-    public EstateController(IPythagorasHandler pythagorasService, IIndexedPythagorasDocumentReader documentReader)
-    {
-        _pythagorasService = pythagorasService;
-        _documentReader = documentReader;
-    }
+    private readonly IPythagorasHandler _pythagorasService = pythagorasService;
+    private readonly IIndexedPythagorasDocumentReader _documentReader = documentReader;
 
     /// <summary>
     /// Gets a specific estate.
@@ -127,11 +121,10 @@ public class EstateController : ControllerBase
             return;
         }
 
-        int[] ids = buildings
+        int[] ids = [.. buildings
             .Select(static building => building.Id)
             .Where(static id => id > 0)
-            .Distinct()
-            .ToArray();
+            .Distinct()];
 
         if (ids.Length == 0)
         {

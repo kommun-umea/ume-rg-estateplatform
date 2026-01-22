@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Net.Http.Headers;
 using Swashbuckle.AspNetCore.Annotations;
 using Umea.se.EstateService.API.Controllers.Requests;
 using Umea.se.EstateService.Logic.Interfaces;
@@ -16,12 +15,8 @@ namespace Umea.se.EstateService.API.Controllers;
 [Produces("application/json")]
 [Route(ApiRoutes.Buildings)]
 [Authorize]
-public class BuildingController(IPythagorasHandler pythagorasService, IIndexedPythagorasDocumentReader documentReader, IBuildingImageService buildingImageService, IFileDocumentHandler fileDocumentHandler) : ControllerBase
+public class BuildingController(IPythagorasHandler pythagorasService, IIndexedPythagorasDocumentReader documentReader, IFileDocumentHandler fileDocumentHandler) : ControllerBase
 {
-    private readonly IIndexedPythagorasDocumentReader _documentReader = documentReader;
-    private readonly IBuildingImageService _buildingImageService = buildingImageService;
-    private readonly IFileDocumentHandler _fileDocumentHandler = fileDocumentHandler;
-
     /// <summary>
     /// Gets details for a specific building.
     /// </summary>
@@ -55,67 +50,9 @@ public class BuildingController(IPythagorasHandler pythagorasService, IIndexedPy
         }
 
         await EnrichBuildingStatisticsAsync([building], includeDocumentCount: true, cancellationToken).ConfigureAwait(false);
+        SetImageUrls([building]);
 
         return Ok(building);
-    }
-
-    /// <summary>
-    /// Gets the primary image for a specific building.
-    /// </summary>
-    /// <param name="buildingId">The ID of the building.</param>
-    /// <param name="size">Optional image size. Defaults to the original image.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <response code="200">Returns the image stream.</response>
-    /// <response code="400">If the buildingId is not valid.</response>
-    /// <response code="404">If no image is available.</response>
-    [HttpGet("{buildingId:int}/image")]
-    [Produces("image/jpeg", "image/png", "application/octet-stream")]
-    [SwaggerOperation(
-        Summary = "Get building image",
-        Description = "Retrieves the first available gallery image for the specified building."
-    )]
-    [SwaggerResponse(StatusCodes.Status200OK, "Image stream")]
-    [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid buildingId")]
-    [SwaggerResponse(StatusCodes.Status404NotFound, "Image not found")]
-    public async Task<IActionResult> GetBuildingImageAsync(
-        int buildingId,
-        [FromQuery(Name = "size")] BuildingImageSize size = BuildingImageSize.Original,
-        CancellationToken cancellationToken = default)
-    {
-        if (buildingId <= 0)
-        {
-            return BadRequest("Building id must be positive.");
-        }
-
-        BuildingImageResult? image = await _buildingImageService
-            .GetPrimaryImageAsync(buildingId, size, cancellationToken)
-            .ConfigureAwait(false);
-
-        if (image is null)
-        {
-            return NotFound();
-        }
-
-        HttpContext.Response.RegisterForDispose(image);
-
-        FileStreamResult fileResult = File(
-            image.Content,
-            image.ContentType ?? "application/octet-stream",
-            fileDownloadName: image.FileName,
-            enableRangeProcessing: false);
-
-        if (image.ContentLength.HasValue)
-        {
-            HttpContext.Response.ContentLength = image.ContentLength.Value;
-        }
-
-        Response.GetTypedHeaders().CacheControl = new CacheControlHeaderValue
-        {
-            Public = true,
-            MaxAge = TimeSpan.FromHours(24)
-        };
-
-        return fileResult;
     }
 
     /// <summary>
@@ -138,7 +75,9 @@ public class BuildingController(IPythagorasHandler pythagorasService, IIndexedPy
         CancellationToken cancellationToken)
     {
         IReadOnlyList<BuildingInfoModel> buildings = await QueryBuildingsAsync(request, cancellationToken).ConfigureAwait(false);
+
         await EnrichBuildingStatisticsAsync(buildings, includeDocumentCount: false, cancellationToken).ConfigureAwait(false);
+        SetImageUrls(buildings);
         return Ok(buildings);
     }
 
@@ -155,11 +94,11 @@ public class BuildingController(IPythagorasHandler pythagorasService, IIndexedPy
     [SwaggerResponse(StatusCodes.Status200OK, "List of building geolocations", typeof(IReadOnlyList<BuildingLocationModel>))]
     public async Task<ActionResult<IReadOnlyList<BuildingLocationModel>>> GetBuildingGeolocationsAsync(CancellationToken cancellationToken)
     {
-        IReadOnlyCollection<PythagorasDocument> documents = await _documentReader
+        IReadOnlyCollection<PythagorasDocument> documents = await documentReader
             .GetIndexedDocumentsAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        BuildingLocationModel[] locations = documents
+        BuildingLocationModel[] locations = [.. documents
             .Where(static document => document.Type == NodeType.Building)
             .Select(static document => new BuildingLocationModel
             {
@@ -167,8 +106,7 @@ public class BuildingController(IPythagorasHandler pythagorasService, IIndexedPy
                 GeoLocation = document.GeoLocation is { } geo
                     ? new GeoPointModel(geo.Lat, geo.Lng)
                     : null
-            })
-            .ToArray();
+            })];
 
         return Ok(locations);
     }
@@ -266,7 +204,7 @@ public class BuildingController(IPythagorasHandler pythagorasService, IIndexedPy
             return;
         }
 
-        IReadOnlyDictionary<int, PythagorasDocument> docs = await _documentReader
+        IReadOnlyDictionary<int, PythagorasDocument> docs = await documentReader
             .GetBuildingDocumentsByIdsAsync(ids, cancellationToken)
             .ConfigureAwait(false);
 
@@ -280,10 +218,18 @@ public class BuildingController(IPythagorasHandler pythagorasService, IIndexedPy
 
             if (includeDocumentCount)
             {
-                building.NumDocuments = await _fileDocumentHandler
+                building.NumDocuments = await fileDocumentHandler
                     .GetBuildingDocumentCountAsync(building.Id, cancellationToken)
                     .ConfigureAwait(false);
             }
+        }
+    }
+
+    private static void SetImageUrls(IEnumerable<BuildingInfoModel> buildings)
+    {
+        foreach (BuildingInfoModel building in buildings)
+        {
+            building.ImageUrl = $"{ApiRoutes.Buildings}/{building.Id}/image";
         }
     }
 }

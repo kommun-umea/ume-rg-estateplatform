@@ -127,9 +127,7 @@ public class SearchHandler(
     {
         ArgumentNullException.ThrowIfNull(buildingIds);
 
-        HashSet<int> idSet = buildingIds
-            .Where(static id => id > 0)
-            .ToHashSet();
+        HashSet<int> idSet = [.. buildingIds.Where(static id => id > 0)];
 
         if (idSet.Count == 0)
         {

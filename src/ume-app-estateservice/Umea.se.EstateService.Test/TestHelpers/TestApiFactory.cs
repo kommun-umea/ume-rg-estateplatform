@@ -32,6 +32,7 @@ public sealed class TestApiFactory : WebAppFactoryBase<Program, HttpClientNames>
         {
             Dictionary<string, string?> overrides = new()
             {
+                ["ASPNETCORE_ENVIRONMENT"] = "IntegrationTest",
                 ["Api:Key"] = ApiKey,
                 ["suppressKeyVaultConfigs"] = "true",
                 ["KeyVaultUrl"] = "https://localhost/",
@@ -46,10 +47,12 @@ public sealed class TestApiFactory : WebAppFactoryBase<Program, HttpClientNames>
         {
             services.RemoveAll<IPythagorasClient>();
             services.RemoveAll<IPythagorasHandler>();
+            services.RemoveAll<IBuildingImageService>();
 
             services.AddSingleton<FakePythagorasClient>(_ => _fakeClient);
             services.AddSingleton<IPythagorasClient>(_ => _fakeClient);
             services.AddSingleton<IPythagorasHandler>(_ => new PythagorasHandler(_fakeClient));
+            services.AddScoped<IBuildingImageService, FakeBuildingImageService>();
         });
     }
 }
