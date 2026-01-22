@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 using Umea.se.EstateService.API.Controllers.Requests;
+using Umea.se.EstateService.API.Controllers.Responses;
 using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Logic.Search;
 using Umea.se.EstateService.Shared.Autocomplete;
@@ -109,4 +110,60 @@ public class SearchController(SearchHandler searchHandler) : ControllerBase
 
         return Ok(locations);
     }
+
+#if DEBUG
+    /// <summary>
+    /// Search with full diagnostic information for debugging search results.
+    /// Only available in DEBUG builds.
+    /// </summary>
+    /// <remarks>
+    /// Returns search results along with detailed diagnostic information including:
+    /// - Query tokenization and normalization
+    /// - Token expansions (exact, prefix, fuzzy, n-gram matches)
+    /// - Per-document score breakdown (BM25, bonuses, field hits)
+    /// - Applied filters and options
+    /// </remarks>
+    /// <param name="req">The search request parameters.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <response code="200">Returns search results with diagnostic information.</response>
+    /// <response code="400">If the request parameters are invalid.</response>
+    [HttpGet("debug")]
+    [SwaggerOperation(
+        Summary = "Search with diagnostics (DEBUG only)",
+        Description = "Search for documents with full diagnostic information for debugging. Only available in DEBUG builds."
+    )]
+    [SwaggerResponse(StatusCodes.Status200OK, "Search results with diagnostics.", typeof(SearchDebugResponse))]
+    [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid request parameters.")]
+    public async Task<ActionResult<SearchDebugResponse>> SearchDebug(
+        [FromQuery][SwaggerParameter("Search request parameters.", Required = true)] SearchRequest req,
+        CancellationToken cancellationToken)
+    {
+        string? query = req.Query?.Trim();
+
+        SearchFilter filter = new()
+        {
+            Types = req.Type is { Count: > 0 }
+                ? req.Type
+                : Array.Empty<AutocompleteType>(),
+            BusinessTypeIds = req.BusinessTypeIds
+        };
+
+        (IReadOnlyList<SearchResult> results, SearchDiagnostics diagnostics) =
+            await searchHandler.SearchWithDiagnosticsAsync(
+                query,
+                filter,
+                req.Limit,
+                req.GeoFilter,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        List<PythagorasDocument> documents = [.. results.Select(result => result.Item)];
+
+        return Ok(new SearchDebugResponse
+        {
+            Results = documents,
+            Diagnostics = diagnostics
+        });
+    }
+#endif
 }

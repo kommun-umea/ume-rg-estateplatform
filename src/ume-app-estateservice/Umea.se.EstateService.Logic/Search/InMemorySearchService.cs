@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Umea.se.EstateService.Logic.Search.Analysis;
 using Umea.se.EstateService.Logic.Search.Indexing;
@@ -49,7 +50,104 @@ public sealed class InMemorySearchService
         { NodeType.Building, 0.0 },
         { NodeType.Room, 0.0 }
     };
-    private const double _ngramPositionWeight = 0.6;
+
+    #region Constants and Helpers
+
+    private static class ScoringConstants
+    {
+        // BM25 parameters
+        public const double Bm25K1 = 1.2;
+        public const double Bm25B = 0.75;
+
+        // Scoring adjustments
+        public const double TermMatchIncrement = 0.2;
+        public const double ProximityMultiplier = 0.05;
+        public const double NgramScoreMultiplier = 0.5;
+        public const double NgramPositionWeight = 0.6;
+
+        // Bonus when query token exactly matches indexed term (not via prefix/fuzzy/ngram expansion)
+        public const double ExactTokenMatchBonus = 25.0;
+
+        // Bonus when multiple query tokens match in the same field (e.g., "skolgatan 31" both in Address)
+        public const double SameFieldMultiTokenBonus = 40.0;
+
+        // Minimum token length for operations
+        public const int MinTokenLengthForFuzzy = 3;
+        public const int MinTokenLengthForNgram = 3;
+        public const int MinPrefixLength = 3;
+    }
+
+    // Helper to detect numeric-only tokens
+    private static bool IsNumericToken(string token) => token.All(char.IsDigit);
+
+    private static TValue GetOrAdd<TKey, TValue>(
+        Dictionary<TKey, TValue> dict,
+        TKey key,
+        Func<TValue> factory) where TKey : notnull
+    {
+        if (!dict.TryGetValue(key, out TValue? value))
+        {
+            value = factory();
+            dict[key] = value;
+        }
+        return value;
+    }
+
+    #endregion
+
+    #region Diagnostics Collector
+
+    /// <summary>
+    /// Collects diagnostic information during search operations.
+    /// Pass null to skip diagnostics collection for better performance.
+    /// </summary>
+    private sealed class DiagnosticsCollector
+    {
+        public Dictionary<string, TokenExpansion> TokenExpansions { get; } = [];
+        public Dictionary<int, DocumentScoreDetails> ScoreDetails { get; } = [];
+        public List<FieldHitInfo> CurrentFieldHits { get; } = [];
+
+        public TokenExpansionBuilder StartTokenExpansion(string queryToken) => new(this, queryToken);
+
+        public sealed class TokenExpansionBuilder(DiagnosticsCollector collector, string queryToken)
+        {
+            public List<string> ExactMatches { get; } = [];
+            public List<string> PrefixMatches { get; } = [];
+            public List<string> FuzzyMatches { get; } = [];
+            public List<string> NgramMatches { get; } = [];
+
+            public void Complete(int totalCandidates)
+            {
+                collector.TokenExpansions[queryToken] = new TokenExpansion
+                {
+                    QueryToken = queryToken,
+                    ExactMatches = ExactMatches,
+                    PrefixMatches = PrefixMatches,
+                    FuzzyMatches = FuzzyMatches,
+                    NgramMatches = NgramMatches,
+                    TotalCandidates = totalCandidates
+                };
+            }
+        }
+    }
+
+    private sealed class DocumentScoreDetails
+    {
+        public double TypeBoost { get; set; }
+        public double Bm25Score { get; set; }
+        public double ExactMatchBonus { get; set; }
+        public double StartsWithBonus { get; set; }
+        public double PopularStartsWithBonus { get; set; }
+        public double ProximityBonus { get; set; }
+        public double TermMatchBonus { get; set; }
+        public double GeoBonus { get; set; }
+        public double ExactTokenMatchBonus { get; set; }
+        public double SameFieldMultiTokenBonus { get; set; }
+        public double NgramDedupeAdjustment { get; set; }
+        public List<FieldHitInfo> FieldHits { get; } = [];
+    }
+
+    #endregion
 
     private static HashSet<string> GenerateNgrams(string token, int minSize = 3, int maxSize = 6)
     {
@@ -157,65 +255,77 @@ public sealed class InMemorySearchService
         }
     }
 
-    private List<HashSet<string>> ExpandQueryTokens(string[] qTokens, QueryOptions options)
+    private List<HashSet<string>> ExpandQueryTokens(
+        string[] qTokens,
+        QueryOptions options,
+        DiagnosticsCollector? diagnostics = null)
     {
         List<HashSet<string>> termCandidates = [];
-        foreach (string? qt in qTokens)
+        foreach (string qt in qTokens)
         {
             HashSet<string> bucket = new(StringComparer.Ordinal);
+            DiagnosticsCollector.TokenExpansionBuilder? diagBuilder = diagnostics?.StartTokenExpansion(qt);
 
             // exact
             if (_idx.Inverted.ContainsKey(qt))
             {
                 bucket.Add(qt);
+                diagBuilder?.ExactMatches.Add(qt);
             }
 
             // prefix
             if (options.EnablePrefix)
             {
-                string key = qt.Length >= 3 ? qt[..3] : qt;
+                string key = qt.Length >= ScoringConstants.MinPrefixLength ? qt[..ScoringConstants.MinPrefixLength] : qt;
                 if (_idx.Prefixes.TryGetValue(key, out HashSet<string>? set))
                 {
                     foreach (string t in set)
                     {
-                        if (t.StartsWith(qt, StringComparison.Ordinal))
+                        // Only add prefix matches (not exact matches, which are handled above)
+                        if (t.StartsWith(qt, StringComparison.Ordinal) && t != qt)
                         {
                             bucket.Add(t);
+                            diagBuilder?.PrefixMatches.Add(t);
                         }
                     }
                 }
             }
 
-            if (options.EnableContains)
+            // ngram/contains - check if query token is indexed (either as term or as n-gram of longer term)
+            if (options.EnableContains && qt.Length >= ScoringConstants.MinTokenLengthForNgram)
             {
-                foreach (string ngram in GenerateNgrams(qt))
+                if (_idx.Inverted.ContainsKey(qt) && !bucket.Contains(qt))
                 {
-                    if (_idx.Inverted.ContainsKey(ngram))
-                    {
-                        bucket.Add(ngram);
-                    }
+                    bucket.Add(qt);
+                    diagBuilder?.NgramMatches.Add(qt);
                 }
             }
 
             // fuzzy (only for short-ish tokens)
-            if (options.EnableFuzzy && qt.Length >= 3)
+            if (options.EnableFuzzy && qt.Length >= ScoringConstants.MinTokenLengthForFuzzy)
             {
                 int maxEdits = Math.Min(options.FuzzyMaxEdits, _symSpellMaxEdits);
                 if (maxEdits > 0 && _termFrequencies.Count > 0)
                 {
-                    foreach (SymSpell.SuggestItem? suggestion in _symSpell.Lookup(qt, SymSpell.Verbosity.Closest, maxEdits))
+                    foreach (SymSpell.SuggestItem suggestion in _symSpell.Lookup(qt, SymSpell.Verbosity.Closest, maxEdits))
                     {
-                        bucket.Add(suggestion.term);
+                        if (!bucket.Contains(suggestion.term))
+                        {
+                            bucket.Add(suggestion.term);
+                            diagBuilder?.FuzzyMatches.Add($"{suggestion.term} (dist={suggestion.distance})");
+                        }
                     }
                 }
             }
 
             // at least keep the original token for later reporting
-            if (bucket.Count == 0 && _idx.Inverted.ContainsKey(qt) == false)
+            if (bucket.Count == 0 && !_idx.Inverted.ContainsKey(qt))
             {
                 // no candidates – keep as-is to avoid empty intersections
                 bucket.Add(qt);
             }
+
+            diagBuilder?.Complete(bucket.Count);
             termCandidates.Add(bucket);
         }
         return termCandidates;
@@ -258,23 +368,32 @@ public sealed class InMemorySearchService
         return finalDocIds ?? [];
     }
 
-    private (Dictionary<int, double>, Dictionary<int, Dictionary<string, string>>) ScoreDocuments(
+    private (Dictionary<int, double> Scores, Dictionary<int, Dictionary<string, string>> MatchedTerms) ScoreDocuments(
         List<HashSet<string>> termCandidates,
         HashSet<int> candidateDocIds,
         string[] qTokens,
-        string normalizedQuery)
+        string normalizedQuery,
+        DiagnosticsCollector? diagnostics = null)
     {
         double avgdl = _docLengths.Count > 0 ? _docLengths.Values.Average() : 1.0;
 
         Dictionary<int, double> docScores = [];
-        Dictionary<int, Dictionary<string, string>> matchedPerDoc = []; // queryToken -> matchedIndexTerm
+        Dictionary<int, Dictionary<string, string>> matchedPerDoc = [];
         HashSet<int> exactMatchAwarded = [];
+
+        // Track which fields each query token hits per document
+        Dictionary<int, Dictionary<Field, HashSet<int>>> fieldHitsPerDoc = [];
+
+        // Track best n-gram score per field per document per query token (contribution, idf)
+        Dictionary<(int docId, int qi, Field field), (double contribution, double idf)> bestNgramScorePerField = [];
 
         for (int qi = 0; qi < termCandidates.Count; qi++)
         {
             string queryToken = qTokens[qi];
             HashSet<string> candidates = termCandidates[qi];
             HashSet<int> seenDocs = [];
+
+            bool isNumeric = IsNumericToken(queryToken);
 
             foreach (string term in candidates)
             {
@@ -283,6 +402,8 @@ public sealed class InMemorySearchService
                 {
                     continue;
                 }
+
+                bool isExactTokenMatch = string.Equals(term, queryToken, StringComparison.Ordinal);
 
                 foreach (IGrouping<int, Posting> group in postings.GroupBy(static p => p.DocId))
                 {
@@ -294,6 +415,16 @@ public sealed class InMemorySearchService
 
                     seenDocs.Add(docId);
 
+                    // Get or create diagnostic details for this document
+                    DocumentScoreDetails? details = null;
+                    if (diagnostics != null)
+                    {
+                        details = GetOrAdd(diagnostics.ScoreDetails, docId, () => new DocumentScoreDetails
+                        {
+                            TypeBoost = _typeBaseBoost.GetValueOrDefault(_docs[docId].Type)
+                        });
+                    }
+
                     double tfWeighted = 0.0;
                     double startsWithBonus = 0.0;
                     bool popularStartsWith = false;
@@ -302,30 +433,73 @@ public sealed class InMemorySearchService
                     {
                         bool isPrefixHit = p.Positions.Contains(0);
                         bool isRealPrefix = term.StartsWith(queryToken, StringComparison.Ordinal);
+                        bool isNgramMatch = p.Positions.Contains(-1);
 
+                        // Don't give startsWithBonus for numeric tokens
                         if (startsWithBonus == 0.0 &&
                             (p.Field == Field.Name || p.Field == Field.PopularName) &&
                             isPrefixHit &&
-                            isRealPrefix)
+                            isRealPrefix &&
+                            !isNumeric)
                         {
                             startsWithBonus = _startsWithBonus;
                         }
 
-                        if (p.Field == Field.PopularName && isPrefixHit && isRealPrefix)
+                        if (p.Field == Field.PopularName && isPrefixHit && isRealPrefix && !isNumeric)
                         {
                             popularStartsWith = true;
                         }
 
                         double positionWeight = ComputePositionWeight(p.Positions);
-                        tfWeighted += _w[p.Field] * p.Positions.Count * positionWeight;
+                        double fieldWeight = _w[p.Field];
+                        double contribution = fieldWeight * p.Positions.Count * positionWeight;
+
+                        // Track field hit for diagnostics
+                        details?.FieldHits.Add(new FieldHitInfo
+                        {
+                            Field = p.Field.ToString(),
+                            MatchedTerm = term,
+                            QueryToken = queryToken,
+                            Positions = [.. p.Positions],
+                            FieldWeight = fieldWeight,
+                            PositionWeight = positionWeight,
+                            ContributedScore = contribution
+                        });
+
+                        // For n-gram matches, only keep the best score per field (with IDF for weighting)
+                        if (isNgramMatch && !isExactTokenMatch)
+                        {
+                            (int docId, int qi, Field Field) key = (docId, qi, p.Field);
+                            if (bestNgramScorePerField.TryGetValue(key, out (double contribution, double idf) existing))
+                            {
+                                // Use contribution * idf to compare, keep the one with best weighted score
+                                if (contribution * idf > existing.contribution * existing.idf)
+                                {
+                                    bestNgramScorePerField[key] = (contribution, idf);
+                                }
+                                continue;
+                            }
+                            else
+                            {
+                                bestNgramScorePerField[key] = (contribution, idf);
+                                continue;
+                            }
+                        }
+
+                        tfWeighted += contribution;
+
+                        // Track field hits for same-field multi-token bonus
+                        Dictionary<Field, HashSet<int>> fieldHits = GetOrAdd(fieldHitsPerDoc, docId, () => new Dictionary<Field, HashSet<int>>());
+                        HashSet<int> tokenIndices = GetOrAdd(fieldHits, p.Field, () => []);
+                        tokenIndices.Add(qi);
                     }
 
                     double bm25 = ComputeBm25(tfWeighted, idf, _docLengths[docId], avgdl);
-                    double proximityBonus = 0.05 * group.Count();
+                    double proximityBonus = ScoringConstants.ProximityMultiplier * group.Count();
 
                     double score = docScores.TryGetValue(docId, out double current)
                         ? current
-                        : _typeBaseBoost.TryGetValue(_docs[docId].Type, out double boost) ? boost : 0.0;
+                        : _typeBaseBoost.GetValueOrDefault(_docs[docId].Type);
 
                     if (normalizedQuery.Length > 0 && !exactMatchAwarded.Contains(docId))
                     {
@@ -335,6 +509,11 @@ public sealed class InMemorySearchService
                             string.Equals(normalizedPopular, normalizedQuery, StringComparison.Ordinal))
                         {
                             score += _exactMatchBonus;
+                            if (details != null)
+                            {
+                                details.ExactMatchBonus = _exactMatchBonus;
+                            }
+
                             exactMatchAwarded.Add(docId);
                         }
                     }
@@ -342,22 +521,40 @@ public sealed class InMemorySearchService
                     if (startsWithBonus > 0)
                     {
                         score += startsWithBonus;
+                        if (details != null)
+                        {
+                            details.StartsWithBonus = Math.Max(details.StartsWithBonus, startsWithBonus);
+                        }
                     }
 
                     if (popularStartsWith)
                     {
                         score += _popularStartsWithBonus;
+                        if (details != null)
+                        {
+                            details.PopularStartsWithBonus = _popularStartsWithBonus;
+                        }
+                    }
+
+                    if (isExactTokenMatch)
+                    {
+                        score += ScoringConstants.ExactTokenMatchBonus;
+                        if (details != null)
+                        {
+                            details.ExactTokenMatchBonus += ScoringConstants.ExactTokenMatchBonus;
+                        }
+                    }
+
+                    if (details != null)
+                    {
+                        details.Bm25Score += bm25;
                     }
 
                     score += bm25 + proximityBonus;
                     docScores[docId] = score;
 
-                    if (!matchedPerDoc.TryGetValue(docId, out Dictionary<string, string>? map))
-                    {
-                        matchedPerDoc[docId] = map = [];
-                    }
-
-                    map[queryToken] = term;
+                    Dictionary<string, string> matchedMap = GetOrAdd(matchedPerDoc, docId, () => new Dictionary<string, string>());
+                    matchedMap[queryToken] = term;
                 }
             }
 
@@ -365,7 +562,49 @@ public sealed class InMemorySearchService
             {
                 if (docScores.TryGetValue(docId, out double current))
                 {
-                    docScores[docId] = current + 0.2;
+                    docScores[docId] = current + ScoringConstants.TermMatchIncrement;
+                    if (diagnostics?.ScoreDetails.TryGetValue(docId, out DocumentScoreDetails? details) == true)
+                    {
+                        details.TermMatchBonus += ScoringConstants.TermMatchIncrement;
+                    }
+                }
+            }
+        }
+
+        // Add the best n-gram scores (weighted by IDF to reduce impact of common substrings like "hem")
+        foreach (KeyValuePair<(int docId, int qi, Field field), (double contribution, double idf)> kvp in bestNgramScorePerField)
+        {
+            int docId = kvp.Key.docId;
+            (double contribution, double idf) = kvp.Value;
+
+            if (docScores.TryGetValue(docId, out double current))
+            {
+                // Apply IDF weighting: common n-grams (low IDF) contribute less
+                double ngramScore = contribution * ScoringConstants.NgramScoreMultiplier * idf;
+                docScores[docId] = current + ngramScore;
+
+                if (diagnostics?.ScoreDetails.TryGetValue(docId, out DocumentScoreDetails? details) == true)
+                {
+                    details.NgramDedupeAdjustment += ngramScore;
+                }
+            }
+        }
+
+        // Apply same-field multi-token bonus
+        foreach (KeyValuePair<int, Dictionary<Field, HashSet<int>>> docEntry in fieldHitsPerDoc)
+        {
+            int docId = docEntry.Key;
+            foreach (KeyValuePair<Field, HashSet<int>> fieldEntry in docEntry.Value)
+            {
+                if (fieldEntry.Value.Count >= 2 && docScores.TryGetValue(docId, out double current))
+                {
+                    double bonus = ScoringConstants.SameFieldMultiTokenBonus * (fieldEntry.Value.Count - 1);
+                    docScores[docId] = current + bonus;
+
+                    if (diagnostics?.ScoreDetails.TryGetValue(docId, out DocumentScoreDetails? details) == true)
+                    {
+                        details.SameFieldMultiTokenBonus += bonus;
+                    }
                 }
             }
         }
@@ -375,7 +614,8 @@ public sealed class InMemorySearchService
 
     private void ApplyProximityBonus(
         Dictionary<int, double> docScores,
-        Dictionary<int, Dictionary<string, string>> matchedPerDoc)
+        Dictionary<int, Dictionary<string, string>> matchedPerDoc,
+        DiagnosticsCollector? diagnostics = null)
     {
         foreach (KeyValuePair<int, Dictionary<string, string>> kv in matchedPerDoc)
         {
@@ -386,9 +626,8 @@ public sealed class InMemorySearchService
                 continue;
             }
 
-            // collect all positions across fields (we just need any positions for the same doc)
             List<List<int>> posLists = [];
-            foreach (string? t in indexTerms)
+            foreach (string t in indexTerms)
             {
                 List<Posting> postings = _idx.Inverted[t];
                 List<int> pos = [.. postings.Where(p => p.DocId == docId).SelectMany(p => p.Positions).OrderBy(x => x)];
@@ -406,7 +645,12 @@ public sealed class InMemorySearchService
             if (bestSpan != int.MaxValue)
             {
                 double increment = 1.0 / (1.0 + bestSpan);
-                docScores[docId] += increment; // closer = bigger boost
+                docScores[docId] += increment;
+
+                if (diagnostics?.ScoreDetails.TryGetValue(docId, out DocumentScoreDetails? details) == true)
+                {
+                    details.ProximityBonus = increment;
+                }
             }
         }
     }
@@ -483,7 +727,7 @@ public sealed class InMemorySearchService
 
         if (first < 0)
         {
-            return _ngramPositionWeight;
+            return ScoringConstants.NgramPositionWeight;
         }
 
         return 1.0 / (1 + first);
@@ -576,7 +820,8 @@ public sealed class InMemorySearchService
     private (Dictionary<int, double> Scores, Dictionary<int, Dictionary<string, string>> Matches) ApplyGeospatialFilter(
         Dictionary<int, double> docScores,
         Dictionary<int, Dictionary<string, string>> matchedPerDoc,
-        QueryOptions options)
+        QueryOptions options,
+        DiagnosticsCollector? diagnostics = null)
     {
         if (options.GeoFilter is not { } geoFilter)
         {
@@ -585,8 +830,8 @@ public sealed class InMemorySearchService
 
         Dictionary<int, double> filteredScores = geoFilter switch
         {
-            GeoRadiusFilter radiusFilter => ApplyRadiusFilter(docScores, radiusFilter),
-            GeoBoundingBoxFilter boxFilter => ApplyBoundingBoxFilter(docScores, boxFilter),
+            GeoRadiusFilter radiusFilter => ApplyRadiusFilter(docScores, radiusFilter, diagnostics),
+            GeoBoundingBoxFilter boxFilter => ApplyBoundingBoxFilter(docScores, boxFilter, diagnostics),
             _ => []
         };
 
@@ -613,7 +858,10 @@ public sealed class InMemorySearchService
         return (filteredScores, filteredMatches);
     }
 
-    private Dictionary<int, double> ApplyRadiusFilter(Dictionary<int, double> docScores, GeoRadiusFilter radiusFilter)
+    private Dictionary<int, double> ApplyRadiusFilter(
+        Dictionary<int, double> docScores,
+        GeoRadiusFilter radiusFilter,
+        DiagnosticsCollector? diagnostics = null)
     {
         double latitude = radiusFilter.Coordinate.Latitude;
         double longitude = radiusFilter.Coordinate.Longitude;
@@ -625,9 +873,7 @@ public sealed class InMemorySearchService
             int docId = kv.Key;
             PythagorasDocument document = _docs[docId];
             GeoPoint? geo = document.GeoLocation;
-            if (geo is null ||
-                double.IsNaN(geo.Lat) ||
-                double.IsNaN(geo.Lng))
+            if (geo is null || double.IsNaN(geo.Lat) || double.IsNaN(geo.Lng))
             {
                 continue;
             }
@@ -643,12 +889,20 @@ public sealed class InMemorySearchService
                 : 0.0;
 
             filteredScores[docId] = kv.Value + closenessBoost;
+
+            if (diagnostics?.ScoreDetails.TryGetValue(docId, out DocumentScoreDetails? details) == true)
+            {
+                details.GeoBonus = closenessBoost;
+            }
         }
 
         return filteredScores;
     }
 
-    private Dictionary<int, double> ApplyBoundingBoxFilter(Dictionary<int, double> docScores, GeoBoundingBoxFilter boxFilter)
+    private Dictionary<int, double> ApplyBoundingBoxFilter(
+        Dictionary<int, double> docScores,
+        GeoBoundingBoxFilter boxFilter,
+        DiagnosticsCollector? diagnostics = null)
     {
         double south = boxFilter.SouthWest.Latitude;
         double west = boxFilter.SouthWest.Longitude;
@@ -666,9 +920,7 @@ public sealed class InMemorySearchService
             int docId = kv.Key;
             PythagorasDocument document = _docs[docId];
             GeoPoint? geo = document.GeoLocation;
-            if (geo is null ||
-                double.IsNaN(geo.Lat) ||
-                double.IsNaN(geo.Lng))
+            if (geo is null || double.IsNaN(geo.Lat) || double.IsNaN(geo.Lng))
             {
                 continue;
             }
@@ -681,7 +933,6 @@ public sealed class InMemorySearchService
                 continue;
             }
 
-            // Encourage items closer to the box center without requiring extra configuration.
             double closenessBoost = 0.0;
             if (latSpan > 0.0 || lonSpan > 0.0)
             {
@@ -692,8 +943,169 @@ public sealed class InMemorySearchService
             }
 
             filteredScores[docId] = kv.Value + closenessBoost;
+
+            if (diagnostics?.ScoreDetails.TryGetValue(docId, out DocumentScoreDetails? details) == true)
+            {
+                details.GeoBonus = closenessBoost;
+            }
         }
 
         return filteredScores;
+    }
+
+    /// <summary>
+    /// Performs a search with full diagnostic information for debugging.
+    /// </summary>
+    public (IEnumerable<SearchResult> Results, SearchDiagnostics Diagnostics) SearchWithDiagnostics(
+        string? query,
+        QueryOptions? options = null)
+    {
+        Stopwatch sw = Stopwatch.StartNew();
+        options ??= new QueryOptions();
+
+        string normalizedQuery = TextNormalizer.Normalize(query ?? string.Empty).Trim();
+        string[] qTokens = [.. TextNormalizer.Tokenize(query)];
+        bool hasQuery = qTokens.Length > 0;
+
+        // Create diagnostics collector
+        DiagnosticsCollector diagnosticsCollector = new();
+
+        List<HashSet<string>> termCandidates = [];
+        HashSet<int> candidateDocIds;
+        Dictionary<int, double> docScores;
+        Dictionary<int, Dictionary<string, string>> matchedPerDoc;
+
+        if (hasQuery)
+        {
+            termCandidates = ExpandQueryTokens(qTokens, options, diagnosticsCollector);
+            candidateDocIds = FindCandidateDocuments(termCandidates);
+
+            if (candidateDocIds.Count > 0)
+            {
+                (docScores, matchedPerDoc) =
+                    ScoreDocuments(termCandidates, candidateDocIds, qTokens, normalizedQuery, diagnosticsCollector);
+
+                ApplyProximityBonus(docScores, matchedPerDoc, diagnosticsCollector);
+            }
+            else
+            {
+                docScores = [];
+                matchedPerDoc = [];
+            }
+        }
+        else
+        {
+            candidateDocIds = [];
+            docScores = new Dictionary<int, double>(_docs.Count);
+            matchedPerDoc = [];
+
+            for (int docId = 0; docId < _docs.Count; docId++)
+            {
+                double baseScore = _typeBaseBoost.GetValueOrDefault(_docs[docId].Type);
+                docScores[docId] = baseScore;
+                diagnosticsCollector.ScoreDetails[docId] = new DocumentScoreDetails { TypeBoost = baseScore };
+                candidateDocIds.Add(docId);
+            }
+        }
+
+        int preGeoCount = docScores.Count;
+
+        // Apply geo filter
+        (Dictionary<int, double> filteredScores, Dictionary<int, Dictionary<string, string>> filteredMatches) =
+            ApplyGeospatialFilter(docScores, matchedPerDoc, options, diagnosticsCollector);
+
+        docScores = filteredScores;
+        matchedPerDoc = filteredMatches;
+
+        // Compose results
+        SearchResult[] results = ComposeResults(docScores, matchedPerDoc, options);
+
+        // Build score breakdowns for top results
+        List<DocumentScoreBreakdown> breakdowns = BuildScoreBreakdowns(
+            results, diagnosticsCollector.ScoreDetails, matchedPerDoc, options);
+
+        sw.Stop();
+
+        SearchDiagnostics diagnostics = new()
+        {
+            OriginalQuery = query ?? string.Empty,
+            NormalizedQuery = normalizedQuery,
+            QueryTokens = qTokens,
+            TokenExpansions = diagnosticsCollector.TokenExpansions,
+            CandidateDocumentCount = candidateDocIds.Count,
+            FilteredDocumentCount = preGeoCount,
+            TopScoreBreakdowns = breakdowns,
+            AppliedOptions = new QueryOptionsSnapshot
+            {
+                EnablePrefix = options.EnablePrefix,
+                EnableFuzzy = options.EnableFuzzy,
+                EnableContains = options.EnableContains,
+                FuzzyMaxEdits = options.FuzzyMaxEdits,
+                MaxResults = options.MaxResults,
+                PreferEstatesOnTie = options.PreferEstatesOnTie,
+                FilterByTypes = options.FilterByTypes?.Select(t => t.ToString()).ToList(),
+                FilterByBusinessTypes = options.FilterByBusinessTypes?.ToList(),
+                GeoFilterDescription = DescribeGeoFilter(options.GeoFilter)
+            },
+            ElapsedMilliseconds = sw.ElapsedMilliseconds
+        };
+
+        return (results, diagnostics);
+    }
+
+    private List<DocumentScoreBreakdown> BuildScoreBreakdowns(
+        SearchResult[] results,
+        Dictionary<int, DocumentScoreDetails> scoreDetails,
+        Dictionary<int, Dictionary<string, string>> matchedPerDoc,
+        QueryOptions options)
+    {
+        List<DocumentScoreBreakdown> breakdowns = new(Math.Min(results.Length, options.MaxResults));
+
+        foreach (SearchResult result in results)
+        {
+            int docId = _docs.FindIndex(d => d.Id == result.Item.Id && d.Type == result.Item.Type);
+            if (docId < 0)
+            {
+                continue;
+            }
+
+            DocumentScoreDetails details = scoreDetails.TryGetValue(docId, out DocumentScoreDetails? d)
+                ? d
+                : new DocumentScoreDetails();
+
+            breakdowns.Add(new DocumentScoreBreakdown
+            {
+                DocId = result.Item.Id,
+                Name = result.Item.Name,
+                PopularName = result.Item.PopularName,
+                Type = result.Item.Type,
+                TypeBoost = details.TypeBoost,
+                Bm25Score = details.Bm25Score,
+                ExactMatchBonus = details.ExactMatchBonus,
+                StartsWithBonus = details.StartsWithBonus,
+                PopularStartsWithBonus = details.PopularStartsWithBonus,
+                ProximityBonus = details.ProximityBonus,
+                TermMatchBonus = details.TermMatchBonus,
+                GeoBonus = details.GeoBonus,
+                ExactTokenMatchBonus = details.ExactTokenMatchBonus,
+                SameFieldMultiTokenBonus = details.SameFieldMultiTokenBonus,
+                NgramDedupeAdjustment = details.NgramDedupeAdjustment,
+                FinalScore = result.Score,
+                FieldHits = details.FieldHits,
+                MatchedTerms = matchedPerDoc.TryGetValue(docId, out Dictionary<string, string>? m) ? m : []
+            });
+        }
+
+        return breakdowns;
+    }
+
+    private static string? DescribeGeoFilter(GeoFilter? geoFilter)
+    {
+        return geoFilter switch
+        {
+            GeoRadiusFilter r => $"Radius: {r.RadiusMeters}m from ({r.Coordinate.Latitude:F6}, {r.Coordinate.Longitude:F6})",
+            GeoBoundingBoxFilter b => $"BoundingBox: SW({b.SouthWest.Latitude:F6}, {b.SouthWest.Longitude:F6}) NE({b.NorthEast.Latitude:F6}, {b.NorthEast.Longitude:F6})",
+            _ => null
+        };
     }
 }

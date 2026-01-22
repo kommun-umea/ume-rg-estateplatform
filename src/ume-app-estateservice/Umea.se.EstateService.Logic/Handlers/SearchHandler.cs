@@ -46,6 +46,29 @@ public class SearchHandler(
         return [.. results.Take(limit)];
     }
 
+    public async Task<(IReadOnlyList<SearchResult> Results, SearchDiagnostics Diagnostics)> SearchWithDiagnosticsAsync(
+        string? query,
+        SearchFilter filter,
+        int limit,
+        GeoFilter? geoFilter = null,
+        CancellationToken cancellationToken = default)
+    {
+        InMemorySearchService service = await EnsureSearchServiceAsync(cancellationToken).ConfigureAwait(false);
+
+        IReadOnlyCollection<NodeType>? filterByTypes = BuildNodeTypeFilter(filter.Types);
+
+        QueryOptions options = new(
+            MaxResults: Math.Max(limit, 1),
+            FilterByTypes: filterByTypes,
+            FilterByBusinessTypes: filter.BusinessTypeIds,
+            GeoFilter: geoFilter);
+
+        (IEnumerable<SearchResult> results, SearchDiagnostics diagnostics) =
+            service.SearchWithDiagnostics(query ?? string.Empty, options);
+
+        return ([.. results.Take(limit)], diagnostics);
+    }
+
     private async Task<InMemorySearchService> EnsureSearchServiceAsync(CancellationToken cancellationToken)
     {
         if (_searchService is { } existing)
