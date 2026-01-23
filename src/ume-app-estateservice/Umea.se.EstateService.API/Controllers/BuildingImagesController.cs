@@ -15,9 +15,21 @@ namespace Umea.se.EstateService.API.Controllers;
 [ApiController]
 [Route(ApiRoutes.BuildingImages)]
 [Authorize]
-public class BuildingImagesController(
-    IBuildingImageService buildingImageService) : ControllerBase
+public class BuildingImagesController(IBuildingImageService buildingImageService) : ControllerBase
 {
+    private static readonly int[] _allowedSizes = [150, 300, 600, 900, 1200];
+
+    private static int? SnapToAllowedSize(int? requested)
+    {
+        if (requested is null)
+        {
+            return null;
+        }
+
+        int snapped = _allowedSizes.FirstOrDefault(s => s >= requested);
+        return snapped > 0 ? snapped : _allowedSizes[^1];
+    }
+
     /// <summary>
     /// Gets all image IDs for a building
     /// </summary>
@@ -55,15 +67,15 @@ public class BuildingImagesController(
     /// </summary>
     /// <param name="buildingId">The building ID</param>
     /// <param name="imageId">Optional image ID. If not specified, returns the primary image.</param>
-    /// <param name="w">Optional maximum width in pixels (0-4096)</param>
-    /// <param name="h">Optional maximum height in pixels (0-4096)</param>
+    /// <param name="w">Optional maximum width in pixels. Snapped to nearest allowed size: 150, 300, 600, 900, 1200</param>
+    /// <param name="h">Optional maximum height in pixels. Snapped to nearest allowed size: 150, 300, 600, 900, 1200</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The image as WebP</returns>
     [AllowAnonymous]
     [HttpGet("image")]
     [SwaggerOperation(
         Summary = "Get an image for a building",
-        Description = "Returns an image for the building. If imageId is not specified, returns the primary (most recently updated) image. Supports optional resizing via w/h query parameters. Returns WebP format."
+        Description = "Returns an image for the building. If imageId is not specified, returns the primary (most recently updated) image. Supports optional resizing via w/h query parameters (snapped to allowed sizes: 150, 300, 600, 900, 1200). Returns WebP format."
     )]
     [SwaggerResponse(StatusCodes.Status200OK, "The image", ContentTypes = ["image/webp"])]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Building has no images or image not found")]
@@ -75,14 +87,14 @@ public class BuildingImagesController(
             return BadRequest("Building id must be positive.");
         }
 
-        if (w is < 0 or > 4096)
+        if (w is < 0)
         {
-            return BadRequest("Width must be between 0 and 4096.");
+            return BadRequest("Width must be positive.");
         }
 
-        if (h is < 0 or > 4096)
+        if (h is < 0)
         {
-            return BadRequest("Height must be between 0 and 4096.");
+            return BadRequest("Height must be positive.");
         }
 
         // Treat 0 as "no constraint"
@@ -95,6 +107,10 @@ public class BuildingImagesController(
         {
             h = null;
         }
+
+        // Snap to allowed sizes to limit cache variations
+        w = SnapToAllowedSize(w);
+        h = SnapToAllowedSize(h);
 
         if (imageId is < 0)
         {
