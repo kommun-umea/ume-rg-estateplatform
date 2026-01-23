@@ -58,6 +58,7 @@ public class SearchController(SearchHandler searchHandler) : ControllerBase
             .ConfigureAwait(false);
 
         List<PythagorasDocument> documents = [.. results.Select(result => result.Item)];
+        SetImageUrls(documents);
 
         return Ok(documents);
     }
@@ -158,6 +159,7 @@ public class SearchController(SearchHandler searchHandler) : ControllerBase
             .ConfigureAwait(false);
 
         List<PythagorasDocument> documents = [.. results.Select(result => result.Item)];
+        SetImageUrls(documents);
 
         return Ok(new SearchDebugResponse
         {
@@ -166,4 +168,15 @@ public class SearchController(SearchHandler searchHandler) : ControllerBase
         });
     }
 #endif
+
+    private static void SetImageUrls(IEnumerable<PythagorasDocument> documents)
+    {
+        foreach (PythagorasDocument doc in documents)
+        {
+            if (doc.Type == NodeType.Building)
+            {
+                doc.ImageUrl = $"{ApiRoutes.Buildings}/{doc.Id}/image";
+            }
+        }
+    }
 }

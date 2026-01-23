@@ -25,7 +25,7 @@ public sealed class PythagorasDocument
         set => GeoLocation = value;
     }
     public GeoPoint? GeoLocation { get; set; }
-    public string? ThumbnailUrl { get; set; }
+    public string? ImageUrl { get; set; }
     [JsonIgnore]
     public double RankScore { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
