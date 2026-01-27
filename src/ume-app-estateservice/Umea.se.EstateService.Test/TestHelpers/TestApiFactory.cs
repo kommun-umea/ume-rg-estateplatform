@@ -20,7 +20,10 @@ public sealed class TestApiFactory : WebAppFactoryBase<Program, HttpClientNames>
     public const string PythagorasBaseUrl = "https://localhost/";
 
     private readonly FakePythagorasClient _fakeClient = new();
+    private readonly StubBuildingImageService _stubImageService = new();
+
     public FakePythagorasClient FakeClient => _fakeClient;
+    public StubBuildingImageService StubImageService => _stubImageService;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -52,7 +55,8 @@ public sealed class TestApiFactory : WebAppFactoryBase<Program, HttpClientNames>
             services.AddSingleton<FakePythagorasClient>(_ => _fakeClient);
             services.AddSingleton<IPythagorasClient>(_ => _fakeClient);
             services.AddSingleton<IPythagorasHandler>(_ => new PythagorasHandler(_fakeClient));
-            services.AddScoped<IBuildingImageService, FakeBuildingImageService>();
+            services.AddSingleton<StubBuildingImageService>(_ => _stubImageService);
+            services.AddSingleton<IBuildingImageService>(_ => _stubImageService);
         });
     }
 }

@@ -75,9 +75,9 @@ public class BuildingImagesController(IBuildingImageService buildingImageService
     [HttpGet("image")]
     [SwaggerOperation(
         Summary = "Get an image for a building",
-        Description = "Returns an image for the building. If imageId is not specified, returns the primary (most recently updated) image. Supports optional resizing via w/h query parameters (snapped to allowed sizes: 150, 300, 600, 900, 1200). Returns WebP format."
+        Description = "Returns an image for the building. If imageId is not specified, returns the primary (most recently updated) image. Supports optional resizing via w/h query parameters (snapped to allowed sizes: 150, 300, 600, 900, 1200). Returns WebP for raster images, GZip-compressed SVG for vector images."
     )]
-    [SwaggerResponse(StatusCodes.Status200OK, "The image", ContentTypes = ["image/webp"])]
+    [SwaggerResponse(StatusCodes.Status200OK, "The image", ContentTypes = ["image/webp", "image/svg+xml"])]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Building has no images or image not found")]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid parameters or image too large")]
     public async Task<IActionResult> GetBuildingImage(int buildingId, [FromQuery] int? imageId, [FromQuery] int? w, [FromQuery] int? h, CancellationToken cancellationToken)
@@ -119,9 +119,9 @@ public class BuildingImagesController(IBuildingImageService buildingImageService
 
         try
         {
-            byte[]? imageData = await buildingImageService.GetImageAsync(buildingId, imageId, w, h, cancellationToken);
+            ImageResult? result = await buildingImageService.GetImageResultAsync(buildingId, imageId, w, h, cancellationToken);
 
-            if (imageData is null)
+            if (result is null)
             {
                 return NotFound(new { message = imageId.HasValue ? "Image not found" : "No images found for this building" });
             }
@@ -132,7 +132,12 @@ public class BuildingImagesController(IBuildingImageService buildingImageService
                 MaxAge = TimeSpan.FromHours(24)
             };
 
-            return File(imageData, "image/webp");
+            if (result.IsGzipped)
+            {
+                Response.Headers.ContentEncoding = "gzip";
+            }
+
+            return File(result.Data, result.ContentType);
         }
         catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
         {

@@ -14,12 +14,14 @@ public class BuildingControllerTests : ControllerTestCloud<TestApiFactory, Progr
 {
     private readonly HttpClient _client;
     private readonly FakePythagorasClient _fakeClient;
+    private readonly StubBuildingImageService _stubImageService;
 
     public BuildingControllerTests()
     {
         _client = Client;
         _client.DefaultRequestHeaders.Add("X-Api-Key", TestApiFactory.ApiKey);
         _fakeClient = WebAppFactory.FakeClient;
+        _stubImageService = WebAppFactory.StubImageService;
 
         MockManager.SetupUser(user => user.WithActualAuthorization());
     }
@@ -164,31 +166,15 @@ public class BuildingControllerTests : ControllerTestCloud<TestApiFactory, Progr
     }
 
     [Fact]
-    public async Task GetBuildingImageAsync_ReturnsFirstImage()
+    public async Task GetBuildingImageAsync_ReturnsImage()
     {
-        _fakeClient.Reset();
-
-        DateTime now = DateTime.UtcNow;
-        _fakeClient.SetGetAsyncResult(
-            new GalleryImageFile { Id = 1, Name = "latest.jpg", Updated = now },
-            new GalleryImageFile { Id = 2, Name = "older.jpg", Updated = now.AddDays(-1) });
+        _stubImageService.Reset();
 
         byte[] expected = [1, 2, 3, 4];
-        _fakeClient.OnGetGalleryImageDataAsync = (imageId, variant, _) =>
-        {
-            imageId.ShouldBe(1);
-            variant.ShouldBe(GalleryImageVariant.Original);
-
-            HttpResponseMessage response = new(HttpStatusCode.OK)
-            {
-                Content = new ByteArrayContent(expected)
-            };
-            response.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg");
-            response.Content.Headers.ContentLength = expected.Length;
-            return Task.FromResult(response);
-        };
+        _stubImageService.ImageResult = Umea.se.Toolkit.Images.ImageResult.WebP(expected);
 
         HttpResponseMessage result = await _client.GetAsync($"{ApiRoutes.Buildings}/1/image");
+
         result.StatusCode.ShouldBe(HttpStatusCode.OK);
         result.Content.Headers.ContentType.ShouldNotBeNull();
         result.Content.Headers.ContentType!.MediaType.ShouldBe("image/webp");
@@ -196,14 +182,14 @@ public class BuildingControllerTests : ControllerTestCloud<TestApiFactory, Progr
         byte[] payload = await result.Content.ReadAsByteArrayAsync();
         payload.ShouldBe(expected);
 
-        _fakeClient.EndpointsCalled.ShouldContain("rest/v1/building/1/galleryimagefile");
+        _stubImageService.ImageRequestedForBuildingIds.ShouldBe([1]);
     }
 
     [Fact]
     public async Task GetBuildingImageAsync_NoImages_ReturnsNotFound()
     {
-        _fakeClient.Reset();
-        _fakeClient.SetGetAsyncResult(Array.Empty<GalleryImageFile>());
+        _stubImageService.Reset();
+        _stubImageService.ImageResult = null;
 
         HttpResponseMessage result = await _client.GetAsync($"{ApiRoutes.Buildings}/1/image");
 

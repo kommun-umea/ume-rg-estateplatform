@@ -1,6 +1,8 @@
+using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Umea.se.EstateService.Logic.Exceptions;
 using Umea.se.EstateService.Logic.Handlers;
@@ -8,11 +10,34 @@ using Umea.se.EstateService.Logic.Models;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.Test.TestHelpers;
+using Umea.se.Toolkit.Images;
 
 namespace Umea.se.EstateService.Test.Blueprint;
 
 public class FloorBlueprintServiceTests
 {
+    private static ImageService CreateImageService()
+    {
+        var options = new ImageServiceOptions();
+        var cache = new MemoryCache(new MemoryCacheOptions { SizeLimit = 100_000_000 });
+        return new ImageService(options, cache, NullLogger<ImageService>.Instance);
+    }
+
+    private static async Task<string> ReadContentAsync(FloorBlueprint blueprint)
+    {
+        blueprint.Content.Position = 0;
+
+        if (blueprint.IsGzipped)
+        {
+            await using var gzip = new GZipStream(blueprint.Content, CompressionMode.Decompress, leaveOpen: true);
+            using var reader = new StreamReader(gzip, Encoding.UTF8);
+            return await reader.ReadToEndAsync();
+        }
+
+        using var directReader = new StreamReader(blueprint.Content, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
+        return await directReader.ReadToEndAsync();
+    }
+
     [Fact]
     public async Task GetBlueprintAsync_ReturnsResultFromClient()
     {
@@ -35,7 +60,7 @@ public class FloorBlueprintServiceTests
         };
 
         PythagorasHandler handler = new(client);
-        FloorBlueprintHandler fbHandler = new(client, handler, NullLogger<FloorBlueprintHandler>.Instance);
+        FloorBlueprintHandler fbHandler = new(client, handler, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
 
         FloorBlueprint result = await fbHandler.GetBlueprintAsync(42, BlueprintFormat.Pdf, includeWorkspaceTexts: false);
 
@@ -56,14 +81,42 @@ public class FloorBlueprintServiceTests
         };
 
         PythagorasHandler handler = new(client);
-        FloorBlueprintHandler fbHandler = new(client, handler, NullLogger<FloorBlueprintHandler>.Instance);
+        FloorBlueprintHandler fbHandler = new(client, handler, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
 
         await Should.ThrowAsync<FloorBlueprintUnavailableException>(() =>
             fbHandler.GetBlueprintAsync(5, BlueprintFormat.Svg, includeWorkspaceTexts: false));
     }
 
     [Fact]
-    public async Task GetBlueprintAsync_AddsExtensionWhenMissing()
+    public async Task GetBlueprintAsync_Svg_GeneratesFileName()
+    {
+        byte[] svgBytes = Encoding.UTF8.GetBytes("<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>");
+        FakePythagorasClient client = new()
+        {
+            OnGetFloorBlueprintAsync = (_, _, _, _) =>
+            {
+                HttpResponseMessage response = new(HttpStatusCode.OK)
+                {
+                    Content = new ByteArrayContent(svgBytes)
+                };
+                response.Content.Headers.ContentType = new MediaTypeHeaderValue("image/svg+xml");
+
+                return Task.FromResult(response);
+            }
+        };
+
+        PythagorasHandler handler = new(client);
+        FloorBlueprintHandler fbHandler = new(client, handler, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
+
+        FloorBlueprint result = await fbHandler.GetBlueprintAsync(11, BlueprintFormat.Svg, includeWorkspaceTexts: false);
+
+        result.FileName.ShouldBe("floor-11.svg");
+        result.ContentType.ShouldBe("image/svg+xml");
+        result.IsGzipped.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task GetBlueprintAsync_Pdf_AddsExtensionWhenMissing()
     {
         FakePythagorasClient client = new()
         {
@@ -73,7 +126,7 @@ public class FloorBlueprintServiceTests
                 {
                     Content = new ByteArrayContent([])
                 };
-                response.Content.Headers.ContentType = new MediaTypeHeaderValue("image/svg+xml");
+                response.Content.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
                 response.Content.Headers.ContentDisposition = new ContentDispositionHeaderValue("attachment")
                 {
                     FileName = "floor"
@@ -84,12 +137,13 @@ public class FloorBlueprintServiceTests
         };
 
         PythagorasHandler handler = new(client);
-        FloorBlueprintHandler fbHandler = new(client, handler, NullLogger<FloorBlueprintHandler>.Instance);
+        FloorBlueprintHandler fbHandler = new(client, handler, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
 
-        FloorBlueprint result = await fbHandler.GetBlueprintAsync(11, BlueprintFormat.Svg, includeWorkspaceTexts: false);
+        FloorBlueprint result = await fbHandler.GetBlueprintAsync(11, BlueprintFormat.Pdf, includeWorkspaceTexts: false);
 
-        result.FileName.ShouldBe("floor.svg");
-        result.ContentType.ShouldBe("image/svg+xml");
+        result.FileName.ShouldBe("floor.pdf");
+        result.ContentType.ShouldBe("application/pdf");
+        result.IsGzipped.ShouldBeFalse();
     }
 
     [Fact]
@@ -97,7 +151,7 @@ public class FloorBlueprintServiceTests
     {
         FakePythagorasClient client = new();
         PythagorasHandler handler = new(client);
-        FloorBlueprintHandler fbHandler = new(client, handler, NullLogger<FloorBlueprintHandler>.Instance);
+        FloorBlueprintHandler fbHandler = new(client, handler, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
 
         await Should.ThrowAsync<FloorBlueprintValidationException>(() =>
             fbHandler.GetBlueprintAsync(0, BlueprintFormat.Pdf, includeWorkspaceTexts: false));
@@ -129,7 +183,7 @@ public class FloorBlueprintServiceTests
             new Workspace { Id = 6, Name = "Beta" });
 
         PythagorasHandler handler = new(client);
-        FloorBlueprintHandler fbHandler = new(client, handler, NullLogger<FloorBlueprintHandler>.Instance);
+        FloorBlueprintHandler fbHandler = new(client, handler, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
 
         FloorBlueprint result = await fbHandler.GetBlueprintAsync(99, BlueprintFormat.Pdf, includeWorkspaceTexts: true);
         result.ShouldNotBeNull();
@@ -183,13 +237,12 @@ public class FloorBlueprintServiceTests
         };
 
         PythagorasHandler handler = new(client);
-        FloorBlueprintHandler fbHandler = new(client, handler, NullLogger<FloorBlueprintHandler>.Instance);
+        FloorBlueprintHandler fbHandler = new(client, handler, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
 
         FloorBlueprint result = await fbHandler.GetBlueprintAsync(5, BlueprintFormat.Svg, includeWorkspaceTexts: false);
 
-        result.Content.Position = 0;
-        using StreamReader reader = new(result.Content, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
-        string cleaned = await reader.ReadToEndAsync();
+        result.IsGzipped.ShouldBeTrue();
+        string cleaned = await ReadContentAsync(result);
 
         cleaned.ShouldNotContain("svgPageBorder");
         cleaned.ShouldNotContain("svgSignature");
@@ -228,13 +281,12 @@ public class FloorBlueprintServiceTests
         };
 
         PythagorasHandler handler = new(client);
-        FloorBlueprintHandler fbHandler = new(client, handler, NullLogger<FloorBlueprintHandler>.Instance);
+        FloorBlueprintHandler fbHandler = new(client, handler, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
 
         FloorBlueprint result = await fbHandler.GetBlueprintAsync(7, BlueprintFormat.Svg, includeWorkspaceTexts: false);
 
-        result.Content.Position = 0;
-        using StreamReader reader = new(result.Content, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
-        string cleaned = await reader.ReadToEndAsync();
+        result.IsGzipped.ShouldBeTrue();
+        string cleaned = await ReadContentAsync(result);
 
         cleaned.ShouldContain("font-size=\"0.4px\"");
         cleaned.ShouldContain("font-size:0.3px");

@@ -9,10 +9,11 @@ using Umea.se.EstateService.Logic.Helpers;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.Shared.Models;
+using Umea.se.Toolkit.Images;
 
 namespace Umea.se.EstateService.Logic.Handlers;
 
-public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IPythagorasHandler pythagorasHandler, ILogger<FloorBlueprintHandler> logger) : IFloorBlueprintService
+public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IPythagorasHandler pythagorasHandler, ImageService imageService, ILogger<FloorBlueprintHandler> logger) : IFloorBlueprintService
 {
     private static readonly string[] _nodesToRemove =
     [
@@ -23,6 +24,7 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IP
 
     private readonly IPythagorasClient _pythagorasClient = pythagorasClient;
     private readonly IPythagorasHandler _pythagorasHandler = pythagorasHandler;
+    private readonly ImageService _imageService = imageService;
     private readonly ILogger<FloorBlueprintHandler> _logger = logger;
 
     public async Task<FloorBlueprint> GetBlueprintAsync(int floorId, BlueprintFormat format, bool includeWorkspaceTexts, CancellationToken cancellationToken = default)
@@ -34,30 +36,102 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IP
             throw new FloorBlueprintValidationException("Floor id must be positive.");
         }
 
-        IDictionary<int, IReadOnlyList<string>>? workspaceTexts = null;
+        IDictionary<int, IReadOnlyList<string>>? workspaceTexts = await GetWorkspaceTextsAsync(floorId, includeWorkspaceTexts, cancellationToken).ConfigureAwait(false);
 
-        if (includeWorkspaceTexts)
+        if (format == BlueprintFormat.Svg)
         {
-            _logger.LogInformation("Workspace text enrichment requested for floor {FloorId}. Fetching room data.", floorId);
-
-            IReadOnlyList<RoomModel> rooms = await _pythagorasHandler
-                .GetRoomsAsync(roomIds: null, buildingId: null, floorId: floorId, queryArgs: null, cancellationToken)
-                .ConfigureAwait(false);
-
-            if (rooms.Count > 0)
-            {
-                workspaceTexts = rooms.ToDictionary(
-                    static room => room.Id,
-                    static room => (IReadOnlyList<string>)[ResolveWorkspaceText(room)]);
-
-                _logger.LogInformation("Found {Count} rooms to include in blueprint for floor {FloorId}.", rooms.Count, floorId);
-            }
-            else
-            {
-                _logger.LogWarning("Workspace text enrichment requested, but no rooms found for floor {FloorId}.", floorId);
-            }
+            return await GetCachedSvgBlueprintAsync(floorId, workspaceTexts, cancellationToken).ConfigureAwait(false);
         }
 
+        return await FetchBlueprintFromPythagorasAsync(floorId, format, workspaceTexts, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<IDictionary<int, IReadOnlyList<string>>?> GetWorkspaceTextsAsync(int floorId, bool includeWorkspaceTexts, CancellationToken cancellationToken)
+    {
+        if (!includeWorkspaceTexts)
+        {
+            return null;
+        }
+
+        _logger.LogInformation("Workspace text enrichment requested for floor {FloorId}. Fetching room data.", floorId);
+
+        IReadOnlyList<RoomModel> rooms = await _pythagorasHandler
+            .GetRoomsAsync(roomIds: null, buildingId: null, floorId: floorId, queryArgs: null, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (rooms.Count == 0)
+        {
+            _logger.LogWarning("Workspace text enrichment requested, but no rooms found for floor {FloorId}.", floorId);
+            return null;
+        }
+
+        _logger.LogInformation("Found {Count} rooms to include in blueprint for floor {FloorId}.", rooms.Count, floorId);
+
+        return rooms.ToDictionary(
+            static room => room.Id,
+            static room => (IReadOnlyList<string>)[ResolveWorkspaceText(room)]);
+    }
+
+    private async Task<FloorBlueprint> GetCachedSvgBlueprintAsync(int floorId, IDictionary<int, IReadOnlyList<string>>? workspaceTexts, CancellationToken cancellationToken)
+    {
+        string cacheKey = $"blueprint:{floorId}";
+        string fileName = $"floor-{floorId}.svg";
+
+        ImageResult result = await _imageService.GetSvgResultAsync(
+            cacheKey,
+            fetchOriginal: async ct => await FetchAndCleanSvgAsync(floorId, workspaceTexts, ct).ConfigureAwait(false),
+            cancellationToken).ConfigureAwait(false);
+
+        return new FloorBlueprint(new MemoryStream(result.Data), result.ContentType, fileName, result.IsGzipped);
+    }
+
+    private async Task<byte[]> FetchAndCleanSvgAsync(int floorId, IDictionary<int, IReadOnlyList<string>>? workspaceTexts, CancellationToken cancellationToken)
+    {
+        HttpResponseMessage response;
+        try
+        {
+            response = await _pythagorasClient
+                .GetFloorBlueprintAsync(floorId, BlueprintFormat.Svg, workspaceTexts, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "HTTP error while retrieving SVG blueprint for floor {FloorId}", floorId);
+            throw new FloorBlueprintUnavailableException("Pythagoras HTTP request failed.", ex);
+        }
+
+        using (response)
+        {
+            await ThrowIfNotSuccessAsync(response, floorId, cancellationToken).ConfigureAwait(false);
+
+            byte[] rawBytes = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+            return CleanSvgBytes(rawBytes);
+        }
+    }
+
+    private byte[] CleanSvgBytes(byte[] rawBytes)
+    {
+        try
+        {
+            using MemoryStream input = new(rawBytes);
+            XDocument document = XDocument.Load(input);
+            SvgCleaner.RemoveNodes(document, _nodesToRemove);
+            document = SvgCleaner.CropSvgToContent(document);
+            document = SvgCleaner.NormalizeFontSizes(document);
+
+            using MemoryStream output = new();
+            document.Save(output, SaveOptions.DisableFormatting | SaveOptions.OmitDuplicateNamespaces);
+            return output.ToArray();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to clean SVG blueprint, returning original.");
+            return rawBytes;
+        }
+    }
+
+    private async Task<FloorBlueprint> FetchBlueprintFromPythagorasAsync(int floorId, BlueprintFormat format, IDictionary<int, IReadOnlyList<string>>? workspaceTexts, CancellationToken cancellationToken)
+    {
         HttpResponseMessage response;
         try
         {
@@ -73,50 +147,12 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IP
 
         using (response)
         {
-            if (!response.IsSuccessStatusCode)
-            {
-                string errorDescription = await ReadErrorBodyAsync(response, cancellationToken).ConfigureAwait(false);
-
-                if (response.StatusCode == HttpStatusCode.NotFound)
-                {
-                    _logger.LogWarning(
-                        "Blueprint not found for floor {FloorId} in Pythagoras. Body: {Body}",
-                        floorId,
-                        errorDescription);
-
-                    throw new KeyNotFoundException($"Blueprint for floor {floorId} was not found.");
-                }
-
-                _logger.LogWarning(
-                    "Blueprint request returned {StatusCode} for floor {FloorId}. Body: {Body}",
-                    (int)response.StatusCode,
-                    floorId,
-                    errorDescription);
-
-                string reason = string.IsNullOrWhiteSpace(response.ReasonPhrase)
-                    ? response.StatusCode.ToString()
-                    : response.ReasonPhrase;
-
-                throw new FloorBlueprintUnavailableException($"Pythagoras returned {(int)response.StatusCode} ({reason}). Body: {errorDescription}");
-            }
+            await ThrowIfNotSuccessAsync(response, floorId, cancellationToken).ConfigureAwait(false);
 
             using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
             MemoryStream buffer = new();
             await responseStream.CopyToAsync(buffer, cancellationToken).ConfigureAwait(false);
             buffer.Position = 0;
-
-            if (format == BlueprintFormat.Svg)
-            {
-                MemoryStream? cleaned = TryCleanSvg(buffer);
-                if (cleaned is not null)
-                {
-                    buffer = cleaned;
-                }
-                else
-                {
-                    buffer.Position = 0;
-                }
-            }
 
             string contentType = ResolveContentType(format, response.Content.Headers.ContentType?.MediaType);
             string resolvedFileName = TryResolveFileName(response.Content.Headers.ContentDisposition);
@@ -126,30 +162,36 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IP
         }
     }
 
-    private MemoryStream? TryCleanSvg(MemoryStream source)
+    private async Task ThrowIfNotSuccessAsync(HttpResponseMessage response, int floorId, CancellationToken cancellationToken)
     {
-        try
+        if (response.IsSuccessStatusCode)
         {
-            source.Position = 0;
-            XDocument document = XDocument.Load(source);
-            SvgCleaner.RemoveNodes(document, _nodesToRemove);
-            document = SvgCleaner.CropSvgToContent(document);
-            document = SvgCleaner.NormalizeFontSizes(document);
+            return;
+        }
 
-            MemoryStream cleaned = new();
-            document.Save(cleaned, SaveOptions.DisableFormatting | SaveOptions.OmitDuplicateNamespaces);
-            cleaned.Position = 0;
-            return cleaned;
-        }
-        catch (Exception ex)
+        string errorDescription = await ReadErrorBodyAsync(response, cancellationToken).ConfigureAwait(false);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
         {
-            _logger.LogWarning(ex, "Failed to clean SVG blueprint before returning result.");
-            return null;
+            _logger.LogWarning(
+                "Blueprint not found for floor {FloorId} in Pythagoras. Body: {Body}",
+                floorId,
+                errorDescription);
+
+            throw new KeyNotFoundException($"Blueprint for floor {floorId} was not found.");
         }
-        finally
-        {
-            source.Position = 0;
-        }
+
+        _logger.LogWarning(
+            "Blueprint request returned {StatusCode} for floor {FloorId}. Body: {Body}",
+            (int)response.StatusCode,
+            floorId,
+            errorDescription);
+
+        string reason = string.IsNullOrWhiteSpace(response.ReasonPhrase)
+            ? response.StatusCode.ToString()
+            : response.ReasonPhrase;
+
+        throw new FloorBlueprintUnavailableException($"Pythagoras returned {(int)response.StatusCode} ({reason}). Body: {errorDescription}");
     }
 
     private static string EnsureFileName(string fileName, int floorId, BlueprintFormat format)

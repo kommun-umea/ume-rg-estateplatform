@@ -10,7 +10,7 @@ namespace Umea.se.EstateService.Logic.Handlers;
 
 public sealed class BuildingImageService(IPythagorasClient pythagorasClient, IBuildingImageMetadataCache metadataCache, ImageService imageService, ILogger<BuildingImageService> logger) : IBuildingImageService
 {
-    public async Task<byte[]?> GetImageAsync(int buildingId, int? imageId, int? maxWidth, int? maxHeight, CancellationToken cancellationToken = default)
+    public async Task<ImageResult?> GetImageResultAsync(int buildingId, int? imageId, int? maxWidth, int? maxHeight, CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(buildingId);
         if (imageId.HasValue)
@@ -31,7 +31,7 @@ public sealed class BuildingImageService(IPythagorasClient pythagorasClient, IBu
             return null;
         }
 
-        return await imageService.GetImageAsync(
+        return await imageService.GetImageResultAsync(
             $"pythagoras:{resolvedImageId}",
             maxWidth,
             maxHeight,

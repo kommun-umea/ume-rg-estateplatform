@@ -97,6 +97,11 @@ public sealed class FloorController(
                 MaxAge = TimeSpan.FromHours(24)
             };
 
+            if (blueprint.IsGzipped)
+            {
+                Response.Headers.ContentEncoding = "gzip";
+            }
+
             return File(blueprint.Content, blueprint.ContentType, blueprint.FileName);
         }
         catch (FloorBlueprintValidationException ex)

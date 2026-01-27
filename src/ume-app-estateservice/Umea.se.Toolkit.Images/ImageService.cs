@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.IO.Compression;
+using System.Text;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using SixLabors.ImageSharp;
@@ -9,109 +11,64 @@ namespace Umea.se.Toolkit.Images;
 
 public sealed class ImageService(ImageServiceOptions options, IMemoryCache cache, ILogger<ImageService> logger)
 {
-    private readonly IMemoryCache _cache = cache;
     private readonly ConcurrentDictionary<string, Task<byte[]>> _pendingTasks = new();
-    private readonly ImageServiceOptions _options = options;
-    private readonly ILogger<ImageService> _logger = logger;
 
     /// <summary>
     /// Get cached image with optional resizing.
-    /// Two-tier cache: normalized original (max 2560px) + thumbnails.
-    /// Avoids re-downloading large originals for each thumbnail size.
     /// </summary>
     public async Task<byte[]> GetImageAsync(string imageId, int? maxWidth, int? maxHeight, Func<CancellationToken, Task<byte[]>> fetchOriginal, CancellationToken ct = default)
     {
-        byte[] normalizedOriginal = await GetOrCreateNormalizedOriginalAsync(imageId, fetchOriginal, ct);
+        ImageResult result = await GetImageResultAsync(imageId, maxWidth, maxHeight, fetchOriginal, ct);
+        return result.Data;
+    }
+
+    /// <summary>
+    /// Get cached SVG with GZip compression. Use when you know the content is SVG.
+    /// </summary>
+    public async Task<ImageResult> GetSvgResultAsync(string imageId, Func<CancellationToken, Task<byte[]>> fetchOriginal, CancellationToken ct = default)
+    {
+        string svgKey = $"img:{imageId}:svg";
+
+        if (cache.TryGetValue(svgKey, out byte[]? cached))
+        {
+            return ImageResult.SvgGzipped(cached!);
+        }
+
+        byte[] raw = await fetchOriginal(ct);
+        ValidateNotEmpty(raw, imageId);
+
+        return CacheAndReturnSvg(svgKey, imageId, raw);
+    }
+
+    /// <summary>
+    /// Get cached image with optional resizing, returning full result with content type.
+    /// SVGs are GZip compressed. Raster images are converted to WebP.
+    /// </summary>
+    public async Task<ImageResult> GetImageResultAsync(string imageId, int? maxWidth, int? maxHeight, Func<CancellationToken, Task<byte[]>> fetchOriginal, CancellationToken ct = default)
+    {
+        string svgKey = $"img:{imageId}:svg";
+
+        if (cache.TryGetValue(svgKey, out byte[]? cachedSvg))
+        {
+            return ImageResult.SvgGzipped(cachedSvg!);
+        }
+
+        byte[] raw = await GetOrFetchRawAsync(imageId, fetchOriginal, ct);
+
+        if (IsSvg(raw))
+        {
+            return CacheAndReturnSvg(svgKey, imageId, raw);
+        }
+
+        byte[] normalized = await GetOrCreateNormalizedOriginalAsync(imageId, fetchOriginal, ct);
 
         if (maxWidth is null && maxHeight is null)
         {
-            return normalizedOriginal;
+            return ImageResult.WebP(normalized);
         }
 
-        return await GetOrCreateThumbnailAsync(imageId, maxWidth, maxHeight, normalizedOriginal, ct);
-    }
-
-    private async Task<byte[]> GetOrCreateNormalizedOriginalAsync(string imageId, Func<CancellationToken, Task<byte[]>> fetchOriginal, CancellationToken ct)
-    {
-        string key = $"img:{imageId}:original";
-
-        if (_cache.TryGetValue(key, out byte[]? cached))
-        {
-            return cached!;
-        }
-
-        Task<byte[]> task = _pendingTasks.GetOrAdd(key, _ =>
-            FetchAndCacheOriginalAsync(key, imageId, fetchOriginal, ct));
-
-        return await task.WaitAsync(ct);
-    }
-
-    private async Task<byte[]> FetchAndCacheOriginalAsync(string key, string imageId, Func<CancellationToken, Task<byte[]>> fetchOriginal, CancellationToken ct)
-    {
-        try
-        {
-            _logger.LogDebug("Fetching original for {ImageId}", imageId);
-
-            byte[] raw = await fetchOriginal(ct);
-
-            if (raw is null || raw.Length == 0)
-            {
-                throw new ImageNotFoundException($"Image not found: {imageId}");
-            }
-
-            byte[] normalized = Resize(raw, _options.MaxOriginalDimension, _options.MaxOriginalDimension, _options.OriginalWebPQuality);
-
-            _cache.Set(key, normalized, new MemoryCacheEntryOptions()
-                .SetAbsoluteExpiration(_options.CacheLifetime)
-                .SetPriority(CacheItemPriority.High)
-                .SetSize(normalized.Length));
-
-            _logger.LogDebug("Cached {ImageId}: {Size}KB", imageId, normalized.Length / 1024);
-
-            return normalized;
-        }
-        finally
-        {
-            _pendingTasks.TryRemove(key, out _);
-        }
-    }
-
-    private async Task<byte[]> GetOrCreateThumbnailAsync(string imageId, int? maxWidth, int? maxHeight, byte[] normalizedOriginal, CancellationToken ct)
-    {
-        string key = $"img:{imageId}:{maxWidth ?? 0}x{maxHeight ?? 0}";
-
-        // Fast path - already cached
-        if (_cache.TryGetValue(key, out byte[]? cached))
-        {
-            return cached!;
-        }
-
-        // Coalesce concurrent requests
-        Task<byte[]> task = _pendingTasks.GetOrAdd(key, _ =>
-            CreateAndCacheThumbnailAsync(key, normalizedOriginal, maxWidth, maxHeight));
-
-        // Allow per-request cancellation of the wait (not the work)
-        return await task.WaitAsync(ct);
-    }
-
-    private async Task<byte[]> CreateAndCacheThumbnailAsync(string key, byte[] normalizedOriginal, int? maxWidth, int? maxHeight)
-    {
-        try
-        {
-            byte[] thumbnail = await Task.Run(() => Resize(normalizedOriginal, maxWidth, maxHeight, _options.WebPQuality));
-
-            _cache.Set(key, thumbnail, new MemoryCacheEntryOptions()
-                .SetAbsoluteExpiration(_options.CacheLifetime)
-                .SetSize(thumbnail.Length));
-
-            _logger.LogDebug("Cached thumbnail {Key}: {Size}KB", key, thumbnail.Length / 1024);
-
-            return thumbnail;
-        }
-        finally
-        {
-            _pendingTasks.TryRemove(key, out _);
-        }
+        byte[] thumbnail = await GetOrCreateThumbnailAsync(imageId, maxWidth, maxHeight, normalized, ct);
+        return ImageResult.WebP(thumbnail);
     }
 
     /// <summary>
@@ -135,10 +92,9 @@ public sealed class ImageService(ImageServiceOptions options, IMemoryCache cache
 
         ImageInfo info = Image.Identify(source);
 
-        // Prevent image bomb attacks - reject images with extreme dimensions
         if (info.Width > 20000 || info.Height > 20000)
         {
-            throw new ImageTooLargeException($"Image dimensions ({info.Width}x{info.Height}) exceed maximum allowed size (20000x20000)");
+            throw new ImageTooLargeException($"Image dimensions ({info.Width}x{info.Height}) exceed maximum allowed (20000x20000)");
         }
 
         if (source.CanSeek)
@@ -147,7 +103,6 @@ public sealed class ImageService(ImageServiceOptions options, IMemoryCache cache
         }
 
         using Image image = Image.Load(source);
-
         (int targetW, int targetH) = CalculateTargetDimensions(info.Width, info.Height, maxWidth, maxHeight);
 
         if (targetW < info.Width || targetH < info.Height)
@@ -161,8 +116,119 @@ public sealed class ImageService(ImageServiceOptions options, IMemoryCache cache
         }
 
         using MemoryStream output = new();
-        image.SaveAsWebp(output, new WebpEncoder { Quality = quality ?? _options.WebPQuality });
+        image.SaveAsWebp(output, new WebpEncoder { Quality = quality ?? options.WebPQuality });
         return output.ToArray();
+    }
+
+    #region Caching Helpers
+
+    private ImageResult CacheAndReturnSvg(string key, string imageId, byte[] raw)
+    {
+        byte[] compressed = GzipCompress(raw);
+        CacheWithOptions(key, compressed, options.CacheLifetime, CacheItemPriority.High);
+        logger.LogDebug("Cached SVG {ImageId}: {Size}KB (gzipped)", imageId, compressed.Length / 1024);
+        return ImageResult.SvgGzipped(compressed);
+    }
+
+    private async Task<byte[]> GetOrFetchRawAsync(string imageId, Func<CancellationToken, Task<byte[]>> fetchOriginal, CancellationToken ct)
+    {
+        string key = $"img:{imageId}:raw";
+
+        if (cache.TryGetValue(key, out byte[]? cached))
+        {
+            return cached!;
+        }
+
+        byte[] raw = await fetchOriginal(ct);
+        ValidateNotEmpty(raw, imageId);
+
+        // Short TTL - just to dedupe concurrent requests
+        CacheWithOptions(key, raw, TimeSpan.FromSeconds(30));
+        return raw;
+    }
+
+    private async Task<byte[]> GetOrCreateNormalizedOriginalAsync(string imageId, Func<CancellationToken, Task<byte[]>> fetchOriginal, CancellationToken ct)
+    {
+        string key = $"img:{imageId}:original";
+
+        if (cache.TryGetValue(key, out byte[]? cached))
+        {
+            return cached!;
+        }
+
+        return await CoalescedCreateAsync(key, async () =>
+        {
+            logger.LogDebug("Fetching original for {ImageId}", imageId);
+
+            byte[] raw = await fetchOriginal(ct);
+            ValidateNotEmpty(raw, imageId);
+
+            byte[] normalized = Resize(raw, options.MaxOriginalDimension, options.MaxOriginalDimension, options.OriginalWebPQuality);
+            CacheWithOptions(key, normalized, options.CacheLifetime, CacheItemPriority.High);
+
+            logger.LogDebug("Cached {ImageId}: {Size}KB", imageId, normalized.Length / 1024);
+            return normalized;
+        }, ct);
+    }
+
+    private async Task<byte[]> GetOrCreateThumbnailAsync(string imageId, int? maxWidth, int? maxHeight, byte[] normalizedOriginal, CancellationToken ct)
+    {
+        string key = $"img:{imageId}:{maxWidth ?? 0}x{maxHeight ?? 0}";
+
+        if (cache.TryGetValue(key, out byte[]? cached))
+        {
+            return cached!;
+        }
+
+        return await CoalescedCreateAsync(key, async () =>
+        {
+            byte[] thumbnail = await Task.Run(() => Resize(normalizedOriginal, maxWidth, maxHeight, options.WebPQuality));
+            CacheWithOptions(key, thumbnail, options.CacheLifetime);
+
+            logger.LogDebug("Cached thumbnail {Key}: {Size}KB", key, thumbnail.Length / 1024);
+            return thumbnail;
+        }, ct);
+    }
+
+    /// <summary>
+    /// Coalesces concurrent requests for the same key into a single execution.
+    /// </summary>
+    private async Task<byte[]> CoalescedCreateAsync(string key, Func<Task<byte[]>> createAsync, CancellationToken ct)
+    {
+        Task<byte[]> task = _pendingTasks.GetOrAdd(key, _ => ExecuteAndRemoveAsync(key, createAsync));
+        return await task.WaitAsync(ct);
+    }
+
+    private async Task<byte[]> ExecuteAndRemoveAsync(string key, Func<Task<byte[]>> createAsync)
+    {
+        try
+        {
+            return await createAsync();
+        }
+        finally
+        {
+            _pendingTasks.TryRemove(key, out _);
+        }
+    }
+
+    private void CacheWithOptions(string key, byte[] data, TimeSpan lifetime, CacheItemPriority priority = CacheItemPriority.Normal)
+    {
+        cache.Set(key, data, new MemoryCacheEntryOptions()
+            .SetAbsoluteExpiration(lifetime)
+            .SetPriority(priority)
+            .SetSize(data.Length));
+    }
+
+    #endregion
+
+    #region Static Helpers
+
+    private static void ValidateNotEmpty(byte[]? data, string imageId)
+    {
+        if (data is null || data.Length == 0)
+        {
+            throw new ImageNotFoundException($"Image not found: {imageId}");
+        }
     }
 
     private static (int width, int height) CalculateTargetDimensions(int sourceW, int sourceH, int? maxW, int? maxH)
@@ -174,4 +240,29 @@ public sealed class ImageService(ImageServiceOptions options, IMemoryCache cache
         return ((int)Math.Round(sourceW * ratio), (int)Math.Round(sourceH * ratio));
     }
 
+    private static bool IsSvg(byte[] data)
+    {
+        if (data.Length < 5)
+        {
+            return false;
+        }
+
+        int offset = (data.Length >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF) ? 3 : 0;
+        string start = Encoding.UTF8.GetString(data, offset, Math.Min(256, data.Length - offset)).TrimStart();
+
+        return (start.StartsWith("<?xml", StringComparison.OrdinalIgnoreCase) && start.Contains("<svg", StringComparison.OrdinalIgnoreCase))
+            || start.StartsWith("<svg", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static byte[] GzipCompress(byte[] data)
+    {
+        using MemoryStream output = new();
+        using (GZipStream gzip = new(output, CompressionLevel.Optimal))
+        {
+            gzip.Write(data);
+        }
+        return output.ToArray();
+    }
+
+    #endregion
 }

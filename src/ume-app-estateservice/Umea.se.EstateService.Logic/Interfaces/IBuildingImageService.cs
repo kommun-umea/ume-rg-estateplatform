@@ -1,4 +1,5 @@
 using Umea.se.EstateService.Shared.Models;
+using Umea.se.Toolkit.Images;
 
 namespace Umea.se.EstateService.Logic.Interfaces;
 
@@ -9,15 +10,15 @@ public interface IBuildingImageService
 {
     /// <summary>
     /// Gets an image for a building with optional resizing.
-    /// Images are cached and served as WebP format.
+    /// SVGs are GZip compressed and returned as-is. Raster images are converted to WebP.
     /// </summary>
     /// <param name="buildingId">The building ID</param>
     /// <param name="imageId">Optional image ID. If null, returns the primary (most recently updated) image.</param>
     /// <param name="maxWidth">Optional maximum width in pixels</param>
     /// <param name="maxHeight">Optional maximum height in pixels</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Image bytes as WebP, or null if no images exist or image doesn't belong to the building</returns>
-    Task<byte[]?> GetImageAsync(int buildingId, int? imageId, int? maxWidth, int? maxHeight, CancellationToken cancellationToken = default);
+    /// <returns>Image result with data and content type, or null if no images exist or image doesn't belong to the building</returns>
+    Task<ImageResult?> GetImageResultAsync(int buildingId, int? imageId, int? maxWidth, int? maxHeight, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets metadata about all images for a building.
