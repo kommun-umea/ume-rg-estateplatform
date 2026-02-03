@@ -2,10 +2,10 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
-using Umea.se.EstateService.Logic.Interfaces;
-using Umea.se.EstateService.Logic.Models;
 using Umea.se.EstateService.Logic.Exceptions;
 using Umea.se.EstateService.Logic.Helpers;
+using Umea.se.EstateService.Logic.Interfaces;
+using Umea.se.EstateService.Logic.Models;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.Shared.Models;
@@ -74,7 +74,7 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IP
 
     private async Task<FloorBlueprint> GetCachedSvgBlueprintAsync(int floorId, IDictionary<int, IReadOnlyList<string>>? workspaceTexts, CancellationToken cancellationToken)
     {
-        string cacheKey = $"blueprint:{floorId}";
+        string cacheKey = $"floors:{floorId}";
         string fileName = $"floor-{floorId}.svg";
 
         ImageResult result = await _imageService.GetSvgResultAsync(

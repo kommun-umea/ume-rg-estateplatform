@@ -71,6 +71,9 @@ public sealed class InMemorySearchService
         // Bonus when multiple query tokens match in the same field (e.g., "skolgatan 31" both in Address)
         public const double SameFieldMultiTokenBonus = 40.0;
 
+        // Cap on total ngram contribution to prevent documents with many ngram matches from dominating
+        public const double NgramMaxContribution = 35.0;
+
         // Minimum token length for operations
         public const int MinTokenLengthForFuzzy = 3;
         public const int MinTokenLengthForNgram = 3;
@@ -134,6 +137,8 @@ public sealed class InMemorySearchService
     private sealed class DocumentScoreDetails
     {
         public double TypeBoost { get; set; }
+        public double AreaBoost { get; set; }
+        public double ChildrenBoost { get; set; }
         public double Bm25Score { get; set; }
         public double ExactMatchBonus { get; set; }
         public double StartsWithBonus { get; set; }
@@ -146,6 +151,17 @@ public sealed class InMemorySearchService
         public double NgramDedupeAdjustment { get; set; }
         public List<FieldHitInfo> FieldHits { get; } = [];
     }
+
+    // Compute area boost: ~3 points per order of magnitude (log10 * 3)
+    // This helps rank larger, more significant properties higher when text scores are close
+    // Zero-area properties (parking lots, empty plots) get a penalty
+    private static double ComputeAreaBoost(decimal? grossArea)
+        => grossArea is > 0 ? Math.Log10((double)grossArea.Value) * 3.0 : -30.0;
+
+    // Compute children boost: ~2 points per doubling of children (log2 * 2)
+    // Estates/buildings with more children are generally more significant
+    private static double ComputeChildrenBoost(int numChildren)
+        => numChildren > 0 ? Math.Log2(numChildren + 1) * 2.0 : 0;
 
     #endregion
 
@@ -421,7 +437,9 @@ public sealed class InMemorySearchService
                     {
                         details = GetOrAdd(diagnostics.ScoreDetails, docId, () => new DocumentScoreDetails
                         {
-                            TypeBoost = _typeBaseBoost.GetValueOrDefault(_docs[docId].Type)
+                            TypeBoost = _typeBaseBoost.GetValueOrDefault(_docs[docId].Type),
+                            AreaBoost = ComputeAreaBoost(_docs[docId].GrossArea),
+                            ChildrenBoost = ComputeChildrenBoost(_docs[docId].NumChildren)
                         });
                     }
 
@@ -499,7 +517,9 @@ public sealed class InMemorySearchService
 
                     double score = docScores.TryGetValue(docId, out double current)
                         ? current
-                        : _typeBaseBoost.GetValueOrDefault(_docs[docId].Type);
+                        : _typeBaseBoost.GetValueOrDefault(_docs[docId].Type)
+                          + ComputeAreaBoost(_docs[docId].GrossArea)
+                          + ComputeChildrenBoost(_docs[docId].NumChildren);
 
                     if (normalizedQuery.Length > 0 && !exactMatchAwarded.Contains(docId))
                     {
@@ -509,10 +529,7 @@ public sealed class InMemorySearchService
                             string.Equals(normalizedPopular, normalizedQuery, StringComparison.Ordinal))
                         {
                             score += _exactMatchBonus;
-                            if (details != null)
-                            {
-                                details.ExactMatchBonus = _exactMatchBonus;
-                            }
+                            details?.ExactMatchBonus = _exactMatchBonus;
 
                             exactMatchAwarded.Add(docId);
                         }
@@ -521,19 +538,13 @@ public sealed class InMemorySearchService
                     if (startsWithBonus > 0)
                     {
                         score += startsWithBonus;
-                        if (details != null)
-                        {
-                            details.StartsWithBonus = Math.Max(details.StartsWithBonus, startsWithBonus);
-                        }
+                        details?.StartsWithBonus = Math.Max(details.StartsWithBonus, startsWithBonus);
                     }
 
                     if (popularStartsWith)
                     {
                         score += _popularStartsWithBonus;
-                        if (details != null)
-                        {
-                            details.PopularStartsWithBonus = _popularStartsWithBonus;
-                        }
+                        details?.PopularStartsWithBonus = _popularStartsWithBonus;
                     }
 
                     if (isExactTokenMatch)
@@ -572,6 +583,8 @@ public sealed class InMemorySearchService
         }
 
         // Add the best n-gram scores (weighted by IDF to reduce impact of common substrings like "hem")
+        // Track accumulated ngram score per document to apply cap
+        Dictionary<int, double> ngramTotals = [];
         foreach (KeyValuePair<(int docId, int qi, Field field), (double contribution, double idf)> kvp in bestNgramScorePerField)
         {
             int docId = kvp.Key.docId;
@@ -581,11 +594,21 @@ public sealed class InMemorySearchService
             {
                 // Apply IDF weighting: common n-grams (low IDF) contribute less
                 double ngramScore = contribution * ScoringConstants.NgramScoreMultiplier * idf;
-                docScores[docId] = current + ngramScore;
 
-                if (diagnostics?.ScoreDetails.TryGetValue(docId, out DocumentScoreDetails? details) == true)
+                // Track running total and cap the contribution
+                double currentNgramTotal = ngramTotals.GetValueOrDefault(docId, 0);
+                double remainingBudget = ScoringConstants.NgramMaxContribution - currentNgramTotal;
+                double cappedScore = Math.Min(ngramScore, Math.Max(0, remainingBudget));
+
+                if (cappedScore > 0)
                 {
-                    details.NgramDedupeAdjustment += ngramScore;
+                    docScores[docId] = current + cappedScore;
+                    ngramTotals[docId] = currentNgramTotal + cappedScore;
+
+                    if (diagnostics?.ScoreDetails.TryGetValue(docId, out DocumentScoreDetails? details) == true)
+                    {
+                        details.NgramDedupeAdjustment += cappedScore;
+                    }
                 }
             }
         }
@@ -744,7 +767,7 @@ public sealed class InMemorySearchService
             .ThenBy(kv2 => _docs[kv2.Key].PopularName ?? _docs[kv2.Key].Name);
 
         // Apply business type filter
-        if(options.FilterByBusinessTypes is { Count: > 0} filterBusinessTypes)
+        if (options.FilterByBusinessTypes is { Count: > 0 } filterBusinessTypes)
         {
             sortedDocs = sortedDocs.Where(kv2 => _docs[kv2.Key].BusinessType?.Id is int id && filterBusinessTypes.Contains(id));
         }
@@ -800,6 +823,8 @@ public sealed class InMemorySearchService
             for (int docId = 0; docId < _docs.Count; docId++)
             {
                 double baseScore = _typeBaseBoost.TryGetValue(_docs[docId].Type, out double boost) ? boost : 0.0;
+                baseScore += ComputeAreaBoost(_docs[docId].GrossArea);
+                baseScore += ComputeChildrenBoost(_docs[docId].NumChildren);
                 docScores[docId] = baseScore;
             }
         }
@@ -1001,9 +1026,11 @@ public sealed class InMemorySearchService
 
             for (int docId = 0; docId < _docs.Count; docId++)
             {
-                double baseScore = _typeBaseBoost.GetValueOrDefault(_docs[docId].Type);
-                docScores[docId] = baseScore;
-                diagnosticsCollector.ScoreDetails[docId] = new DocumentScoreDetails { TypeBoost = baseScore };
+                double typeBoost = _typeBaseBoost.GetValueOrDefault(_docs[docId].Type);
+                double areaBoost = ComputeAreaBoost(_docs[docId].GrossArea);
+                double childrenBoost = ComputeChildrenBoost(_docs[docId].NumChildren);
+                docScores[docId] = typeBoost + areaBoost + childrenBoost;
+                diagnosticsCollector.ScoreDetails[docId] = new DocumentScoreDetails { TypeBoost = typeBoost, AreaBoost = areaBoost, ChildrenBoost = childrenBoost };
                 candidateDocIds.Add(docId);
             }
         }
@@ -1080,6 +1107,8 @@ public sealed class InMemorySearchService
                 PopularName = result.Item.PopularName,
                 Type = result.Item.Type,
                 TypeBoost = details.TypeBoost,
+                AreaBoost = details.AreaBoost,
+                ChildrenBoost = details.ChildrenBoost,
                 Bm25Score = details.Bm25Score,
                 ExactMatchBonus = details.ExactMatchBonus,
                 StartsWithBonus = details.StartsWithBonus,

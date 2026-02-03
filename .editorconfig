@@ -217,6 +217,9 @@ dotnet_diagnostic.CA1857.severity = warning
 # CA1858: Use 'StartsWith' instead of 'IndexOf'
 dotnet_diagnostic.CA1858.severity = warning
 
+# CA1873: Avoid string.Concat with char - micro-optimization, not worth the noise
+dotnet_diagnostic.CA1873.severity = none
+
 # CA2007: Consider calling ConfigureAwait on the awaited task
 dotnet_diagnostic.CA2007.severity = suggestion
 

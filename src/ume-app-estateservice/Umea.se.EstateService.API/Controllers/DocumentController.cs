@@ -33,7 +33,7 @@ public class DocumentController(IFileDocumentHandler fileDocumentHandler) : Cont
             return NotFound();
         }
 
-        return File(document.Content,document.ContentType, document.Name);
+        return File(document.Content, document.ContentType, document.Name);
     }
 
     /// <summary>

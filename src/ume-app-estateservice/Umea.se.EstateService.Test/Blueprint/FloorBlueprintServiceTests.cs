@@ -2,7 +2,6 @@ using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Umea.se.EstateService.Logic.Exceptions;
 using Umea.se.EstateService.Logic.Handlers;
@@ -11,6 +10,7 @@ using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.EstateService.Test.TestHelpers;
 using Umea.se.Toolkit.Images;
+using ZiggyCreatures.Caching.Fusion;
 
 namespace Umea.se.EstateService.Test.Blueprint;
 
@@ -18,9 +18,9 @@ public class FloorBlueprintServiceTests
 {
     private static ImageService CreateImageService()
     {
-        var options = new ImageServiceOptions();
-        var cache = new MemoryCache(new MemoryCacheOptions { SizeLimit = 100_000_000 });
-        return new ImageService(options, cache, NullLogger<ImageService>.Instance);
+        ImageServiceOptions options = new() { CacheKeyPrefix = "test" };
+        FusionCache cache = new(new FusionCacheOptions());
+        return new ImageService(cache, options, NullLogger<ImageService>.Instance);
     }
 
     private static async Task<string> ReadContentAsync(FloorBlueprint blueprint)
@@ -29,12 +29,12 @@ public class FloorBlueprintServiceTests
 
         if (blueprint.IsGzipped)
         {
-            await using var gzip = new GZipStream(blueprint.Content, CompressionMode.Decompress, leaveOpen: true);
-            using var reader = new StreamReader(gzip, Encoding.UTF8);
+            await using GZipStream gzip = new(blueprint.Content, CompressionMode.Decompress, leaveOpen: true);
+            using StreamReader reader = new(gzip, Encoding.UTF8);
             return await reader.ReadToEndAsync();
         }
 
-        using var directReader = new StreamReader(blueprint.Content, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
+        using StreamReader directReader = new(blueprint.Content, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
         return await directReader.ReadToEndAsync();
     }
 

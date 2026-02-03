@@ -12,17 +12,17 @@ public sealed record SearchRequest : IValidatableObject
     public const int MaxRadiusMeters = 50_000;
 
     [FromQuery(Name = "type")]
-    public HashSet<AutocompleteType> Type { get; init; } = [AutocompleteType.Any];
+    public HashSet<AutocompleteType>? Type { get; init; }
 
     [FromQuery(Name = "businessTypeId")]
-    public List<int> BusinessTypeIds { get; init; } = [];
+    public List<int>? BusinessTypeIds { get; init; }
 
     [FromQuery(Name = "query")]
-    public string? Query { get; init; } = string.Empty;
+    public string? Query { get; init; }
 
     [FromQuery(Name = "limit")]
     [Range(1, MaxLimit, ErrorMessage = "Limit must be between {1} and {2}.")]
-    public int Limit { get; init; } = 10;
+    public int? Limit { get; init; }
 
     [FromQuery(Name = "lat")]
     public double? Latitude { get; init; }
@@ -71,7 +71,7 @@ public sealed record SearchRequest : IValidatableObject
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        if (Type.Count > 1 && Type.Contains(AutocompleteType.Any))
+        if (Type is { Count: > 1 } && Type.Contains(AutocompleteType.Any))
         {
             yield return new ValidationResult(
                 "The 'Any' type cannot be combined with other values.",

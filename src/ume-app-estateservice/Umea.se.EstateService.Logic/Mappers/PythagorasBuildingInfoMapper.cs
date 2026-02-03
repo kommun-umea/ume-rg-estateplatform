@@ -40,7 +40,7 @@ public static class PythagorasBuildingInfoMapper
 
     private static BusinessTypeModel? CreateBusinessType(BuildingInfo dto)
     {
-        if(dto.BusinessTypeId is null || string.IsNullOrWhiteSpace(dto.BusinessTypeName))
+        if (dto.BusinessTypeId is null || string.IsNullOrWhiteSpace(dto.BusinessTypeName))
         {
             return null;
         }

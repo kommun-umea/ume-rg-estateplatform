@@ -25,7 +25,7 @@ parameters:
   - name: buildAndDeployEstateServiceJobPicker
     displayName: Deploy ume-app-estateservice
     type: boolean
-    default: false
+    default: true
 
 variables:
   - template: pipelines/general/template-default-pipeline-variables.yml@templates
@@ -83,7 +83,7 @@ stages:
         parameters:
           projectFolderName: ume-app-estateservice
           entrypointProjectName: Umea.se.EstateService.API
-          dotnetVersion: 8.0.x
+          dotnetVersion: 10.0.x
 
   - stage: DeployEstateServiceStage
     displayName: Deploy EstateService

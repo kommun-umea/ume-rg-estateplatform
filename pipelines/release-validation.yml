@@ -54,6 +54,6 @@ stages:
         parameters:
           projectFolderName: ume-app-estateservice
           entrypointProjectName: Umea.se.EstateService.API
-          dotnetVersion: 8.0.x
+          dotnetVersion: 10.0.x
           shouldPublish: false
   # ------

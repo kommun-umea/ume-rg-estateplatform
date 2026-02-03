@@ -41,6 +41,8 @@ public sealed record DocumentScoreBreakdown
     public required string? PopularName { get; init; }
     public required NodeType Type { get; init; }
     public required double TypeBoost { get; init; }
+    public required double AreaBoost { get; init; }
+    public required double ChildrenBoost { get; init; }
     public required double Bm25Score { get; init; }
     public required double ExactMatchBonus { get; init; }
     public required double StartsWithBonus { get; init; }

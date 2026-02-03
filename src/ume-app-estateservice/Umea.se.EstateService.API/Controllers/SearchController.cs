@@ -36,7 +36,7 @@ public class SearchController(SearchHandler searchHandler) : ControllerBase
     [SwaggerResponse(StatusCodes.Status200OK, "A list of matching Pythagoras documents.", typeof(ICollection<PythagorasDocument>))]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid request parameters.")]
     public async Task<ActionResult<ICollection<PythagorasDocument>>> Search(
-        [FromQuery][SwaggerParameter("Search request parameters.", Required = true)] SearchRequest req,
+        [FromQuery][SwaggerParameter("Search request parameters.")] SearchRequest req,
         CancellationToken cancellationToken)
     {
         string? query = req.Query?.Trim();
@@ -45,14 +45,14 @@ public class SearchController(SearchHandler searchHandler) : ControllerBase
         {
             Types = req.Type is { Count: > 0 }
                 ? req.Type
-                : Array.Empty<AutocompleteType>(),
-            BusinessTypeIds = req.BusinessTypeIds
+                : [AutocompleteType.Any],
+            BusinessTypeIds = req.BusinessTypeIds ?? []
         };
 
         IReadOnlyList<SearchResult> results = await searchHandler.SearchAsync(
             query,
             filter,
-            req.Limit,
+            req.Limit ?? 50,
             req.GeoFilter,
             cancellationToken)
             .ConfigureAwait(false);
@@ -81,7 +81,7 @@ public class SearchController(SearchHandler searchHandler) : ControllerBase
     [SwaggerResponse(StatusCodes.Status200OK, "A list of matching geo locations.", typeof(ICollection<BuildingLocationModel>))]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid request parameters.")]
     public async Task<ActionResult<ICollection<BuildingLocationModel>>> SearchGeoLocation(
-        [FromQuery][SwaggerParameter("Search request parameters.", Required = true)] SearchRequest req,
+        [FromQuery][SwaggerParameter("Search request parameters.")] SearchRequest req,
         CancellationToken cancellationToken)
     {
         string? query = req.Query?.Trim();
@@ -89,7 +89,7 @@ public class SearchController(SearchHandler searchHandler) : ControllerBase
         SearchFilter filter = new()
         {
             Types = [AutocompleteType.Building], // Geo locations only exist for buildings
-            BusinessTypeIds = req.BusinessTypeIds
+            BusinessTypeIds = req.BusinessTypeIds ?? []
         };
 
         IReadOnlyList<SearchResult> results = await searchHandler.SearchAsync(
@@ -136,7 +136,7 @@ public class SearchController(SearchHandler searchHandler) : ControllerBase
     [SwaggerResponse(StatusCodes.Status200OK, "Search results with diagnostics.", typeof(SearchDebugResponse))]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid request parameters.")]
     public async Task<ActionResult<SearchDebugResponse>> SearchDebug(
-        [FromQuery][SwaggerParameter("Search request parameters.", Required = true)] SearchRequest req,
+        [FromQuery][SwaggerParameter("Search request parameters.")] SearchRequest req,
         CancellationToken cancellationToken)
     {
         string? query = req.Query?.Trim();
@@ -145,15 +145,15 @@ public class SearchController(SearchHandler searchHandler) : ControllerBase
         {
             Types = req.Type is { Count: > 0 }
                 ? req.Type
-                : Array.Empty<AutocompleteType>(),
-            BusinessTypeIds = req.BusinessTypeIds
+                : [AutocompleteType.Any],
+            BusinessTypeIds = req.BusinessTypeIds ?? []
         };
 
         (IReadOnlyList<SearchResult> results, SearchDiagnostics diagnostics) =
             await searchHandler.SearchWithDiagnosticsAsync(
                 query,
                 filter,
-                req.Limit,
+                req.Limit ?? 50,
                 req.GeoFilter,
                 cancellationToken)
             .ConfigureAwait(false);

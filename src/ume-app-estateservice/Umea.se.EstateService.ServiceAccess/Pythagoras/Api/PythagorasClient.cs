@@ -240,7 +240,7 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : Ext
         string requestUri = NormalizeEndpoint(endpoint);
 
         using HttpResponseMessage response = await HttpClient.GetAsync(requestUri, cancellationToken).ConfigureAwait(false);
-        if(response.StatusCode == HttpStatusCode.NotFound)
+        if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return default;
         }

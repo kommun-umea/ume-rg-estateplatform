@@ -124,6 +124,41 @@ module appSlot_estateservice 'br/ume:microsoft.web.sites.slots:v2.0' = {
   }
 }
 
+// Storage Account - Image Cache
+module storageAccount 'br/ume:microsoft.storage.storageaccounts:v2.1' = {
+  scope: resourceGroup
+  name: 'storageAccount'
+  params: {
+    environment: environment
+    companyPrefix: companyPrefix
+    purpose: 'estateplatform'
+    containers: [
+      {
+        purpose: 'imagecache'
+      }
+    ]
+    contributors: [
+      {
+        principalId: app_estateservice.outputs.principalId
+        principalType: 'ServicePrincipal'
+      }
+      {
+        principalId: appSlot_estateservice.outputs.principalId
+        principalType: 'ServicePrincipal'
+      }
+    ]
+  }
+}
+
+// Default Role Assignments
+module defaultRoleAssignments 'br/ume:umea.roleassignments.turkos.defaults:v2.0' = {
+  scope: resourceGroup
+  name: 'defaultRoleAssignments'
+  params: {
+    environment: environment
+  }
+}
+
 // Library variables
 module libraryVariables 'library-variable-group.bicep' = {
   scope: resourceGroup

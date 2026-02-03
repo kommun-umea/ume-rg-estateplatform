@@ -46,15 +46,10 @@ public sealed class InMemoryBuildingImageMetadataCache(
     {
         ArgumentNullException.ThrowIfNull(allImageIds);
 
-        if (allImageIds.Count == 0)
-        {
-            throw new ArgumentException("At least one image ID must be provided", nameof(allImageIds));
-        }
-
         string key = GetCacheKey(buildingId);
 
-        // Use first image as primary if not specified
-        int resolvedPrimaryImageId = primaryImageId ?? allImageIds[0];
+        // Use first image as primary if not specified (null if no images)
+        int? resolvedPrimaryImageId = primaryImageId ?? (allImageIds.Count > 0 ? allImageIds[0] : null);
 
         BuildingImageMetadata metadata = new(buildingId, resolvedPrimaryImageId, allImageIds);
 
@@ -68,8 +63,8 @@ public sealed class InMemoryBuildingImageMetadataCache(
         _cache.Set(key, metadata, options);
 
         _logger.LogDebug(
-            "Cached metadata for building {BuildingId} → primary: {PrimaryImageId}, total: {TotalCount} images (expires in {Expiration})",
-            buildingId, resolvedPrimaryImageId, allImageIds.Count, expiration ?? _defaultExpiration);
+            "Cached metadata for building {BuildingId}: {TotalCount} images (expires in {Expiration})",
+            buildingId, allImageIds.Count, expiration ?? _defaultExpiration);
 
         return Task.CompletedTask;
     }

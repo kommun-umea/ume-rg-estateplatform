@@ -1,12 +1,12 @@
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Logic.HostedServices;
 using Umea.se.EstateService.Logic.Interfaces;
 using Umea.se.EstateService.Logic.Options;
 using Umea.se.EstateService.Logic.Search.Providers;
+using Umea.se.EstateService.Shared.Infrastructure;
 
 namespace Umea.se.EstateService.Logic;
 
@@ -22,17 +22,15 @@ public static class DependencyInjectorLogic
         services.AddScoped<IBuildingImageService, BuildingImageService>();
         services.AddMemoryCache(options =>
         {
-            options.SizeLimit = 500 * 1024 * 1024; // 500 MB shared cache limit
+            options.SizeLimit = 500 * 1024 * 1024; // 500 MB metadata cache limit
             options.CompactionPercentage = 0.25;
         });
-        services.AddOptions<BuildingImageCacheOptions>()
-            .BindConfiguration(BuildingImageCacheOptions.SectionName);
         services.AddSingleton<IBuildingImageMetadataCache>(sp =>
         {
             IMemoryCache cache = sp.GetRequiredService<IMemoryCache>();
             ILogger<InMemoryBuildingImageMetadataCache> logger = sp.GetRequiredService<ILogger<InMemoryBuildingImageMetadataCache>>();
-            BuildingImageCacheOptions options = sp.GetRequiredService<IOptions<BuildingImageCacheOptions>>().Value;
-            return new InMemoryBuildingImageMetadataCache(cache, logger, options.MetadataExpirationHours);
+            ApplicationConfig config = sp.GetRequiredService<ApplicationConfig>();
+            return new InMemoryBuildingImageMetadataCache(cache, logger, config.ImageCache.MetadataExpirationHours);
         });
 
         services.AddTransient<IFileDocumentHandler, FileDocumentHandler>();

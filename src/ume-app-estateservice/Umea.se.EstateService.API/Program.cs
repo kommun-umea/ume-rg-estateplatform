@@ -2,14 +2,16 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using Polly;
 using Umea.se.EstateService.API;
-using Umea.se.Toolkit.Images;
+using Umea.se.EstateService.API.Infrastructure;
 using Umea.se.EstateService.Logic;
 using Umea.se.EstateService.ServiceAccess;
 using Umea.se.EstateService.Shared;
 using Umea.se.EstateService.Shared.Infrastructure;
 using Umea.se.Toolkit.EntryPoints;
 using Umea.se.Toolkit.Filters;
+using Umea.se.Toolkit.Images;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -17,13 +19,6 @@ ApplicationConfig config = new(builder.Configuration);
 
 if (!builder.Environment.IsEnvironment("IntegrationTest"))
 {
-    builder.Services.ConnectToKeyVault(config.KeyVaultUrl);
-
-    if (!config.SuppressKeyVaultConfigs)
-    {
-        config.LoadKeyVaultSecrets();
-    }
-
     builder.Logging.UseDefaultLoggers(config);
 }
 else
@@ -32,12 +27,21 @@ else
 }
 
 // ImageService must be registered before AddLogicDependencies (BuildingImageService depends on it)
-builder.Services.AddSingleton(new ImageServiceOptions
-{
-    CacheSizeMb = 500,
-    CacheLifetime = TimeSpan.FromHours(24),
-});
-builder.Services.AddSingleton<ImageService>();
+builder.Services.AddImageService(
+    cacheKeyPrefix: "estateservice",
+    configureOptions: options =>
+    {
+        options.MemoryCacheLifetime = TimeSpan.FromHours(config.ImageCache.MemoryCacheLifetimeHours);
+        options.BlobCacheLifetime = TimeSpan.FromDays(config.ImageCache.BlobCacheLifetimeDays);
+    },
+    configureBlobCache: blobCache =>
+    {
+        blobCache.ConnectionString = config.ImageCache.BlobConnectionString;
+        blobCache.ServiceUri = config.ImageCache.BlobServiceUrl is not null
+            ? new Uri(config.ImageCache.BlobServiceUrl)
+            : null;
+        blobCache.ContainerName = config.ImageCache.BlobContainerName ?? "imagecache";
+    });
 
 builder.Services
     .AddApplicationConfig(config)
@@ -47,10 +51,19 @@ builder.Services
     .AddSharedDependencies()
 ;
 
-builder.Services.AddDefaultHttpClient(HttpClientNames.Pythagoras, options =>
+builder.Services.AddHttpClient(HttpClientNames.Pythagoras, client =>
 {
-    options.BaseAddress = config.PythagorasBaseUrl;
-    options.DefaultRequestHeaders.Add("api_key", config.PythagorasApiKey);
+    client.BaseAddress = new Uri(config.PythagorasBaseUrl);
+    client.DefaultRequestHeaders.Add("api_key", config.PythagorasApiKey);
+})
+.AddStandardResilienceHandler(options =>
+{
+    options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(30);
+    options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(60);
+    options.Retry.MaxRetryAttempts = 2;
+    options.Retry.BackoffType = DelayBackoffType.Exponential;
+    options.Retry.UseJitter = true;
+    options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(60);
 });
 
 builder.Services
@@ -74,7 +87,13 @@ builder.Services
 if (!builder.Environment.IsEnvironment("IntegrationTest"))
 {
     builder.Services.AddDefaultSwagger(config);
-    builder.Services.ConfigureSwaggerGen(options => options.CustomSchemaIds(x => x.FullName));
+    builder.Services.ConfigureSwaggerGen(options =>
+    {
+        options.CustomSchemaIds(x => x.FullName);
+        // Fix: FromQuery model properties incorrectly marked as required
+        // See: https://github.com/dotnet/aspnetcore/issues/52881
+        options.OperationFilter<NullableQueryParametersOperationFilter>();
+    });
 }
 
 builder.Services.AddAllowedOriginsCorsPolicy(config.AllowedOrigins);
@@ -102,5 +121,3 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
-
-public partial class Program;

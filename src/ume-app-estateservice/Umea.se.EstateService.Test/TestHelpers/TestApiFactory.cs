@@ -1,12 +1,12 @@
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Logic.Interfaces;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess;
-using Microsoft.AspNetCore.TestHost;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.TestToolkit.TestInfrastructure;
 
 namespace Umea.se.EstateService.Test.TestHelpers;
