@@ -1,8 +1,8 @@
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 using Umea.se.EstateService.Logic.Handlers;
-using Umea.se.EstateService.Logic.Interfaces;
-using Umea.se.EstateService.Logic.Options;
+using Umea.se.EstateService.Logic.Search.Providers;
 using Umea.se.EstateService.Logic.Search;
+using Umea.se.EstateService.Shared.Infrastructure;
 using Umea.se.EstateService.Shared.Search;
 
 namespace Umea.se.EstateService.Test.Search;
@@ -80,8 +80,16 @@ public class SearchHandlerIndexingTests
     private static SearchHandler CreateHandler(ICollection<PythagorasDocument> documents, bool excludeRooms)
     {
         IPythagorasDocumentProvider provider = new FakeDocumentProvider(documents);
-        SearchOptions options = new() { ExcludeRooms = excludeRooms };
-        return new SearchHandler(provider, Options.Create(options));
+        string testProjectRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", ".."));
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddJsonFile(Path.Combine(testProjectRoot, "appsettings.unittests.json"))
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Search:ExcludeRoomsFromSearch"] = excludeRooms.ToString()
+            })
+            .Build();
+        ApplicationConfig appConfig = new(configuration, typeof(Program).Assembly);
+        return new SearchHandler(provider, appConfig);
     }
 
     private static List<PythagorasDocument> CreateDocuments()

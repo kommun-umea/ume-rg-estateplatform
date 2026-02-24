@@ -1,25 +1,21 @@
-﻿using Microsoft.Extensions.Options;
-using Umea.se.EstateService.Logic.Interfaces;
-using Umea.se.EstateService.Logic.Options;
+﻿using Umea.se.EstateService.Logic.Search.Providers;
 using Umea.se.EstateService.Logic.Search;
 using Umea.se.EstateService.Shared.Autocomplete;
+using Umea.se.EstateService.Shared.Infrastructure;
 using Umea.se.EstateService.Shared.Search;
 
 namespace Umea.se.EstateService.Logic.Handlers;
 
 public class SearchHandler(
     IPythagorasDocumentProvider documentProvider,
-    IOptions<SearchOptions> searchOptions)
+    ApplicationConfig appConfig)
     : IIndexedPythagorasDocumentReader
 {
     private readonly IPythagorasDocumentProvider _documentProvider = documentProvider;
-    private readonly bool _excludeRooms = searchOptions.Value.ExcludeRooms;
+    private readonly bool _excludeRooms = appConfig.Search.ExcludeRoomsFromSearch;
     private readonly SemaphoreSlim _indexLock = new(1, 1);
     private InMemorySearchService? _searchService;
     private IReadOnlyList<PythagorasDocument>? _indexedDocuments;
-
-    public Task<ICollection<PythagorasDocument>> GetPythagorasDocumentsAsync()
-        => _documentProvider.GetDocumentsAsync();
 
     public int GetDocumentCount() => _searchService?.DocumentCount ?? 0;
 
@@ -103,7 +99,7 @@ public class SearchHandler(
     private async Task<InMemorySearchService> BuildSearchServiceAsync(CancellationToken _)
     {
         ICollection<PythagorasDocument> documents = await _documentProvider.GetDocumentsAsync().ConfigureAwait(false);
-        List<PythagorasDocument> snapshot = new(documents);
+        List<PythagorasDocument> snapshot = [.. documents];
         IEnumerable<PythagorasDocument> documentsToIndex = _excludeRooms
             ? snapshot.Where(static doc => doc.Type != NodeType.Room)
             : snapshot;
@@ -143,7 +139,7 @@ public class SearchHandler(
     public async Task<IReadOnlyCollection<PythagorasDocument>> GetIndexedDocumentsAsync(CancellationToken cancellationToken = default)
     {
         await EnsureSearchServiceAsync(cancellationToken).ConfigureAwait(false);
-        return _indexedDocuments ?? Array.Empty<PythagorasDocument>();
+        return _indexedDocuments ?? [];
     }
 
     public async Task<IReadOnlyDictionary<int, PythagorasDocument>> GetBuildingDocumentsByIdsAsync(IEnumerable<int> buildingIds, CancellationToken cancellationToken = default)
@@ -175,11 +171,11 @@ public class SearchHandler(
     {
         if (estateId <= 0)
         {
-            return Array.Empty<PythagorasDocument>();
+            return [];
         }
 
         IReadOnlyCollection<PythagorasDocument> documents = await GetIndexedDocumentsAsync(cancellationToken).ConfigureAwait(false);
-        List<PythagorasDocument> result = new();
+        List<PythagorasDocument> result = [];
 
         foreach (PythagorasDocument document in documents)
         {

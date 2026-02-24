@@ -10,7 +10,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.ApplicationInsights" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
     <PackageReference Include="Swashbuckle.AspNetCore" />
@@ -19,8 +18,20 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Umea.se.EstateService.DataStore\Umea.se.EstateService.DataStore.csproj" />
     <ProjectReference Include="..\Umea.se.EstateService.Logic\Umea.se.EstateService.Logic.csproj" />
     <ProjectReference Include="..\Umea.se.Toolkit.Images\Umea.se.Toolkit.Images.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="DataStoreCache\" />
   </ItemGroup>
 
 </Project>

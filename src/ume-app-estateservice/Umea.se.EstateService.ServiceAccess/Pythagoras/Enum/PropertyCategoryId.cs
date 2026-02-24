@@ -10,6 +10,7 @@ public enum PropertyCategoryId
     EstateExternalOwnerName = 213,
     EstateExternalOwnerNote = 214,
     YearOfConstruction = 226,
+    BuildingCondition = 228,
     BuildingExternalStatus = 233,
     BuildingExternalOwnerName = 234,
     BuildingExternalOwnerNote = 236,

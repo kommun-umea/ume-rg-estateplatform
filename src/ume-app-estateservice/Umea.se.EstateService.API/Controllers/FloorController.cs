@@ -1,10 +1,9 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Net.Http.Headers;
 using Swashbuckle.AspNetCore.Annotations;
-using Umea.se.EstateService.API.Controllers.Requests;
-using Umea.se.EstateService.Logic.Exceptions;
-using Umea.se.EstateService.Logic.Interfaces;
+using Umea.se.EstateService.API.Requests;
+using Umea.se.EstateService.Logic.Handlers.Blueprint;
+using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Logic.Models;
 using Umea.se.EstateService.Shared.Models;
 
@@ -14,13 +13,10 @@ namespace Umea.se.EstateService.API.Controllers;
 [Produces("application/json")]
 [Route(ApiRoutes.Floors)]
 [Authorize]
-public sealed class FloorController(
-    IFloorBlueprintService blueprintService,
-    IPythagorasHandler pythagorasHandler,
-    ILogger<FloorController> logger) : ControllerBase
+public sealed class FloorController(IFloorBlueprintService blueprintService, IEstateDataQueryHandler pythagorasHandler, ILogger<FloorController> logger) : ControllerBase
 {
     private readonly IFloorBlueprintService _blueprintService = blueprintService;
-    private readonly IPythagorasHandler _pythagorasHandler = pythagorasHandler;
+    private readonly IEstateDataQueryHandler _pythagorasHandler = pythagorasHandler;
     private readonly ILogger<FloorController> _logger = logger;
 
     /// <summary>
@@ -88,10 +84,13 @@ public sealed class FloorController(
 
         try
         {
-            FloorBlueprint blueprint = await _blueprintService.GetBlueprintAsync(floorId, request.Format, request.IncludeWorkspaceTexts, cancellationToken).ConfigureAwait(false);
+            FloorBlueprint blueprint = await _blueprintService
+                .GetBlueprintAsync(floorId, request.Format, request.IncludeWorkspaceTexts, cancellationToken)
+                .ConfigureAwait(false);
+
             blueprint.Content.Position = 0;
 
-            Response.GetTypedHeaders().CacheControl = new CacheControlHeaderValue
+            Response.GetTypedHeaders().CacheControl = new Microsoft.Net.Http.Headers.CacheControlHeaderValue
             {
                 Public = true,
                 MaxAge = TimeSpan.FromHours(24)
@@ -118,7 +117,7 @@ public sealed class FloorController(
         }
         catch (FloorBlueprintUnavailableException ex)
         {
-            _logger.LogError(ex, "Blueprint unavailable for floor {FloorId}", floorId);
+            _logger.LogWarning(ex, "Blueprint unavailable for floor {FloorId}", floorId);
             ProblemDetails problem = new()
             {
                 Status = StatusCodes.Status502BadGateway,

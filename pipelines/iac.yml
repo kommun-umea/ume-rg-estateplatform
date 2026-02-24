@@ -16,7 +16,7 @@ resources:
     - repository: templates
       type: git
       name: Turkos/ume-pipeline-templates
-      ref: refs/tags/release/v251202T0847-15470
+      ref: refs/tags/release/v260213T1327-15561
 
 parameters:
   - name: environment
@@ -74,11 +74,13 @@ stages:
     jobs:
       - template: pipelines/azure/template-deploy-infrastructure.yml@templates
         parameters:
+          templateRepoAlias: templates
           environment: ${{ parameters.environment }}
           serviceConnection: $(serviceConnection)
           resourceGroup: ${{ variables.resourceGroup }}
           entrypointScriptPath: iac/entrypoint.ps1
           personalAccessToken: $(System.AccessToken)
+          shouldProvideSqlScript: true
 
   - stage: UpdateKeyVaultStage
     displayName: Update Key Vault

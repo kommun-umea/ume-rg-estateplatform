@@ -142,7 +142,7 @@ public class PythagorasClientTests
 
         HttpRequestMessage captured = handler.LastRequest.ShouldNotBeNull();
         captured.Method.ShouldBe(HttpMethod.Post);
-        captured.RequestUri!.ToString().ShouldBe("https://example.org/rest/v1/navigationfolder/info/uilistdata?navigationId=2&includePropertyValues=true&propertyIds%5B%5D=208&navigationFolderIds%5B%5D=7");
+        captured.RequestUri!.ToString().ShouldBe("https://example.org/rest/v1/navigationfolder/info/uilistdata?navigationId=2&includePropertyValues=true&includeAscendantBuildings=false&propertyIds%5B%5D=208&navigationFolderIds%5B%5D=7");
         handler.LastRequestContent.ShouldBe("{}");
         factory.LastRequestedClientName.ShouldBe(HttpClientNames.Pythagoras);
     }

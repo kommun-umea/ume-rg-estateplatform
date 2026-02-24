@@ -15,7 +15,12 @@ public static class BlobPathBuilder
     public static string ForImage(string imageId, string variant)
     {
         string path = SanitizeForPath(imageId);
-        string filename = variant == "svg" ? "blueprint.svg.gz" : $"{variant}.webp";
+        string filename = variant switch
+        {
+            "svg" => "blueprint.svg.gz",
+            _ when variant.StartsWith("svg_") => $"blueprint_{variant[4..]}.svg.gz",
+            _ => $"{variant}.webp"
+        };
         return $"cache/{path}/{filename}";
     }
 

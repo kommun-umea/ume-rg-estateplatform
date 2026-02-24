@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using Polly;
 using Umea.se.EstateService.API;
 using Umea.se.EstateService.API.Infrastructure;
+using Umea.se.EstateService.DataStore;
 using Umea.se.EstateService.Logic;
 using Umea.se.EstateService.ServiceAccess;
 using Umea.se.EstateService.Shared;
@@ -15,7 +16,7 @@ using Umea.se.Toolkit.Images;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
-ApplicationConfig config = new(builder.Configuration);
+ApplicationConfig config = new(builder.Configuration, typeof(Program).Assembly);
 
 if (!builder.Environment.IsEnvironment("IntegrationTest"))
 {
@@ -47,6 +48,7 @@ builder.Services
     .AddApplicationConfig(config)
     .AddApiDependencies()
     .AddLogicDependencies()
+    .AddDataStorePersistence(builder.Configuration.GetConnectionString("EstateService"), config.DataSync)
     .AddServiceAccessDependencies()
     .AddSharedDependencies()
 ;
@@ -78,7 +80,7 @@ builder.Services
             ValidIssuer = config.Authentication.TokenServiceUrl,
             ValidateAudience = true,
             ValidAudience = config.Authentication.Audience,
-            ValidateLifetime = true,
+            ValidateLifetime = false,
             ClockSkew = TimeSpan.Zero,
         };
     });
@@ -98,6 +100,12 @@ if (!builder.Environment.IsEnvironment("IntegrationTest"))
 
 builder.Services.AddAllowedOriginsCorsPolicy(config.AllowedOrigins);
 
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.MimeTypes = ["application/json", "text/json", "application/problem+json"];
+});
+
 builder.Services.AddControllers(options =>
 {
     options.Filters.Add<HttpResponseExceptionFilter>();
@@ -108,6 +116,8 @@ builder.Services.AddControllers(options =>
 });
 
 WebApplication app = builder.Build();
+
+app.UseResponseCompression();
 
 if (!app.Environment.IsEnvironment("IntegrationTest"))
 {

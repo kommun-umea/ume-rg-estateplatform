@@ -13,6 +13,9 @@ param dateNowUtc string = utcNow()
 
 param generalPurpose string
 
+param sqlServerName string
+param estateserviceSqldbName string
+
 param personalAccessToken string
 param organization string
 param project string
@@ -32,6 +35,10 @@ var libraryVariables = [
     value: ''
   }
   {
+    name: 'estateservice-database-connection-string'
+    value: 'Server=tcp:${sqlServerName}${az.environment().suffixes.sqlServerHostname},1433;Initial Catalog=${estateserviceSqldbName};Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Authentication="Active Directory Default";'
+  }
+  {
     name: 'estateservice-api-key'
     value: ''
   }
@@ -45,7 +52,7 @@ resource applicationInsights_general 'Microsoft.Insights/components@2020-02-02' 
 }
 
 // Deployment Script - Library Variables
-module libraryVariablesDeploymentScript 'br/ume:umea.deploymentscripts.libraryvariables:v2.2' = {
+module libraryVariablesDeploymentScript 'br/ume:umea.deploymentscripts.libraryvariables:v2.4' = {
   name: 'libraryVariablesDeploymentScript'
   params: {
     environment: environment

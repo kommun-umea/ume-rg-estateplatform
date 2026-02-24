@@ -1,11 +1,11 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
-using Umea.se.EstateService.API.Controllers.Requests;
-using Umea.se.EstateService.Logic.Interfaces;
+using Umea.se.EstateService.API.Requests;
+using Umea.se.EstateService.Logic.Handlers;
+using Umea.se.EstateService.Logic.Models;
 using Umea.se.EstateService.Shared.Models;
-using Umea.se.EstateService.Shared.Search;
-using QueryArgs = Umea.se.EstateService.Logic.Interfaces.QueryArgs;
+using QueryArgs = Umea.se.EstateService.Logic.Models.QueryArgs;
 
 namespace Umea.se.EstateService.API.Controllers;
 
@@ -13,11 +13,8 @@ namespace Umea.se.EstateService.API.Controllers;
 [Produces("application/json")]
 [Route(ApiRoutes.Estates)]
 [Authorize]
-public class EstateController(IPythagorasHandler pythagorasService, IIndexedPythagorasDocumentReader documentReader) : ControllerBase
+public class EstateController(IEstateDataQueryHandler pythData) : ControllerBase
 {
-    private readonly IPythagorasHandler _pythagorasService = pythagorasService;
-    private readonly IIndexedPythagorasDocumentReader _documentReader = documentReader;
-
     /// <summary>
     /// Gets a specific estate.
     /// </summary>
@@ -37,10 +34,8 @@ public class EstateController(IPythagorasHandler pythagorasService, IIndexedPyth
         [FromQuery] EstateDetailsRequest request,
         CancellationToken cancellationToken)
     {
-        EstateModel? estate = await _pythagorasService
-            .GetEstateByIdAsync(estateId, request.IncludeBuildings, cancellationToken)
-            .ConfigureAwait(false);
 
+        EstateModel? estate = await pythData.GetEstateByIdAsync(estateId, request.IncludeBuildings, cancellationToken);
         if (estate is null)
         {
             return NotFound();
@@ -71,8 +66,7 @@ public class EstateController(IPythagorasHandler pythagorasService, IIndexedPyth
             take: request.Limit > 0 ? request.Limit : null,
             searchTerm: request.SearchTerm);
 
-        IReadOnlyList<EstateModel> estates = await _pythagorasService
-            .GetEstatesWithBuildingsAsync(request.IncludeBuildings, queryArgs, cancellationToken);
+        IReadOnlyList<EstateModel> estates = await pythData.GetEstatesWithBuildingsAsync(request.IncludeBuildings, queryArgs, cancellationToken);
 
         return Ok(estates);
     }
@@ -81,6 +75,7 @@ public class EstateController(IPythagorasHandler pythagorasService, IIndexedPyth
     /// Gets all buildings for a specific estate.
     /// </summary>
     /// <param name="estateId">The estate ID.</param>
+    /// <param name="request">Query parameters for paging and filtering.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A list of buildings belonging to the estate.</returns>
     [HttpGet("{estateId:int}/buildings")]
@@ -106,47 +101,9 @@ public class EstateController(IPythagorasHandler pythagorasService, IIndexedPyth
             take: request.Limit > 0 ? request.Limit : null,
             searchTerm: request.SearchTerm);
 
-        IReadOnlyList<BuildingInfoModel> buildings = await _pythagorasService
-            .GetBuildingsAsync(buildingIds: null, estateId: estateId, includeOptions: ServiceAccess.Pythagoras.Enum.BuildingIncludeOptions.None, queryArgs: queryArgs, cancellationToken);
-
-        await EnrichBuildingStatisticsAsync(buildings, cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<BuildingInfoModel> buildings = await pythData
+            .GetBuildingsAsync(buildingIds: null, estateId: estateId, queryArgs: queryArgs, cancellationToken: cancellationToken);
 
         return Ok(buildings);
-    }
-
-    private async Task EnrichBuildingStatisticsAsync(IEnumerable<BuildingInfoModel> buildings, CancellationToken cancellationToken)
-    {
-        if (buildings is null)
-        {
-            return;
-        }
-
-        int[] ids = [.. buildings
-            .Select(static building => building.Id)
-            .Where(static id => id > 0)
-            .Distinct()];
-
-        if (ids.Length == 0)
-        {
-            return;
-        }
-
-        IReadOnlyDictionary<int, PythagorasDocument> docs = await _documentReader
-            .GetBuildingDocumentsByIdsAsync(ids, cancellationToken)
-            .ConfigureAwait(false);
-
-        if (docs.Count == 0)
-        {
-            return;
-        }
-
-        foreach (BuildingInfoModel building in buildings)
-        {
-            if (docs.TryGetValue(building.Id, out PythagorasDocument? doc))
-            {
-                building.NumFloors = doc.NumFloors;
-                building.NumRooms = doc.NumRooms;
-            }
-        }
     }
 }

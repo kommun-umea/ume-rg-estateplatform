@@ -24,9 +24,10 @@ public sealed class BlobCacheOptions
     public string ContainerName { get; set; } = "cache";
 
     /// <summary>
-    /// Create container on startup if it doesn't exist. Default: true.
+    /// Create container on startup if it doesn't exist. Default: false.
+    /// Set to true only for local development; in deployed environments the container is provisioned by infrastructure.
     /// </summary>
-    public bool CreateContainerIfNotExists { get; set; } = true;
+    public bool CreateContainerIfNotExists { get; set; }
 
     /// <summary>
     /// Returns true if blob cache is properly configured (either connection string or service URI).

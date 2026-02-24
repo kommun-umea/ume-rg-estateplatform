@@ -1,14 +1,18 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using System.Reflection;
+using Microsoft.Extensions.Configuration;
 using Umea.se.EstateService.Shared.Infrastructure.ConfigurationModels;
 using Umea.se.Toolkit.Configuration;
 
 namespace Umea.se.EstateService.Shared.Infrastructure;
 
-public class ApplicationConfig(IConfiguration configuration) : ApplicationConfigCloudBase(configuration)
+public class ApplicationConfig(IConfiguration configuration, Assembly? entryAssembly = null) : ApplicationConfigCloudBase(configuration, entryAssembly)
 {
     public string PythagorasApiKey => GetValue("Pythagoras:ApiKey");
     public string PythagorasBaseUrl => GetValue("Pythagoras:BaseUrl");
-    public bool ExcludeRoomsFromSearchIndex => TryGetBool("SearchIndex:ExcludeRooms") ?? true;
+
+    public DataSyncConfiguration DataSync => GetValue<DataSyncConfiguration>("DataSync");
+
+    public SearchConfiguration Search => GetValue<SearchConfiguration>("Search");
 
     public AuthenticationConfiguration Authentication => GetValue<AuthenticationConfiguration>("Authentication");
 

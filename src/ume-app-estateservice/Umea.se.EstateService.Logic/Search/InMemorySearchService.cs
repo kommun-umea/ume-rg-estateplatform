@@ -3,6 +3,7 @@ using System.Text.Json;
 using Umea.se.EstateService.Logic.Search.Analysis;
 using Umea.se.EstateService.Logic.Search.Indexing;
 using Umea.se.EstateService.Shared.Search;
+using Umea.se.EstateService.Shared.ValueObjects;
 
 namespace Umea.se.EstateService.Logic.Search;
 
@@ -507,7 +508,7 @@ public sealed class InMemorySearchService
                         tfWeighted += contribution;
 
                         // Track field hits for same-field multi-token bonus
-                        Dictionary<Field, HashSet<int>> fieldHits = GetOrAdd(fieldHitsPerDoc, docId, () => new Dictionary<Field, HashSet<int>>());
+                        Dictionary<Field, HashSet<int>> fieldHits = GetOrAdd(fieldHitsPerDoc, docId, () => []);
                         HashSet<int> tokenIndices = GetOrAdd(fieldHits, p.Field, () => []);
                         tokenIndices.Add(qi);
                     }
@@ -550,21 +551,15 @@ public sealed class InMemorySearchService
                     if (isExactTokenMatch)
                     {
                         score += ScoringConstants.ExactTokenMatchBonus;
-                        if (details != null)
-                        {
-                            details.ExactTokenMatchBonus += ScoringConstants.ExactTokenMatchBonus;
-                        }
+                        details?.ExactTokenMatchBonus += ScoringConstants.ExactTokenMatchBonus;
                     }
 
-                    if (details != null)
-                    {
-                        details.Bm25Score += bm25;
-                    }
+                    details?.Bm25Score += bm25;
 
                     score += bm25 + proximityBonus;
                     docScores[docId] = score;
 
-                    Dictionary<string, string> matchedMap = GetOrAdd(matchedPerDoc, docId, () => new Dictionary<string, string>());
+                    Dictionary<string, string> matchedMap = GetOrAdd(matchedPerDoc, docId, () => []);
                     matchedMap[queryToken] = term;
                 }
             }
@@ -897,13 +892,13 @@ public sealed class InMemorySearchService
         {
             int docId = kv.Key;
             PythagorasDocument document = _docs[docId];
-            GeoPoint? geo = document.GeoLocation;
-            if (geo is null || double.IsNaN(geo.Lat) || double.IsNaN(geo.Lng))
+            GeoPointModel? geo = document.GeoLocation;
+            if (geo is null || double.IsNaN(geo.Lat) || double.IsNaN(geo.Lon))
             {
                 continue;
             }
 
-            double distance = GeoHelper.CalculateDistanceInMeters(latitude, longitude, geo.Lat, geo.Lng);
+            double distance = GeoHelper.CalculateDistanceInMeters(latitude, longitude, geo.Lat, geo.Lon);
             if (double.IsNaN(distance) || distance > radiusMeters)
             {
                 continue;
@@ -944,14 +939,14 @@ public sealed class InMemorySearchService
         {
             int docId = kv.Key;
             PythagorasDocument document = _docs[docId];
-            GeoPoint? geo = document.GeoLocation;
-            if (geo is null || double.IsNaN(geo.Lat) || double.IsNaN(geo.Lng))
+            GeoPointModel? geo = document.GeoLocation;
+            if (geo is null || double.IsNaN(geo.Lat) || double.IsNaN(geo.Lon))
             {
                 continue;
             }
 
             double lat = geo.Lat;
-            double lng = geo.Lng;
+            double lng = geo.Lon;
 
             if (lat < south || lat > north || lng < west || lng > east)
             {

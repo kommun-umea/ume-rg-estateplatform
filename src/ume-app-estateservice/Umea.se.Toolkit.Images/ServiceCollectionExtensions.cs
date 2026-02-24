@@ -45,7 +45,7 @@ public static class ServiceCollectionExtensions
             BlobCacheOptions options = sp.GetRequiredService<BlobCacheOptions>();
             ILogger<BlobDistributedCache> logger = sp.GetRequiredService<ILogger<BlobDistributedCache>>();
 
-            logger.LogWarning(
+            logger.LogInformation(
                 "BlobCacheOptions - UseConnectionString: {HasConnStr}, ServiceUri: {ServiceUri}, ContainerName: {Container}, IsConfigured: {IsConfigured}",
                 !string.IsNullOrWhiteSpace(options.ConnectionString),
                 options.ServiceUri,
@@ -54,7 +54,7 @@ public static class ServiceCollectionExtensions
 
             if (!options.IsConfigured)
             {
-                logger.LogWarning("Blob cache not configured, using memory-only distributed cache");
+                logger.LogInformation("Blob cache not configured, using memory-only distributed cache");
                 return new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions()));
             }
 
@@ -72,7 +72,9 @@ public static class ServiceCollectionExtensions
 
         // FusionCache with L1 (Memory, 500MB limit) + L2 (Blob Storage) + Protobuf serialization
         // Size is set via adaptive caching in factory, with a default fallback for L2 cache hits
+        // No backplane needed: single-node deployment with immutable image content
         services.AddFusionCache()
+            .WithOptions(o => o.EnableBestPracticesAdvisor = false)
             .WithMemoryCache(new MemoryCache(new MemoryCacheOptions
             {
                 SizeLimit = 500 * 1024 * 1024, // 500 MB

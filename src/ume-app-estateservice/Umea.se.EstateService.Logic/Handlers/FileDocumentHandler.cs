@@ -1,5 +1,4 @@
-using Umea.se.EstateService.Logic.Interfaces;
-using Umea.se.EstateService.Logic.Mappers;
+using Umea.se.EstateService.Logic.Data.Pythagoras.Mappers;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;

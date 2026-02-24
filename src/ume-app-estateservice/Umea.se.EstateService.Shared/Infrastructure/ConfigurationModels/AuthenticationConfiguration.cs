@@ -2,6 +2,6 @@
 
 public class AuthenticationConfiguration
 {
-    public required string TokenServiceUrl { get; init; }
-    public required string Audience { get; init; }
+    public required string TokenServiceUrl { get; set; }
+    public required string Audience { get; set; }
 }

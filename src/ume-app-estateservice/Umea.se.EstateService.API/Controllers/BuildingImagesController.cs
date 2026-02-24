@@ -3,8 +3,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
 using Swashbuckle.AspNetCore.Annotations;
-using Umea.se.EstateService.Logic.Interfaces;
-using Umea.se.EstateService.Shared.Models;
+using Umea.se.EstateService.API.Responses;
+using Umea.se.EstateService.Logic.Handlers.Images;
+using Umea.se.EstateService.Logic.Models;
 using Umea.se.Toolkit.Images;
 
 namespace Umea.se.EstateService.API.Controllers;
@@ -52,14 +53,20 @@ public class BuildingImagesController(IBuildingImageService buildingImageService
             return BadRequest("Building id must be positive.");
         }
 
-        BuildingImagesResponse? response = await buildingImageService.GetImageMetadataAsync(buildingId, cancellationToken);
+        BuildingImageMetadata? metadata = await buildingImageService.GetImageMetadataAsync(buildingId, cancellationToken);
 
-        if (response is null)
+        if (metadata is null)
         {
             return NotFound(new { message = "No images found for this building" });
         }
 
-        return Ok(response);
+        return Ok(new BuildingImagesResponse
+        {
+            BuildingId = metadata.BuildingId,
+            PrimaryImageId = metadata.PrimaryImageId,
+            ImageIds = metadata.ImageIds,
+            TotalCount = metadata.ImageIds.Count
+        });
     }
 
     /// <summary>

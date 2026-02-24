@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
-using Umea.se.EstateService.Logic.Interfaces;
+using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Shared.Models;
 
 namespace Umea.se.EstateService.API.Controllers;

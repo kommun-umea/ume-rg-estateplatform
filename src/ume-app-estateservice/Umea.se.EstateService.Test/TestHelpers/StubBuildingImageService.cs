@@ -1,5 +1,5 @@
-using Umea.se.EstateService.Logic.Interfaces;
-using Umea.se.EstateService.Shared.Models;
+using Umea.se.EstateService.Logic.Handlers.Images;
+using Umea.se.EstateService.Logic.Models;
 using Umea.se.Toolkit.Images;
 
 namespace Umea.se.EstateService.Test.TestHelpers;
@@ -20,7 +20,7 @@ public sealed class StubBuildingImageService : IBuildingImageService
     /// The result to return from <see cref="GetImageMetadataAsync"/>.
     /// Set to null to simulate no images found.
     /// </summary>
-    public BuildingImagesResponse? MetadataResult { get; set; }
+    public BuildingImageMetadata? MetadataResult { get; set; }
 
     /// <summary>
     /// Captured building IDs from <see cref="GetImageResultAsync"/> calls.
@@ -48,7 +48,7 @@ public sealed class StubBuildingImageService : IBuildingImageService
         return Task.FromResult(ImageResult);
     }
 
-    public Task<BuildingImagesResponse?> GetImageMetadataAsync(
+    public Task<BuildingImageMetadata?> GetImageMetadataAsync(
         int buildingId,
         CancellationToken cancellationToken = default)
     {

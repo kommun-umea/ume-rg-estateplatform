@@ -1,5 +1,6 @@
 using Umea.se.EstateService.Logic.Search;
 using Umea.se.EstateService.Shared.Search;
+using Umea.se.EstateService.Shared.ValueObjects;
 
 namespace Umea.se.EstateService.Test.Search;
 
@@ -18,7 +19,7 @@ public class InMemorySearchServiceGeoTests
             PopularName = "Main Library",
             RankScore = 1,
             UpdatedAt = now,
-            GeoLocation = new GeoPoint { Lat = 63.8258, Lng = 20.2630 },
+            GeoLocation = new GeoPointModel { Lat = 63.8258, Lon = 20.2630 },
             Ancestors = []
         };
 
@@ -30,7 +31,7 @@ public class InMemorySearchServiceGeoTests
             PopularName = "Annex",
             RankScore = 1,
             UpdatedAt = now,
-            GeoLocation = new GeoPoint { Lat = 63.9000, Lng = 20.5000 },
+            GeoLocation = new GeoPointModel { Lat = 63.9000, Lon = 20.5000 },
             Ancestors = []
         };
 
@@ -39,7 +40,7 @@ public class InMemorySearchServiceGeoTests
         QueryOptions options = new(
             MaxResults: 10,
             GeoFilter: new GeoRadiusFilter(
-                new GeoCoordinate(withinRadius.GeoLocation!.Lat, withinRadius.GeoLocation!.Lng),
+                new GeoCoordinate(withinRadius.GeoLocation!.Lat, withinRadius.GeoLocation!.Lon),
                 500));
 
         List<SearchResult> results = [.. service.Search("Library", options)];
@@ -61,7 +62,7 @@ public class InMemorySearchServiceGeoTests
             PopularName = "Campus Estate",
             RankScore = 1,
             UpdatedAt = now,
-            GeoLocation = new GeoPoint { Lat = 63.8258, Lng = 20.2630 },
+            GeoLocation = new GeoPointModel { Lat = 63.8258, Lon = 20.2630 },
             Ancestors = []
         };
 
@@ -85,7 +86,7 @@ public class InMemorySearchServiceGeoTests
             PopularName = "Remote",
             RankScore = 1,
             UpdatedAt = now,
-            GeoLocation = new GeoPoint { Lat = 63.9000, Lng = 20.5000 },
+            GeoLocation = new GeoPointModel { Lat = 63.9000, Lon = 20.5000 },
             Ancestors = []
         };
 
@@ -94,7 +95,7 @@ public class InMemorySearchServiceGeoTests
         QueryOptions options = new(
             MaxResults: 10,
             GeoFilter: new GeoRadiusFilter(
-                new GeoCoordinate(withGeo.GeoLocation!.Lat, withGeo.GeoLocation!.Lng),
+                new GeoCoordinate(withGeo.GeoLocation!.Lat, withGeo.GeoLocation!.Lon),
                 1_000));
 
         List<SearchResult> results = [.. service.Search(string.Empty, options)];
@@ -117,7 +118,7 @@ public class InMemorySearchServiceGeoTests
             PopularName = "Central Estate",
             RankScore = 1,
             UpdatedAt = now,
-            GeoLocation = new GeoPoint { Lat = 63.8258, Lng = 20.2630 },
+            GeoLocation = new GeoPointModel { Lat = 63.8258, Lon = 20.2630 },
             Ancestors = []
         };
 
@@ -129,7 +130,7 @@ public class InMemorySearchServiceGeoTests
             PopularName = "Far Away",
             RankScore = 1,
             UpdatedAt = now,
-            GeoLocation = new GeoPoint { Lat = 64.1000, Lng = 20.7000 },
+            GeoLocation = new GeoPointModel { Lat = 64.1000, Lon = 20.7000 },
             Ancestors = []
         };
 

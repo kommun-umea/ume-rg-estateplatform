@@ -1,8 +1,8 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
-using Umea.se.EstateService.API.Controllers.Requests;
-using Umea.se.EstateService.API.Controllers.Responses;
+using Umea.se.EstateService.API.Requests;
+using Umea.se.EstateService.API.Responses;
 using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Logic.Search;
 using Umea.se.EstateService.Shared.Autocomplete;
@@ -58,7 +58,6 @@ public class SearchController(SearchHandler searchHandler) : ControllerBase
             .ConfigureAwait(false);
 
         List<PythagorasDocument> documents = [.. results.Select(result => result.Item)];
-        SetImageUrls(documents);
 
         return Ok(documents);
     }
@@ -99,15 +98,13 @@ public class SearchController(SearchHandler searchHandler) : ControllerBase
             req.GeoFilter,
             cancellationToken);
 
-        List<BuildingLocationModel> locations = results
+        List<BuildingLocationModel> locations = [.. results
+           .Where(result => result.Item.GeoLocation is not null)
            .Select(result => new BuildingLocationModel
            {
                Id = result.Item.Id,
-               GeoLocation = result.Item.GeoLocation is { } geo
-                   ? new GeoPointModel(geo.Lat, geo.Lng)
-                   : null
-           })
-           .ToList();
+               GeoLocation = result.Item.GeoLocation
+           })];
 
         return Ok(locations);
     }
@@ -159,7 +156,6 @@ public class SearchController(SearchHandler searchHandler) : ControllerBase
             .ConfigureAwait(false);
 
         List<PythagorasDocument> documents = [.. results.Select(result => result.Item)];
-        SetImageUrls(documents);
 
         return Ok(new SearchDebugResponse
         {
@@ -168,15 +164,4 @@ public class SearchController(SearchHandler searchHandler) : ControllerBase
         });
     }
 #endif
-
-    private static void SetImageUrls(IEnumerable<PythagorasDocument> documents)
-    {
-        foreach (PythagorasDocument doc in documents)
-        {
-            if (doc.Type == NodeType.Building)
-            {
-                doc.ImageUrl = $"{ApiRoutes.Buildings}/{doc.Id}/image";
-            }
-        }
-    }
 }

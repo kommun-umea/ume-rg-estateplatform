@@ -55,6 +55,10 @@ func getKeyVaultAccessPolicy(objectId string, permissions object) object => {
   permissions: permissions
 }
 
+var databasePurposes = {
+  estateservice: 'estateservice'
+}
+
 // ------------ Resources ------------
 targetScope = 'subscription'
 
@@ -159,6 +163,26 @@ module defaultRoleAssignments 'br/ume:umea.roleassignments.turkos.defaults:v2.0'
   }
 }
 
+// SQL Server
+module sqlServer 'br/ume:microsoft.sql.servers:v2.1' = {
+  scope: resourceGroup
+  name: 'sqlServer'
+  params: {
+    environment: environment
+    companyPrefix: companyPrefix
+    purpose: purpose
+
+    databases: [
+      {
+        purpose: databasePurposes.estateservice
+        users: [
+          app_estateservice.outputs.name
+        ]
+      }
+    ]
+  }
+}
+
 // Library variables
 module libraryVariables 'library-variable-group.bicep' = {
   scope: resourceGroup
@@ -170,8 +194,19 @@ module libraryVariables 'library-variable-group.bicep' = {
 
     generalPurpose: 'general'
 
+    sqlServerName: sqlServer.outputs.name
+    estateserviceSqldbName: sqlServer.outputs.databases.estateservice.name
+
     personalAccessToken: personalAccessToken
     organization: organization
     project: project
   }
+}
+
+// ------------ Outputs ------------
+output sqlConfiguration object = {
+  serverName: sqlServer.outputs.name
+  serverPrincipalId: sqlServer.outputs.principalId
+  serverFullyQualifiedDomainName: sqlServer.outputs.fullyQualifiedDomainName
+  databases: sqlServer.outputs.databases
 }

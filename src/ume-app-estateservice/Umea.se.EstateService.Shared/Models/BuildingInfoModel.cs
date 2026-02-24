@@ -1,4 +1,4 @@
-using Umea.se.EstateService.Shared.Interfaces;
+using Umea.se.EstateService.Shared.Data;
 using Umea.se.EstateService.Shared.ValueObjects;
 
 namespace Umea.se.EstateService.Shared.Models;

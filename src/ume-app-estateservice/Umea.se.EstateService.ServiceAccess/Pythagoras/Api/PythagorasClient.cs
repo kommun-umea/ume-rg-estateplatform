@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Api.Request;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
 using Umea.se.Toolkit.ExternalService;
@@ -176,7 +177,7 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : Ext
         }
 
         string endpoint = "rest/v1/building/info/uilistdata";
-        string queryString = BuildUiListDataQuery(request.NavigationId, request.IncludePropertyValues, request.PropertyIds, request.BuildingIds, "buildingIds[]");
+        string queryString = BuildUiListDataQuery(request.NavigationId, request.IncludePropertyValues, request.IncludeNavigationInfo, request.PropertyIds, request.BuildingIds, "buildingIds[]");
         return await PostAsync<UiListDataResponse<BuildingInfo>>(endpoint, queryString, cancellationToken).ConfigureAwait(false);
     }
 
@@ -209,12 +210,12 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : Ext
         }
 
         string endpoint = "rest/v1/navigationfolder/info/uilistdata";
-        string queryString = BuildUiListDataQuery(
+        string queryString = BuildNavigationFolderUiListDataQuery(
             request.NavigationId,
             request.IncludePropertyValues,
+            request.IncludeAscendantBuildings,
             request.PropertyIds,
-            request.NavigationFolderIds,
-            "navigationFolderIds[]");
+            request.NavigationFolderIds);
         return await PostAsync<UiListDataResponse<NavigationFolder>>(endpoint, queryString, cancellationToken).ConfigureAwait(false);
     }
 
@@ -318,6 +319,7 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : Ext
     private static string BuildUiListDataQuery(
         int? navigationId,
         bool includePropertyValues,
+        bool includeNavigationInfo,
         IReadOnlyCollection<int>? propertyIds,
         IReadOnlyCollection<int>? entityIds,
         string entityIdParameterName)
@@ -330,6 +332,11 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : Ext
         }
 
         parts.Add(FormQueryParameter("includePropertyValues", includePropertyValues ? "true" : "false"));
+
+        if (includeNavigationInfo)
+        {
+            parts.Add(FormQueryParameter("includeNavigationInfo", "true"));
+        }
 
         if (propertyIds is { Count: > 0 })
         {
@@ -344,6 +351,42 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : Ext
             foreach (int entityId in entityIds)
             {
                 parts.Add(FormQueryParameter(entityIdParameterName, entityId.ToString(CultureInfo.InvariantCulture)));
+            }
+        }
+
+        return string.Join('&', parts);
+    }
+
+    private static string BuildNavigationFolderUiListDataQuery(
+        int? navigationId,
+        bool includePropertyValues,
+        bool includeAscendantBuildings,
+        IReadOnlyCollection<int>? propertyIds,
+        IReadOnlyCollection<int>? navigationFolderIds)
+    {
+        List<string> parts = [];
+
+        if (navigationId is int value)
+        {
+            parts.Add(FormQueryParameter("navigationId", value.ToString(CultureInfo.InvariantCulture)));
+        }
+
+        parts.Add(FormQueryParameter("includePropertyValues", includePropertyValues ? "true" : "false"));
+        parts.Add(FormQueryParameter("includeAscendantBuildings", includeAscendantBuildings ? "true" : "false"));
+
+        if (propertyIds is { Count: > 0 })
+        {
+            foreach (int propertyId in propertyIds)
+            {
+                parts.Add(FormQueryParameter("propertyIds[]", propertyId.ToString(CultureInfo.InvariantCulture)));
+            }
+        }
+
+        if (navigationFolderIds is { Count: > 0 })
+        {
+            foreach (int folderId in navigationFolderIds)
+            {
+                parts.Add(FormQueryParameter("navigationFolderIds[]", folderId.ToString(CultureInfo.InvariantCulture)));
             }
         }
 

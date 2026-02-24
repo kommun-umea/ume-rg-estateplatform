@@ -13,7 +13,7 @@ public sealed class BuildingExtendedPropertiesModel
 
 public sealed class BuildingNoticeBoardModel
 {
-    public string? Text { get; init; }
+    public required string Text { get; init; }
     public DateTime? StartDate { get; init; }
     public DateTime? EndDate { get; init; }
 }

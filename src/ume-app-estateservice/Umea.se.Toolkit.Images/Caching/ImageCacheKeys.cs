@@ -11,7 +11,8 @@ public static class ImageCacheKeys
     /// Path for cached gzipped SVG (used for floor blueprints).
     /// Example: cache/estateservice/floors/123/blueprint.svg.gz
     /// </summary>
-    public static string Svg(string imageId) => BlobPathBuilder.ForImage(imageId, "svg");
+    public static string Svg(string imageId, string? suffix = null)
+        => BlobPathBuilder.ForImage(imageId, suffix is null ? "svg" : $"svg_{suffix}");
 
     /// <summary>
     /// Path for normalized original (max 2560px, high-quality WebP).

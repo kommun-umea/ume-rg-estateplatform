@@ -19,6 +19,7 @@ public sealed class ImageService(IFusionCache cache, ImageServiceOptions options
     private readonly ImageServiceOptions _options = options;
     private readonly ILogger<ImageService> _logger = logger;
     private readonly FusionCacheEntryOptions _cacheOptions = CreateCacheOptions(options);
+    private readonly FusionCacheEntryOptions _svgCacheOptions = CreateSvgCacheOptions(options);
 
     /// <summary>
     /// Get cached raster image with optional resizing. Converts to WebP format.
@@ -33,9 +34,9 @@ public sealed class ImageService(IFusionCache cache, ImageServiceOptions options
     /// <summary>
     /// Get cached SVG with GZip compression. Use when you know the content is SVG.
     /// </summary>
-    public async Task<ImageResult> GetSvgResultAsync(string imageId, Func<CancellationToken, Task<byte[]>> fetchOriginal, CancellationToken ct = default)
+    public async Task<ImageResult> GetSvgResultAsync(string imageId, Func<CancellationToken, Task<byte[]>> fetchOriginal, string? svgSuffix = null, CancellationToken ct = default)
     {
-        string svgKey = ImageCacheKeys.Svg(PrefixKey(imageId));
+        string svgKey = ImageCacheKeys.Svg(PrefixKey(imageId), svgSuffix);
 
         // Don't pass request cancellation token - let factory complete to populate cache
         // even if client disconnects. FusionCache timeouts protect against runaway operations.
@@ -50,7 +51,7 @@ public sealed class ImageService(IFusionCache cache, ImageServiceOptions options
                 ctx.Options.SetSize(result.Data.Length); // Adaptive caching: set actual size
                 return result;
             },
-            _cacheOptions,
+            _svgCacheOptions,
             CancellationToken.None);
 
         return entry.ToImageResult();
@@ -124,6 +125,21 @@ public sealed class ImageService(IFusionCache cache, ImageServiceOptions options
         FailSafeThrottleDuration = TimeSpan.FromSeconds(30),
         FactorySoftTimeout = TimeSpan.FromSeconds(10),  // Allow time for image fetch + processing
         FactoryHardTimeout = TimeSpan.FromSeconds(30),  // Hard limit for slow networks
+        EagerRefreshThreshold = 0.9f,
+    };
+
+    private static FusionCacheEntryOptions CreateSvgCacheOptions(ImageServiceOptions options) => new()
+    {
+        Duration = options.MemoryCacheLifetime,
+        DistributedCacheDuration = options.BlobCacheLifetime,
+        Size = 200 * 1024,
+        Priority = CacheItemPriority.High,
+        IsFailSafeEnabled = true,
+        FailSafeMaxDuration = TimeSpan.FromDays(365),
+        FailSafeThrottleDuration = TimeSpan.FromSeconds(30),
+        FactorySoftTimeout = TimeSpan.FromSeconds(30),   // SVG rendering is slower than image fetches
+        FactoryHardTimeout = TimeSpan.FromSeconds(90),   // Pythagoras can be slow for complex blueprints
+        AllowTimedOutFactoryBackgroundCompletion = true,  // Let factory finish in background so next request hits cache
         EagerRefreshThreshold = 0.9f,
     };
 

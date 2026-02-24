@@ -10,7 +10,7 @@ resources:
     - repository: templates
       type: git
       name: Turkos/ume-pipeline-templates
-      ref: refs/tags/release/v251202T0847-15470
+      ref: refs/tags/release/v260213T1327-15561
 
 parameters:
   - name: environment
@@ -21,6 +21,11 @@ parameters:
       - dev
       - test
       - prod
+
+  - name: updateEstateServiceDatabaseJobPicker
+    displayName: Update ume-sqldb-estateservice
+    type: boolean
+    default: false
 
   - name: buildAndDeployEstateServiceJobPicker
     displayName: Deploy ume-app-estateservice
@@ -34,6 +39,8 @@ variables:
 
   - name: isAutomatedDeployment
     value: $[ eq(variables['Build.RequestedFor'], 'Project Collection Build Service (umeakommun)') ]
+
+  - group: ume-rg-estateplatform-${{ parameters.environment }}
 
 stages:
   - stage: ValidateRequestStage
@@ -56,12 +63,47 @@ stages:
       - template: pipelines/general/template-check-for-changes.yml@templates
         parameters:
           paths:
+            - src/ume-app-estateservice/Umea.se.EstateService.DataStore/Migrations
             - src/ume-app-estateservice
+
+  # ume-sqldb-estateservice
+  - stage: UpdateEstateServiceDatabaseStage
+    displayName: Update EstateService Database
+    dependsOn: CheckForChangesStage
+    variables:
+      changedPaths: $[ dependencies.CheckForChangesStage.outputs['Job.Task.CHANGED_PATHS'] ]
+      ESTATE_DB_CONNECTION: $(estateservice-database-connection-string)
+    condition: >-
+      and(
+        not(or(failed(), canceled())),
+        or(
+          eq(${{ parameters.updateEstateServiceDatabaseJobPicker }}, true),
+          and(
+            contains(variables['changedPaths'], 'Umea.se.EstateService.DataStore/Migrations'),
+            or(
+              eq(variables['Build.Reason'], 'IndividualCI'),
+              eq(variables['isAutomatedDeployment'], true)
+            )
+          )
+        )
+      )
+    jobs:
+      - template: pipelines/azure/template-update-database.yml@templates
+        parameters:
+          environment: ${{ parameters.environment }}
+          azureSubscription: $(serviceConnection)
+          projectFolderName: ume-app-estateservice
+          startupProjectName: Umea.se.EstateService.API
+          databaseProjectName: Umea.se.EstateService.DataStore
+          dotnetVersion: 10.0.x
+  # ------
 
   # EstateService
   - stage: BuildEstateServiceStage
     displayName: Build EstateService
-    dependsOn: CheckForChangesStage
+    dependsOn:
+      - CheckForChangesStage
+      - UpdateEstateServiceDatabaseStage
     variables:
       changedPaths: $[ dependencies.CheckForChangesStage.outputs['Job.Task.CHANGED_PATHS'] ]
     condition: |
@@ -88,6 +130,14 @@ stages:
   - stage: DeployEstateServiceStage
     displayName: Deploy EstateService
     dependsOn: BuildEstateServiceStage
+    condition: >-
+      and(
+        succeeded('BuildEstateServiceStage'),
+        or(
+          eq(dependencies.UpdateEstateServiceDatabaseStage.result, 'Succeeded'),
+          eq(dependencies.UpdateEstateServiceDatabaseStage.result, 'Skipped')
+        )
+      )
     jobs:
       - template: pipelines/azure/template-deploy-backend.yml@templates
         parameters:

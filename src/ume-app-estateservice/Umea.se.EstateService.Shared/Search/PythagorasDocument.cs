@@ -19,12 +19,12 @@ public sealed class PythagorasDocument
     public List<Ancestor> Ancestors { get; set; } = [];
     public string? Path => string.Join(" > ", Ancestors.Select(a => a.Name + " " + a.PopularName).Append(Name + " " + PopularName));
     [JsonPropertyName("_geo")]
-    public GeoPoint? LegacyGeo
+    public GeoPointModel? LegacyGeo
     {
         get => GeoLocation;
         set => GeoLocation = value;
     }
-    public GeoPoint? GeoLocation { get; set; }
+    public GeoPointModel? GeoLocation { get; set; }
     public string? ImageUrl { get; set; }
     [JsonIgnore]
     public double RankScore { get; set; }

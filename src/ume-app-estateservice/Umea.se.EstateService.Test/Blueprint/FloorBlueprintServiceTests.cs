@@ -1,13 +1,16 @@
+using System.Collections.Immutable;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
-using Umea.se.EstateService.Logic.Exceptions;
+using Umea.se.EstateService.Logic.Data;
 using Umea.se.EstateService.Logic.Handlers;
+using Umea.se.EstateService.Logic.Handlers.Blueprint;
 using Umea.se.EstateService.Logic.Models;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
+using Umea.se.EstateService.Shared.Data;
+using Umea.se.EstateService.Shared.Data.Entities;
 using Umea.se.EstateService.Test.TestHelpers;
 using Umea.se.Toolkit.Images;
 using ZiggyCreatures.Caching.Fusion;
@@ -21,6 +24,23 @@ public class FloorBlueprintServiceTests
         ImageServiceOptions options = new() { CacheKeyPrefix = "test" };
         FusionCache cache = new(new FusionCacheOptions());
         return new ImageService(cache, options, NullLogger<ImageService>.Instance);
+    }
+
+    private static EstateDataQueryHandler CreateHandler(params RoomEntity[] rooms)
+    {
+        InMemoryDataStore dataStore = new();
+        if (rooms.Length > 0)
+        {
+            dataStore.SetSnapshot(new DataSnapshot(
+                estates: [],
+                buildings: [],
+                floors: [],
+                rooms: [.. rooms],
+                buildingAscendants: ImmutableDictionary<int, BuildingAscendantTriplet>.Empty,
+                refreshUtc: DateTimeOffset.UtcNow));
+        }
+
+        return new EstateDataQueryHandler(dataStore);
     }
 
     private static async Task<string> ReadContentAsync(FloorBlueprint blueprint)
@@ -59,7 +79,7 @@ public class FloorBlueprintServiceTests
             }
         };
 
-        PythagorasHandler handler = new(client);
+        EstateDataQueryHandler handler = CreateHandler();
         FloorBlueprintHandler fbHandler = new(client, handler, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
 
         FloorBlueprint result = await fbHandler.GetBlueprintAsync(42, BlueprintFormat.Pdf, includeWorkspaceTexts: false);
@@ -80,7 +100,7 @@ public class FloorBlueprintServiceTests
             OnGetFloorBlueprintAsync = (_, _, _, _) => throw new HttpRequestException("fail")
         };
 
-        PythagorasHandler handler = new(client);
+        EstateDataQueryHandler handler = CreateHandler();
         FloorBlueprintHandler fbHandler = new(client, handler, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
 
         await Should.ThrowAsync<FloorBlueprintUnavailableException>(() =>
@@ -105,7 +125,7 @@ public class FloorBlueprintServiceTests
             }
         };
 
-        PythagorasHandler handler = new(client);
+        EstateDataQueryHandler handler = CreateHandler();
         FloorBlueprintHandler fbHandler = new(client, handler, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
 
         FloorBlueprint result = await fbHandler.GetBlueprintAsync(11, BlueprintFormat.Svg, includeWorkspaceTexts: false);
@@ -136,7 +156,7 @@ public class FloorBlueprintServiceTests
             }
         };
 
-        PythagorasHandler handler = new(client);
+        EstateDataQueryHandler handler = CreateHandler();
         FloorBlueprintHandler fbHandler = new(client, handler, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
 
         FloorBlueprint result = await fbHandler.GetBlueprintAsync(11, BlueprintFormat.Pdf, includeWorkspaceTexts: false);
@@ -150,7 +170,7 @@ public class FloorBlueprintServiceTests
     public async Task GetBlueprintAsync_WithInvalidFloorId_ThrowsValidationException()
     {
         FakePythagorasClient client = new();
-        PythagorasHandler handler = new(client);
+        EstateDataQueryHandler handler = CreateHandler();
         FloorBlueprintHandler fbHandler = new(client, handler, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
 
         await Should.ThrowAsync<FloorBlueprintValidationException>(() =>
@@ -178,11 +198,10 @@ public class FloorBlueprintServiceTests
             }
         };
 
-        client.SetGetAsyncResult(
-            new Workspace { Id = 5, Name = "Alpha", PopularName = "Popular Alpha" },
-            new Workspace { Id = 6, Name = "Beta" });
+        EstateDataQueryHandler handler = CreateHandler(
+            new RoomEntity { Id = 5, Name = "Alpha", PopularName = "Popular Alpha", BuildingId = 1, FloorId = 99 },
+            new RoomEntity { Id = 6, Name = "Beta", BuildingId = 1, FloorId = 99 });
 
-        PythagorasHandler handler = new(client);
         FloorBlueprintHandler fbHandler = new(client, handler, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
 
         FloorBlueprint result = await fbHandler.GetBlueprintAsync(99, BlueprintFormat.Pdf, includeWorkspaceTexts: true);
@@ -193,12 +212,6 @@ public class FloorBlueprintServiceTests
         capturedTexts.ShouldContainKey(6);
         capturedTexts[5].ShouldBe(["Popular Alpha"]);
         capturedTexts[6].ShouldBe(["Beta"]);
-
-        string? lastQuery = client.LastQueryString;
-        lastQuery.ShouldNotBeNull();
-        string decodedQuery = Uri.UnescapeDataString(lastQuery);
-        decodedQuery.ShouldContain("floorId");
-        decodedQuery.ShouldContain("99");
     }
 
     [Fact]
@@ -236,7 +249,7 @@ public class FloorBlueprintServiceTests
             }
         };
 
-        PythagorasHandler handler = new(client);
+        EstateDataQueryHandler handler = CreateHandler();
         FloorBlueprintHandler fbHandler = new(client, handler, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
 
         FloorBlueprint result = await fbHandler.GetBlueprintAsync(5, BlueprintFormat.Svg, includeWorkspaceTexts: false);
@@ -280,7 +293,7 @@ public class FloorBlueprintServiceTests
             }
         };
 
-        PythagorasHandler handler = new(client);
+        EstateDataQueryHandler handler = CreateHandler();
         FloorBlueprintHandler fbHandler = new(client, handler, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
 
         FloorBlueprint result = await fbHandler.GetBlueprintAsync(7, BlueprintFormat.Svg, includeWorkspaceTexts: false);
