@@ -3,7 +3,9 @@ using Umea.se.EstateService.Logic.Data;
 using Umea.se.EstateService.Logic.Data.Pythagoras;
 using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Logic.Handlers.Blueprint;
+using Umea.se.EstateService.Logic.Handlers.Favorite;
 using Umea.se.EstateService.Logic.Handlers.Images;
+using Umea.se.EstateService.Logic.Handlers.WorkOrder;
 using Umea.se.EstateService.Logic.HostedServices;
 using Umea.se.EstateService.Logic.Search.Providers;
 using Umea.se.EstateService.Shared.Data;
@@ -25,12 +27,20 @@ public static class DependencyInjectionLogic
 
         services.AddSingleton<IFloorBlueprintService, FloorBlueprintHandler>();
         services.AddScoped<IBuildingImageService, BuildingImageService>();
-        services.AddSingleton<BuildingImageIdCache>();
+        services.AddSingleton<BuildingBackgroundCache>();
 
         services.AddTransient<IFileDocumentHandler, FileDocumentHandler>();
 
+        services.AddSingleton<WorkOrderChannel>();
+        services.AddScoped<IWorkOrderStatusSyncService, WorkOrderStatusSyncService>();
+        services.AddScoped<IWorkOrderProcessor, WorkOrderProcessor>();
+        services.AddSingleton<IWorkOrderFileValidator, WorkOrderFileValidator>();
+        services.AddScoped<IWorkOrderHandler, WorkOrderHandler>();
+        services.AddScoped<IFavoriteHandler, FavoriteHandler>();
+
         services.AddSingleton<DataSyncService>();
         services.AddHostedService(sp => sp.GetRequiredService<DataSyncService>());
+        services.AddHostedService<WorkOrderProcessingService>();
 
         return services;
     }

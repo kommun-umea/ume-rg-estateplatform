@@ -4,121 +4,37 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
-using Umea.se.EstateService.DataStore.Entities;
+using Umea.se.EstateService.DataStore.EfCore;
 using Umea.se.EstateService.Shared.Data;
 using Umea.se.EstateService.Shared.Data.Entities;
-using Umea.se.EstateService.Shared.Models;
-using Umea.se.EstateService.Shared.ValueObjects;
 
 namespace Umea.se.EstateService.DataStore.SqlServer;
 
 /// <summary>
 /// SQL Server persistence implementation for the data store.
-/// Implements IDataStorePersistence to save and load snapshots from SQL Server.
 /// Uses SqlBulkCopy for high-performance bulk inserts.
 /// </summary>
 public sealed class SqlServerPersistence(
     IDbContextFactory<EstateDbContext> dbContextFactory,
-    ILogger<SqlServerPersistence> logger) : IDataStorePersistence
+    ILogger<SqlServerPersistence> logger) : EfCorePersistenceBase(dbContextFactory, logger)
 {
-    private readonly IDbContextFactory<EstateDbContext> _dbContextFactory = dbContextFactory;
-    private readonly ILogger<SqlServerPersistence> _logger = logger;
-
-    public async Task<(DataSnapshot? Snapshot, DateTimeOffset? LastRefresh)> TryLoadAsync(CancellationToken ct = default)
-    {
-        try
-        {
-            _logger.LogInformation("Loading data from SQL Server database...");
-
-            await using EstateDbContext context = await _dbContextFactory.CreateDbContextAsync(ct);
-
-            // Check sync metadata first
-            DataSyncMetadata? metadata = await context.SyncMetadata
-                .AsNoTracking()
-                .OrderBy(m => m.Id)
-                .FirstOrDefaultAsync(ct);
-
-            if (metadata is null)
-            {
-                _logger.LogInformation("No sync metadata found in database");
-                return (null, null);
-            }
-
-            // Check if database has data
-            if (!await context.Estates.AnyAsync(ct))
-            {
-                _logger.LogInformation("Database is empty, no data to load");
-                return (null, null);
-            }
-
-            // Load all entities
-            List<EstateEntity> estates = await context.Estates
-                .AsNoTracking()
-                .ToListAsync(ct);
-
-            List<BuildingEntity> buildings = await context.Buildings
-                .AsNoTracking()
-                .ToListAsync(ct);
-
-            List<FloorEntity> floors = await context.Floors
-                .AsNoTracking()
-                .ToListAsync(ct);
-
-            List<RoomEntity> rooms = await context.Rooms
-                .AsNoTracking()
-                .ToListAsync(ct);
-
-            List<BuildingAscendantDbEntity> ascendantEntities = await context.BuildingAscendants
-                .AsNoTracking()
-                .ToListAsync(ct);
-
-            // Build relationships
-            BuildEntityRelationships(estates, buildings, floors, rooms);
-
-            // Convert ascendants to triplets
-            Dictionary<int, BuildingAscendantTriplet> buildingAscendants = ascendantEntities
-                .ToDictionary(a => a.BuildingId, ToDomainTriplet);
-
-            // Create snapshot
-            DataSnapshot snapshot = new(
-                estates: [.. estates],
-                buildings: [.. buildings],
-                floors: [.. floors],
-                rooms: [.. rooms],
-                buildingAscendants: buildingAscendants,
-                refreshUtc: metadata.LastRefreshUtc
-            );
-
-            _logger.LogInformation(
-                "Loaded from database: {EstateCount} estates, {BuildingCount} buildings, {FloorCount} floors, {RoomCount} rooms",
-                estates.Count, buildings.Count, floors.Count, rooms.Count);
-
-            return (snapshot, metadata.LastRefreshUtc);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to load data from database");
-            return (null, null);
-        }
-    }
-
-    public async Task SaveAsync(DataSnapshot snapshot, DateTimeOffset refreshTime, CancellationToken ct = default)
+    public override async Task SaveAsync(DataSnapshot snapshot, DateTimeOffset refreshTime, CancellationToken ct = default)
     {
         if (!snapshot.IsReady)
         {
             return;
         }
 
-        _logger.LogInformation("Persisting data to SQL Server database...");
+        Logger.LogInformation("Persisting data to SQL Server database...");
 
         // Use a throwaway context to get the execution strategy — the real context is created inside the lambda
-        await using EstateDbContext strategyContext = await _dbContextFactory.CreateDbContextAsync(ct);
+        await using EstateDbContext strategyContext = await DbContextFactory.CreateDbContextAsync(ct);
         IExecutionStrategy strategy = strategyContext.Database.CreateExecutionStrategy();
 
         await strategy.ExecuteAsync(async () =>
         {
             // Fresh context per attempt so state is clean on retries
-            await using EstateDbContext context = await _dbContextFactory.CreateDbContextAsync(ct);
+            await using EstateDbContext context = await DbContextFactory.CreateDbContextAsync(ct);
 
             SqlConnection sqlConnection = (SqlConnection)context.Database.GetDbConnection();
             await sqlConnection.OpenAsync(ct);
@@ -146,7 +62,7 @@ public sealed class SqlServerPersistence(
 
             await transaction.CommitAsync(ct);
 
-            _logger.LogInformation(
+            Logger.LogInformation(
                 "Persisted to database: {EstateCount} estates, {BuildingCount} buildings, {FloorCount} floors, {RoomCount} rooms",
                 snapshot.Estates.Length, snapshot.Buildings.Length, snapshot.Floors.Length, snapshot.Rooms.Length);
         });
@@ -273,6 +189,8 @@ public sealed class SqlServerPersistence(
         table.Columns.Add("OperationCoordinator", typeof(string));
         table.Columns.Add("RentalAdministrator", typeof(string));
         table.Columns.Add("ImageIds", typeof(string));
+        table.Columns.Add("NumDocuments", typeof(int));
+        table.Columns.Add("BackgroundCacheFetchedAtUtc", typeof(DateTimeOffset));
 
         foreach (BuildingEntity b in buildings)
         {
@@ -310,9 +228,11 @@ public sealed class SqlServerPersistence(
                 (object?)b.ContactPersons?.OperationsManager ?? DBNull.Value,
                 (object?)b.ContactPersons?.OperationCoordinator ?? DBNull.Value,
                 (object?)b.ContactPersons?.RentalAdministrator ?? DBNull.Value,
-                b.ImageIds is { Count: > 0 }
+                b.ImageIds is not null
                     ? JsonSerializer.Serialize(b.ImageIds, (JsonSerializerOptions?)null)
-                    : DBNull.Value
+                    : DBNull.Value,
+                (object?)b.NumDocuments ?? DBNull.Value,
+                (object?)b.BackgroundCacheFetchedAtUtc ?? DBNull.Value
             );
         }
 
@@ -437,123 +357,13 @@ public sealed class SqlServerPersistence(
         table.Columns.Add("BuildingCount", typeof(int));
         table.Columns.Add("FloorCount", typeof(int));
         table.Columns.Add("RoomCount", typeof(int));
+        table.Columns.Add("WorkOrderCategoriesJson", typeof(string));
 
         table.Rows.Add(1, refreshTime, snapshot.Estates.Length, snapshot.Buildings.Length,
-            snapshot.Floors.Length, snapshot.Rooms.Length);
+            snapshot.Floors.Length, snapshot.Rooms.Length,
+            SerializeCategories(snapshot.WorkOrderCategories));
 
         return table;
-    }
-
-    #endregion
-
-    #region Entity Relationships
-
-    private static void BuildEntityRelationships(
-        List<EstateEntity> estates,
-        List<BuildingEntity> buildings,
-        List<FloorEntity> floors,
-        List<RoomEntity> rooms)
-    {
-        Dictionary<int, EstateEntity> estatesById = estates.ToDictionary(e => e.Id);
-        Dictionary<int, BuildingEntity> buildingsById = buildings.ToDictionary(b => b.Id);
-        Dictionary<int, FloorEntity> floorsById = floors.ToDictionary(f => f.Id);
-
-        // Link buildings to estates
-        foreach (BuildingEntity building in buildings)
-        {
-            if (building.EstateId > 0 && estatesById.TryGetValue(building.EstateId, out EstateEntity? estate))
-            {
-                estate.Buildings.Add(building);
-            }
-        }
-
-        // Link floors to buildings
-        foreach (FloorEntity floor in floors)
-        {
-            if (floor.BuildingId > 0 && buildingsById.TryGetValue(floor.BuildingId, out BuildingEntity? building))
-            {
-                building.Floors.Add(floor);
-            }
-        }
-
-        // Link rooms to buildings and floors
-        foreach (RoomEntity room in rooms)
-        {
-            if (room.BuildingId > 0 && buildingsById.TryGetValue(room.BuildingId, out BuildingEntity? building))
-            {
-                building.Rooms.Add(room);
-            }
-
-            if (room.FloorId.HasValue && floorsById.TryGetValue(room.FloorId.Value, out FloorEntity? floor))
-            {
-                floor.Rooms.Add(room);
-            }
-        }
-
-        // Update counts
-        foreach (EstateEntity estate in estates)
-        {
-            estate.BuildingCount = estate.Buildings.Count;
-        }
-
-        foreach (BuildingEntity building in buildings)
-        {
-            building.NumFloors = building.Floors.Count;
-            building.NumRooms = building.Rooms.Count;
-        }
-    }
-
-    #endregion
-
-    #region Ascendant Mapping
-
-    private static BuildingAscendantTriplet ToDomainTriplet(BuildingAscendantDbEntity entity)
-    {
-        BuildingAscendantModel? estate = entity.EstateAscendantId.HasValue
-            ? new BuildingAscendantModel
-            {
-                Id = entity.EstateAscendantId.Value,
-                Name = entity.EstateAscendantName ?? string.Empty,
-                PopularName = entity.EstateAscendantPopularName,
-                GeoLocation = entity.EstateAscendantGeoLat.HasValue && entity.EstateAscendantGeoLon.HasValue
-                    ? new GeoPointModel(entity.EstateAscendantGeoLat.Value, entity.EstateAscendantGeoLon.Value)
-                    : null,
-                Type = BuildingAscendantType.Estate
-            }
-            : null;
-
-        BuildingAscendantModel? region = entity.RegionAscendantId.HasValue
-            ? new BuildingAscendantModel
-            {
-                Id = entity.RegionAscendantId.Value,
-                Name = entity.RegionAscendantName ?? string.Empty,
-                PopularName = entity.RegionAscendantPopularName,
-                GeoLocation = entity.RegionAscendantGeoLat.HasValue && entity.RegionAscendantGeoLon.HasValue
-                    ? new GeoPointModel(entity.RegionAscendantGeoLat.Value, entity.RegionAscendantGeoLon.Value)
-                    : null,
-                Type = BuildingAscendantType.Area
-            }
-            : null;
-
-        BuildingAscendantModel? organization = entity.OrganizationAscendantId.HasValue
-            ? new BuildingAscendantModel
-            {
-                Id = entity.OrganizationAscendantId.Value,
-                Name = entity.OrganizationAscendantName ?? string.Empty,
-                PopularName = entity.OrganizationAscendantPopularName,
-                GeoLocation = entity.OrganizationAscendantGeoLat.HasValue && entity.OrganizationAscendantGeoLon.HasValue
-                    ? new GeoPointModel(entity.OrganizationAscendantGeoLat.Value, entity.OrganizationAscendantGeoLon.Value)
-                    : null,
-                Type = BuildingAscendantType.Organization
-            }
-            : null;
-
-        return new BuildingAscendantTriplet
-        {
-            Estate = estate,
-            Region = region,
-            Organization = organization
-        };
     }
 
     #endregion

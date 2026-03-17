@@ -1,6 +1,6 @@
 namespace Umea.se.EstateService.Shared.Data.Entities;
 
-public class FloorEntity : BaseEntity
+public class FloorEntity : NamedEntity
 {
     public double? GrossArea { get; set; }
     public double? NetArea { get; set; }

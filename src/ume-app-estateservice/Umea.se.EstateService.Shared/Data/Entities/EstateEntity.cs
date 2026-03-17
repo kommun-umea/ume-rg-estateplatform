@@ -2,7 +2,7 @@ using Umea.se.EstateService.Shared.ValueObjects;
 
 namespace Umea.se.EstateService.Shared.Data.Entities;
 
-public class EstateEntity : BaseEntity
+public class EstateEntity : NamedEntity
 {
     public decimal GrossArea { get; set; }
     public decimal NetArea { get; set; }

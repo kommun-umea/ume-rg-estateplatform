@@ -45,7 +45,7 @@ public class DataStoreDocumentProvider(IDataStore dataStore) : IPythagorasDocume
         return Task.FromResult<ICollection<PythagorasDocument>>([.. docs.Values]);
     }
 
-    private static PythagorasDocument CreateDocumentFromEstate(EstateEntity estate)
+    internal static PythagorasDocument CreateDocumentFromEstate(EstateEntity estate)
     {
         return new PythagorasDocument
         {
@@ -64,7 +64,7 @@ public class DataStoreDocumentProvider(IDataStore dataStore) : IPythagorasDocume
         };
     }
 
-    private static PythagorasDocument CreateDocumentFromBuilding(BuildingEntity building)
+    internal static PythagorasDocument CreateDocumentFromBuilding(BuildingEntity building)
     {
         return new PythagorasDocument
         {
@@ -76,7 +76,8 @@ public class DataStoreDocumentProvider(IDataStore dataStore) : IPythagorasDocume
             GeoLocation = building.GeoLocation,
             GrossArea = building.GrossArea,
             BusinessType = building.BusinessType,
-            ImageUrl = building.ImageIds is { Count: 0 } ? null : $"/api/buildings/{building.Id}/image",
+            // ImageUrl is not set here — it's patched at response time from live entity data
+            // (kept fresh by write-through from BuildingBackgroundCache).
             RankScore = 2,
             UpdatedAt = building.UpdatedAt,
             Ancestors = [],
@@ -86,7 +87,7 @@ public class DataStoreDocumentProvider(IDataStore dataStore) : IPythagorasDocume
         };
     }
 
-    private static PythagorasDocument CreateDocumentFromRoom(RoomEntity room, BuildingEntity building)
+    internal static PythagorasDocument CreateDocumentFromRoom(RoomEntity room, BuildingEntity building)
     {
         return new PythagorasDocument
         {
@@ -105,7 +106,7 @@ public class DataStoreDocumentProvider(IDataStore dataStore) : IPythagorasDocume
         };
     }
 
-    private static Ancestor CreateAncestorFromDocument(PythagorasDocument doc)
+    internal static Ancestor CreateAncestorFromDocument(PythagorasDocument doc)
     {
         return new Ancestor
         {
@@ -116,7 +117,7 @@ public class DataStoreDocumentProvider(IDataStore dataStore) : IPythagorasDocume
         };
     }
 
-    private static void LinkParent(PythagorasDocument child, PythagorasDocument parent)
+    internal static void LinkParent(PythagorasDocument child, PythagorasDocument parent)
     {
         ArgumentNullException.ThrowIfNull(child);
         ArgumentNullException.ThrowIfNull(parent);

@@ -4,7 +4,7 @@ using Umea.se.EstateService.Shared.ValueObjects;
 
 namespace Umea.se.EstateService.Shared.Search;
 
-public sealed class PythagorasDocument
+public sealed class PythagorasDocument : IFavoriteable
 {
     public readonly record struct DocumentKey(NodeType Type, int Id);
 
@@ -48,6 +48,9 @@ public sealed class PythagorasDocument
     public int? NumRooms { get; set; }
     public BusinessTypeModel? BusinessType { get; set; }
     public IReadOnlyDictionary<string, string>? ExtendedProperties { get; set; }
+    public bool? IsFavorite { get; set; }
+    [JsonIgnore]
+    public NodeType FavoriteNodeType => Type;
     [JsonIgnore]
     public DocumentKey Key => new(Type, Id);
 

@@ -8,7 +8,8 @@ using Umea.se.EstateService.Logic.Data;
 using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Logic.Handlers.Blueprint;
 using Umea.se.EstateService.Logic.Models;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
+using Umea.se.EstateService.Shared.Exceptions;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Enums;
 using Umea.se.EstateService.Shared.Data;
 using Umea.se.EstateService.Shared.Data.Entities;
 using Umea.se.EstateService.Test.TestHelpers;
@@ -103,7 +104,7 @@ public class FloorBlueprintServiceTests
         EstateDataQueryHandler handler = CreateHandler();
         FloorBlueprintHandler fbHandler = new(client, handler, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
 
-        await Should.ThrowAsync<FloorBlueprintUnavailableException>(() =>
+        await Should.ThrowAsync<ExternalServiceUnavailableException>(() =>
             fbHandler.GetBlueprintAsync(5, BlueprintFormat.Svg, includeWorkspaceTexts: false));
     }
 
@@ -173,7 +174,7 @@ public class FloorBlueprintServiceTests
         EstateDataQueryHandler handler = CreateHandler();
         FloorBlueprintHandler fbHandler = new(client, handler, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
 
-        await Should.ThrowAsync<FloorBlueprintValidationException>(() =>
+        await Should.ThrowAsync<BusinessValidationException>(() =>
             fbHandler.GetBlueprintAsync(0, BlueprintFormat.Pdf, includeWorkspaceTexts: false));
     }
 

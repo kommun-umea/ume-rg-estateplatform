@@ -16,7 +16,8 @@ public static class DataStoreSeeder
         IEnumerable<BuildingEntity>? buildings = null,
         IEnumerable<FloorEntity>? floors = null,
         IEnumerable<RoomEntity>? rooms = null,
-        IReadOnlyDictionary<int, BuildingAscendantTriplet>? buildingAscendants = null)
+        IReadOnlyDictionary<int, BuildingAscendantTriplet>? buildingAscendants = null,
+        IEnumerable<WorkOrderCategoryNode>? workOrderCategories = null)
     {
         DateTimeOffset refreshTime = DateTimeOffset.UtcNow;
 
@@ -26,7 +27,8 @@ public static class DataStoreSeeder
             floors: floors is null ? [] : [.. floors],
             rooms: rooms is null ? [] : [.. rooms],
             buildingAscendants: buildingAscendants ?? ImmutableDictionary<int, BuildingAscendantTriplet>.Empty,
-            refreshUtc: refreshTime
+            refreshUtc: refreshTime,
+            workOrderCategories: workOrderCategories is null ? default : [.. workOrderCategories]
         );
 
         dataStore.SetSnapshot(snapshot);

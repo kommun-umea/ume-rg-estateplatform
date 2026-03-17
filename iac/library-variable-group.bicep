@@ -11,10 +11,11 @@ param variableGroupPurpose string
 param tags object = {}
 param dateNowUtc string = utcNow()
 
-param generalPurpose string
-
 param sqlServerName string
 param estateserviceSqldbName string
+
+param openaiEndpoint string
+param applicationInsightsConnectionString string
 
 param personalAccessToken string
 param organization string
@@ -24,7 +25,7 @@ param project string
 var libraryVariables = [
   {
     name: 'application-insights-connection-string'
-    value: applicationInsights_general.properties.ConnectionString
+    value: applicationInsightsConnectionString
   }
   {
     name: 'pythagoras-api-key'
@@ -42,15 +43,13 @@ var libraryVariables = [
     name: 'estateservice-api-key'
     value: ''
   }
+  {
+    name: 'openai-endpoint'
+    value: openaiEndpoint
+  }
 ]
 
 // ------------ Resources ------------
-// Application Insights - General
-resource applicationInsights_general 'Microsoft.Insights/components@2020-02-02' existing = {
-  scope: az.resourceGroup('${companyPrefix}-rg-${generalPurpose}-${environment}')
-  name: '${companyPrefix}-appi-${generalPurpose}-${environment}'
-}
-
 // Deployment Script - Library Variables
 module libraryVariablesDeploymentScript 'br/ume:umea.deploymentscripts.libraryvariables:v2.4' = {
   name: 'libraryVariablesDeploymentScript'

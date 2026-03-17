@@ -1,10 +1,14 @@
+using System.Text.Json.Serialization;
 using Umea.se.EstateService.Shared.Data;
+using Umea.se.EstateService.Shared.Search;
 using Umea.se.EstateService.Shared.ValueObjects;
 
 namespace Umea.se.EstateService.Shared.Models;
 
-public sealed class BuildingInfoModel : ISearchable
+public sealed class BuildingInfoModel : ISearchable, IFavoriteable
 {
+    [JsonIgnore]
+    public NodeType FavoriteNodeType => NodeType.Building;
     public int Id { get; init; }
     public Guid Uid { get; init; }
     public string Name { get; init; } = string.Empty;
@@ -24,5 +28,6 @@ public sealed class BuildingInfoModel : ISearchable
     public BuildingAscendantModel? Organization { get; set; }
     public BuildingExtendedPropertiesModel? ExtendedProperties { get; init; }
     public string? ImageUrl { get; set; }
+    public bool? IsFavorite { get; set; }
     public DateTimeOffset UpdatedAt => DateTime.Now;
 }

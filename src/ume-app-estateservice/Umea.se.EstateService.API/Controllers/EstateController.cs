@@ -1,10 +1,13 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
+using Umea.se.EstateService.API.Extensions;
 using Umea.se.EstateService.API.Requests;
 using Umea.se.EstateService.Logic.Handlers;
-using Umea.se.EstateService.Logic.Models;
+using Umea.se.EstateService.Logic.Handlers.Favorite;
 using Umea.se.EstateService.Shared.Models;
+using Umea.se.Toolkit.UserFromToken;
 using QueryArgs = Umea.se.EstateService.Logic.Models.QueryArgs;
 
 namespace Umea.se.EstateService.API.Controllers;
@@ -13,7 +16,7 @@ namespace Umea.se.EstateService.API.Controllers;
 [Produces("application/json")]
 [Route(ApiRoutes.Estates)]
 [Authorize]
-public class EstateController(IEstateDataQueryHandler pythData) : ControllerBase
+public class EstateController(IEstateDataQueryHandler pythagorasHandler, IFavoriteHandler favoriteHandler, UserToken userToken) : ControllerBase
 {
     /// <summary>
     /// Gets a specific estate.
@@ -35,11 +38,9 @@ public class EstateController(IEstateDataQueryHandler pythData) : ControllerBase
         CancellationToken cancellationToken)
     {
 
-        EstateModel? estate = await pythData.GetEstateByIdAsync(estateId, request.IncludeBuildings, cancellationToken);
-        if (estate is null)
-        {
-            return NotFound();
-        }
+        EstateModel estate = await pythagorasHandler.GetEstateByIdAsync(estateId, request.IncludeBuildings, cancellationToken);
+
+        await favoriteHandler.StampFavoriteAsync(userToken.GetRequiredEmail(), estate, cancellationToken);
 
         return Ok(estate);
     }
@@ -61,12 +62,11 @@ public class EstateController(IEstateDataQueryHandler pythData) : ControllerBase
         [FromQuery] EstateListRequest request,
         CancellationToken cancellationToken)
     {
-        QueryArgs queryArgs = QueryArgs.Create(
-            skip: request.Offset > 0 ? request.Offset : null,
-            take: request.Limit > 0 ? request.Limit : null,
-            searchTerm: request.SearchTerm);
+        QueryArgs queryArgs = request.ToQueryArgs();
 
-        IReadOnlyList<EstateModel> estates = await pythData.GetEstatesWithBuildingsAsync(request.IncludeBuildings, queryArgs, cancellationToken);
+        IReadOnlyList<EstateModel> estates = await pythagorasHandler.GetEstatesWithBuildingsAsync(request.IncludeBuildings, queryArgs, cancellationToken);
+
+        await favoriteHandler.StampFavoritesAsync(userToken.GetRequiredEmail(), estates, cancellationToken);
 
         return Ok(estates);
     }
@@ -87,22 +87,16 @@ public class EstateController(IEstateDataQueryHandler pythData) : ControllerBase
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid estate ID.")]
     [SwaggerResponse(StatusCodes.Status401Unauthorized, "Unauthorized.")]
     public async Task<ActionResult<IReadOnlyList<BuildingInfoModel>>> GetEstateBuildingsAsync(
-        int estateId,
+        [Range(1, int.MaxValue, ErrorMessage = "Estate id must be positive.")] int estateId,
         [FromQuery] PagedQueryRequest request,
         CancellationToken cancellationToken)
     {
-        if (estateId <= 0)
-        {
-            return BadRequest("Estate id must be positive.");
-        }
+        QueryArgs queryArgs = request.ToQueryArgs();
 
-        QueryArgs queryArgs = QueryArgs.Create(
-            skip: request.Offset > 0 ? request.Offset : null,
-            take: request.Limit > 0 ? request.Limit : null,
-            searchTerm: request.SearchTerm);
-
-        IReadOnlyList<BuildingInfoModel> buildings = await pythData
+        IReadOnlyList<BuildingInfoModel> buildings = await pythagorasHandler
             .GetBuildingsAsync(buildingIds: null, estateId: estateId, queryArgs: queryArgs, cancellationToken: cancellationToken);
+
+        await favoriteHandler.StampFavoritesAsync(userToken.GetRequiredEmail(), buildings, cancellationToken);
 
         return Ok(buildings);
     }

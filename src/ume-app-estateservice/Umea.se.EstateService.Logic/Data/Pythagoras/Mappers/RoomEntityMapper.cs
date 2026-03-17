@@ -1,7 +1,7 @@
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Data.Entities;
 
-namespace Umea.se.EstateService.Logic.Data.Mappers;
+namespace Umea.se.EstateService.Logic.Data.Pythagoras.Mappers;
 
 /// <summary>
 /// Maps Workspace DTOs from Pythagoras API to RoomEntity objects.
@@ -35,23 +35,6 @@ public static class RoomEntityMapper
     /// <summary>
     /// Converts a collection of Workspace DTOs to RoomEntity objects.
     /// </summary>
-    /// <param name="dtos">The collection of Workspace DTOs.</param>
-    /// <returns>A list of mapped RoomEntity objects.</returns>
     public static List<RoomEntity> ToEntities(IReadOnlyList<Workspace> dtos)
-    {
-        ArgumentNullException.ThrowIfNull(dtos);
-
-        if (dtos.Count == 0)
-        {
-            return [];
-        }
-
-        List<RoomEntity> entities = new(dtos.Count);
-        foreach (Workspace dto in dtos)
-        {
-            entities.Add(ToEntity(dto));
-        }
-
-        return entities;
-    }
+        => MapperUtilities.ToEntities(dtos, ToEntity);
 }

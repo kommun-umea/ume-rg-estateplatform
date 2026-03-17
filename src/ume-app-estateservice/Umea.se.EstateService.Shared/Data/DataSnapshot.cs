@@ -17,11 +17,13 @@ public sealed class DataSnapshot
     public ImmutableArray<BuildingEntity> Buildings { get; }
     public ImmutableArray<FloorEntity> Floors { get; }
     public ImmutableArray<RoomEntity> Rooms { get; }
+    public ImmutableArray<WorkOrderCategoryNode> WorkOrderCategories { get; }
     public IReadOnlyDictionary<int, BuildingAscendantTriplet> BuildingAscendants { get; }
     public ImmutableDictionary<int, EstateEntity> EstatesById { get; }
     public ImmutableDictionary<int, BuildingEntity> BuildingsById { get; }
     public ImmutableDictionary<int, FloorEntity> FloorsById { get; }
     public ImmutableDictionary<int, RoomEntity> RoomsById { get; }
+    public ImmutableDictionary<int, WorkOrderCategoryNode> WorkOrderCategoriesById { get; }
     public DateTimeOffset? LastRefreshUtc { get; }
     public bool IsReady { get; }
 
@@ -34,11 +36,13 @@ public sealed class DataSnapshot
         Buildings = [];
         Floors = [];
         Rooms = [];
+        WorkOrderCategories = [];
         BuildingAscendants = ImmutableDictionary<int, BuildingAscendantTriplet>.Empty;
         EstatesById = [];
         BuildingsById = [];
         FloorsById = [];
         RoomsById = [];
+        WorkOrderCategoriesById = ImmutableDictionary<int, WorkOrderCategoryNode>.Empty;
         IsReady = false;
         LastRefreshUtc = null;
     }
@@ -54,12 +58,14 @@ public sealed class DataSnapshot
         ImmutableArray<FloorEntity> floors,
         ImmutableArray<RoomEntity> rooms,
         IReadOnlyDictionary<int, BuildingAscendantTriplet> buildingAscendants,
-        DateTimeOffset refreshUtc)
+        DateTimeOffset refreshUtc,
+        ImmutableArray<WorkOrderCategoryNode> workOrderCategories = default)
     {
         Estates = estates;
         Buildings = buildings;
         Floors = floors;
         Rooms = rooms;
+        WorkOrderCategories = workOrderCategories.IsDefault ? [] : workOrderCategories;
         BuildingAscendants = buildingAscendants;
         LastRefreshUtc = refreshUtc;
         IsReady = true;
@@ -70,6 +76,7 @@ public sealed class DataSnapshot
         BuildingsById = buildings.ToImmutableDictionary(b => b.Id);
         FloorsById = floors.ToImmutableDictionary(f => f.Id);
         RoomsById = rooms.ToImmutableDictionary(r => r.Id);
+        WorkOrderCategoriesById = WorkOrderCategories.ToImmutableDictionary(c => c.Id);
 
         // Wire up navigation properties so handlers can traverse the hierarchy.
         // Skip if already populated (e.g. by PythagorasDataRefreshService before snapshot creation).

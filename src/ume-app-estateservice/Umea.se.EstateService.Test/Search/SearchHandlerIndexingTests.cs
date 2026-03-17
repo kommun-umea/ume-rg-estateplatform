@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Umea.se.EstateService.Logic.Handlers;
-using Umea.se.EstateService.Logic.Search.Providers;
 using Umea.se.EstateService.Logic.Search;
+using Umea.se.EstateService.Logic.Search.Providers;
 using Umea.se.EstateService.Shared.Infrastructure;
 using Umea.se.EstateService.Shared.Search;
 

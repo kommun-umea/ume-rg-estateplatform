@@ -1,14 +1,16 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
+using Umea.se.EstateService.API.Extensions;
 using Umea.se.EstateService.API.Requests;
 using Umea.se.EstateService.API.Responses;
 using Umea.se.EstateService.Logic.Handlers;
+using Umea.se.EstateService.Logic.Handlers.Favorite;
 using Umea.se.EstateService.Logic.Search;
 using Umea.se.EstateService.Shared.Autocomplete;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.EstateService.Shared.Search;
-using Umea.se.EstateService.Shared.ValueObjects;
+using Umea.se.Toolkit.UserFromToken;
 
 namespace Umea.se.EstateService.API.Controllers;
 
@@ -16,7 +18,7 @@ namespace Umea.se.EstateService.API.Controllers;
 [Produces("application/json")]
 [Route(ApiRoutes.Search)]
 [Authorize]
-public class SearchController(SearchHandler searchHandler) : ControllerBase
+public class SearchController(SearchHandler searchHandler, IEstateDataQueryHandler estateDataQueryHandler, IFavoriteHandler favoriteHandler, UserToken userToken) : ControllerBase
 {
     /// <summary>
     /// Search for Pythagoras documents (estates, buildings, rooms) by query and types.
@@ -39,25 +41,18 @@ public class SearchController(SearchHandler searchHandler) : ControllerBase
         [FromQuery][SwaggerParameter("Search request parameters.")] SearchRequest req,
         CancellationToken cancellationToken)
     {
-        string? query = req.Query?.Trim();
-
-        SearchFilter filter = new()
-        {
-            Types = req.Type is { Count: > 0 }
-                ? req.Type
-                : [AutocompleteType.Any],
-            BusinessTypeIds = req.BusinessTypeIds ?? []
-        };
-
         IReadOnlyList<SearchResult> results = await searchHandler.SearchAsync(
-            query,
-            filter,
+            req.Query?.Trim(),
+            req.ToSearchFilter(),
             req.Limit ?? 50,
             req.GeoFilter,
             cancellationToken)
             .ConfigureAwait(false);
 
         List<PythagorasDocument> documents = [.. results.Select(result => result.Item)];
+
+        estateDataQueryHandler.StampBuildingImageUrls(documents);
+        await favoriteHandler.StampFavoritesAsync(userToken.GetRequiredEmail(), documents, cancellationToken);
 
         return Ok(documents);
     }
@@ -83,17 +78,9 @@ public class SearchController(SearchHandler searchHandler) : ControllerBase
         [FromQuery][SwaggerParameter("Search request parameters.")] SearchRequest req,
         CancellationToken cancellationToken)
     {
-        string? query = req.Query?.Trim();
-
-        SearchFilter filter = new()
-        {
-            Types = [AutocompleteType.Building], // Geo locations only exist for buildings
-            BusinessTypeIds = req.BusinessTypeIds ?? []
-        };
-
         IReadOnlyList<SearchResult> results = await searchHandler.SearchAsync(
-            query,
-            filter,
+            req.Query?.Trim(),
+            req.ToSearchFilter(typeOverride: [AutocompleteType.Building]),
             limit: 10000,
             req.GeoFilter,
             cancellationToken);
@@ -136,26 +123,18 @@ public class SearchController(SearchHandler searchHandler) : ControllerBase
         [FromQuery][SwaggerParameter("Search request parameters.")] SearchRequest req,
         CancellationToken cancellationToken)
     {
-        string? query = req.Query?.Trim();
-
-        SearchFilter filter = new()
-        {
-            Types = req.Type is { Count: > 0 }
-                ? req.Type
-                : [AutocompleteType.Any],
-            BusinessTypeIds = req.BusinessTypeIds ?? []
-        };
-
         (IReadOnlyList<SearchResult> results, SearchDiagnostics diagnostics) =
             await searchHandler.SearchWithDiagnosticsAsync(
-                query,
-                filter,
+                req.Query?.Trim(),
+                req.ToSearchFilter(),
                 req.Limit ?? 50,
                 req.GeoFilter,
                 cancellationToken)
             .ConfigureAwait(false);
 
         List<PythagorasDocument> documents = [.. results.Select(result => result.Item)];
+
+        estateDataQueryHandler.StampBuildingImageUrls(documents);
 
         return Ok(new SearchDebugResponse
         {
@@ -164,4 +143,5 @@ public class SearchController(SearchHandler searchHandler) : ControllerBase
         });
     }
 #endif
+
 }

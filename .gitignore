@@ -403,3 +403,6 @@ FodyWeavers.xsd
 .idea
 
 src/ume-app-estateservice/Umea.se.EstateService.API/DataStoreCache
+*.db
+*.db-shm
+*.db-wal

@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
-using Umea.se.EstateService.DataStore.Json;
+using Umea.se.EstateService.DataStore.Sqlite;
 using Umea.se.EstateService.DataStore.SqlServer;
 using Umea.se.EstateService.Shared.Data;
-using Umea.se.EstateService.Shared.Infrastructure.ConfigurationModels;
 
 namespace Umea.se.EstateService.DataStore;
 
@@ -14,34 +14,36 @@ public static class DependencyInjectionDataStore
 {
     /// <summary>
     /// Adds the data store persistence implementation to the service collection.
-    /// Uses SQL Server when a connection string is configured, otherwise falls back to JSON file persistence.
+    /// Auto-detects the database provider from the connection string format:
+    /// - SQL Server when the string contains "Server=", "Initial Catalog=", or "Integrated Security="
+    /// - SQLite otherwise (e.g. "Data Source=file.db")
     /// </summary>
-    public static IServiceCollection AddDataStorePersistence(this IServiceCollection services, string? connectionString, DataSyncConfiguration dataSync)
+    public static IServiceCollection AddDataStorePersistence(this IServiceCollection services, string? connectionString)
     {
-        if (!string.IsNullOrWhiteSpace(connectionString))
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException(
+                "A connection string for 'EstateService' is required. " +
+                "Use SQLite (e.g. 'Data Source=estateservice.db') for local development " +
+                "or SQL Server for production.");
+        }
+
+        if (IsSqlServer(connectionString))
         {
             return services.AddSqlServerPersistence(connectionString);
         }
-        else
-        {
-            return services.AddJsonFilePersistence(dataSync.CacheFilePath);
-        }
+
+        return services.AddSqlitePersistence(connectionString);
     }
 
     /// <summary>
-    /// Adds the JSON file persistence implementation to the service collection.
+    /// SQL Server strings contain "Server=" or "Initial Catalog=" or "Integrated Security=".
+    /// SQLite strings are simpler: "Data Source=file.db" or "DataSource=:memory:".
     /// </summary>
-    private static IServiceCollection AddJsonFilePersistence(this IServiceCollection services, string cacheFilePath)
-    {
-        services.Configure<JsonFilePersistenceOptions>(options =>
-        {
-            options.CacheFilePath = cacheFilePath;
-        });
-
-        services.AddSingleton<IDataStorePersistence, JsonFilePersistence>();
-
-        return services;
-    }
+    private static bool IsSqlServer(string connectionString) =>
+        connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase) ||
+        connectionString.Contains("Initial Catalog=", StringComparison.OrdinalIgnoreCase) ||
+        connectionString.Contains("Integrated Security=", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Adds the SQL Server persistence implementation to the service collection.
@@ -67,24 +69,58 @@ public static class DependencyInjectionDataStore
         });
 
         services.AddSingleton<IDataStorePersistence, SqlServerPersistence>();
+        services.AddRepositories();
 
         return services;
     }
 
     /// <summary>
-    /// Ensures the database is created and migrations are applied.
-    /// Should be called during application startup when using SQL Server persistence.
+    /// Adds the SQLite persistence implementation to the service collection.
+    /// </summary>
+    private static IServiceCollection AddSqlitePersistence(this IServiceCollection services, string connectionString)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
+
+        services.AddDbContextFactory<EstateDbContext>(options =>
+        {
+            options.UseSqlite(connectionString);
+            options.ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
+        });
+
+        services.AddSingleton<IDataStorePersistence, SqlitePersistence>();
+        services.AddRepositories();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers repository services. Separated from provider setup so tests can call this
+    /// after configuring their own DbContext without duplicating registrations.
+    /// </summary>
+    public static IServiceCollection AddRepositories(this IServiceCollection services)
+    {
+        services.AddScoped<IWorkOrderRepository, WorkOrderRepository>();
+        services.AddScoped<IFavoriteRepository, FavoriteRepository>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Ensures the database exists and schema is up to date.
+    /// SQLite (both in-memory and file-based) uses EnsureCreatedAsync because
+    /// EF migrations are scaffolded for SQL Server and contain incompatible DDL.
+    /// SQL Server migrations are handled by the deployment pipeline.
     /// </summary>
     public static async Task EnsureDatabaseCreatedAsync(this IServiceProvider services, CancellationToken cancellationToken = default)
     {
-        IDbContextFactory<EstateDbContext>? dbContextFactory = services.GetService<IDbContextFactory<EstateDbContext>>();
-        if (dbContextFactory is null)
-        {
-            // SQL Server persistence is not configured
-            return;
-        }
+        IDbContextFactory<EstateDbContext> dbContextFactory = services.GetRequiredService<IDbContextFactory<EstateDbContext>>();
 
         await using EstateDbContext context = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        await context.Database.MigrateAsync(cancellationToken);
+
+        if (context.Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite")
+        {
+            await context.Database.EnsureCreatedAsync(cancellationToken);
+        }
+        // SQL Server migrations are handled by the deployment pipeline
     }
 }

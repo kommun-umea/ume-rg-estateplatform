@@ -2,10 +2,13 @@ using System.Collections.Immutable;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
+using Umea.se.EstateService.API.Extensions;
 using Umea.se.EstateService.API.Requests;
 using Umea.se.EstateService.Logic.Handlers;
+using Umea.se.EstateService.Logic.Handlers.Favorite;
 using Umea.se.EstateService.Logic.Models;
 using Umea.se.EstateService.Shared.Models;
+using Umea.se.Toolkit.UserFromToken;
 
 namespace Umea.se.EstateService.API.Controllers;
 
@@ -13,7 +16,7 @@ namespace Umea.se.EstateService.API.Controllers;
 [Produces("application/json")]
 [Route(ApiRoutes.Rooms)]
 [Authorize]
-public class RoomController(IEstateDataQueryHandler pythagorasHandler) : ControllerBase
+public class RoomController(IEstateDataQueryHandler pythagorasHandler, IFavoriteHandler favoriteHandler, UserToken userToken) : ControllerBase
 {
     /// <summary>
     /// Retrieves a specific room.
@@ -41,6 +44,8 @@ public class RoomController(IEstateDataQueryHandler pythagorasHandler) : Control
             return NotFound();
         }
 
+        await favoriteHandler.StampFavoriteAsync(userToken.GetRequiredEmail(), room, cancellationToken);
+
         return Ok(room);
     }
 
@@ -63,16 +68,13 @@ public class RoomController(IEstateDataQueryHandler pythagorasHandler) : Control
         ImmutableArray<int> ids = request.GetIdsOrEmpty();
         int[]? roomIds = ids.Length > 0 ? [.. ids] : null;
 
-        QueryArgs? queryArgs = roomIds is null
-            ? QueryArgs.Create(
-                skip: request.Offset > 0 ? request.Offset : null,
-                take: request.Limit > 0 ? request.Limit : null,
-                searchTerm: request.SearchTerm)
-            : null;
+        QueryArgs? queryArgs = roomIds is null ? request.ToQueryArgs() : null;
 
         IReadOnlyList<RoomModel> rooms = await pythagorasHandler
             .GetRoomsAsync(roomIds, request.BuildingId, floorId: null, queryArgs: queryArgs, cancellationToken)
             .ConfigureAwait(false);
+
+        await favoriteHandler.StampFavoritesAsync(userToken.GetRequiredEmail(), rooms, cancellationToken);
 
         return Ok(rooms);
     }

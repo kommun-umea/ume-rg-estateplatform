@@ -21,11 +21,13 @@ public sealed class InMemoryDataStore : IDataStore
     public IEnumerable<BuildingEntity> Buildings => _snapshot.Buildings;
     public IEnumerable<FloorEntity> Floors => _snapshot.Floors;
     public IEnumerable<RoomEntity> Rooms => _snapshot.Rooms;
+    public IEnumerable<WorkOrderCategoryNode> WorkOrderCategories => _snapshot.WorkOrderCategories;
     public IReadOnlyDictionary<int, BuildingAscendantTriplet> BuildingAscendants => _snapshot.BuildingAscendants;
     public IReadOnlyDictionary<int, BuildingEntity> BuildingsById => _snapshot.BuildingsById;
     public IReadOnlyDictionary<int, FloorEntity> FloorsById => _snapshot.FloorsById;
     public IReadOnlyDictionary<int, EstateEntity> EstatesById => _snapshot.EstatesById;
     public IReadOnlyDictionary<int, RoomEntity> RoomsById => _snapshot.RoomsById;
+    public IReadOnlyDictionary<int, WorkOrderCategoryNode> WorkOrderCategoriesById => _snapshot.WorkOrderCategoriesById;
 
     public bool IsReady => _snapshot.IsReady;
     public DateTimeOffset? LastRefreshUtc => _snapshot.LastRefreshUtc;

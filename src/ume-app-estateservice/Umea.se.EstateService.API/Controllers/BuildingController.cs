@@ -1,9 +1,13 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
+using Umea.se.EstateService.API.Extensions;
 using Umea.se.EstateService.API.Requests;
 using Umea.se.EstateService.Logic.Handlers;
+using Umea.se.EstateService.Logic.Handlers.Favorite;
 using Umea.se.EstateService.Shared.Models;
+using Umea.se.Toolkit.UserFromToken;
 using QueryArgs = Umea.se.EstateService.Logic.Models.QueryArgs;
 
 namespace Umea.se.EstateService.API.Controllers;
@@ -12,7 +16,7 @@ namespace Umea.se.EstateService.API.Controllers;
 [Produces("application/json")]
 [Route(ApiRoutes.Buildings)]
 [Authorize]
-public class BuildingController(IEstateDataQueryHandler pythagorasHandler, IFileDocumentHandler fileDocumentHandler) : ControllerBase
+public class BuildingController(IEstateDataQueryHandler pythagorasHandler, IFavoriteHandler favoriteHandler, UserToken userToken) : ControllerBase
 {
     /// <summary>
     /// Gets a list of buildings.
@@ -33,10 +37,7 @@ public class BuildingController(IEstateDataQueryHandler pythagorasHandler, IFile
         [FromQuery] BuildingListRequest request,
         CancellationToken cancellationToken)
     {
-        QueryArgs queryArgs = QueryArgs.Create(
-            skip: request.Offset > 0 ? request.Offset : null,
-            take: request.Limit > 0 ? request.Limit : null,
-            searchTerm: request.SearchTerm);
+        QueryArgs queryArgs = request.ToQueryArgs();
 
         IReadOnlyList<BuildingInfoModel> buildings = await pythagorasHandler
             .GetBuildingsAsync(
@@ -45,6 +46,8 @@ public class BuildingController(IEstateDataQueryHandler pythagorasHandler, IFile
                 queryArgs: queryArgs,
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
+
+        await favoriteHandler.StampFavoritesAsync(userToken.GetRequiredEmail(), buildings, cancellationToken);
 
         return Ok(buildings);
     }
@@ -85,23 +88,17 @@ public class BuildingController(IEstateDataQueryHandler pythagorasHandler, IFile
     [SwaggerResponse(StatusCodes.Status200OK, "List of rooms for the building", typeof(IReadOnlyList<RoomModel>))]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid buildingId")]
     public async Task<ActionResult<IReadOnlyList<RoomModel>>> GetBuildingRoomsAsync(
-        int buildingId,
+        [Range(1, int.MaxValue, ErrorMessage = "Building id must be positive.")] int buildingId,
         [FromQuery] BuildingRoomsRequest request,
         CancellationToken cancellationToken)
     {
-        if (buildingId <= 0)
-        {
-            return BadRequest("Building id must be positive.");
-        }
-
-        QueryArgs queryArgs = QueryArgs.Create(
-            skip: request.Offset > 0 ? request.Offset : null,
-            take: request.Limit > 0 ? request.Limit : null,
-            searchTerm: request.SearchTerm);
+        QueryArgs queryArgs = request.ToQueryArgs();
 
         IReadOnlyList<RoomModel> rooms = await pythagorasHandler
             .GetBuildingWorkspacesAsync(buildingId, request.FloorId, queryArgs, cancellationToken)
             .ConfigureAwait(false);
+
+        await favoriteHandler.StampFavoritesAsync(userToken.GetRequiredEmail(), rooms, cancellationToken);
 
         return Ok(rooms);
     }
@@ -122,19 +119,11 @@ public class BuildingController(IEstateDataQueryHandler pythagorasHandler, IFile
     [SwaggerResponse(StatusCodes.Status200OK, "List of floors. Rooms collection populated only when includeRooms=true", typeof(IReadOnlyList<FloorInfoModel>))]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid buildingId")]
     public async Task<ActionResult<IReadOnlyList<FloorInfoModel>>> GetBuildingFloorsAsync(
-        int buildingId,
+        [Range(1, int.MaxValue, ErrorMessage = "Building id must be positive.")] int buildingId,
         [FromQuery] BuildingFloorsRequest request,
         CancellationToken cancellationToken)
     {
-        if (buildingId <= 0)
-        {
-            return BadRequest("Building id must be positive.");
-        }
-
-        QueryArgs queryArgs = QueryArgs.Create(
-            skip: request.Offset > 0 ? request.Offset : null,
-            take: request.Limit > 0 ? request.Limit : null,
-            searchTerm: request.SearchTerm);
+        QueryArgs queryArgs = request.ToQueryArgs();
 
         IReadOnlyList<FloorInfoModel> floors = await pythagorasHandler
             .GetBuildingFloorsAsync(buildingId, request.IncludeRooms, floorsQueryArgs: queryArgs, roomsQueryArgs: null, cancellationToken)
@@ -159,33 +148,15 @@ public class BuildingController(IEstateDataQueryHandler pythagorasHandler, IFile
     [SwaggerResponse(StatusCodes.Status200OK, "The building", typeof(BuildingInfoModel))]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid buildingId")]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Building not found")]
-    public async Task<ActionResult<BuildingInfoModel>> GetBuildingByIdAsync(int buildingId, CancellationToken cancellationToken = default)
+    public async Task<ActionResult<BuildingInfoModel>> GetBuildingByIdAsync(
+        [Range(1, int.MaxValue, ErrorMessage = "Building id must be positive.")] int buildingId,
+        CancellationToken cancellationToken = default)
     {
-        if (buildingId <= 0)
-        {
-            return BadRequest("Building id must be positive.");
-        }
-
-        BuildingInfoModel? building = await pythagorasHandler
+        BuildingInfoModel building = await pythagorasHandler
             .GetBuildingByIdAsync(buildingId, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
-        if (building is null)
-        {
-            return NotFound();
-        }
-
-        // Enrich with document count for single building requests
-        try
-        {
-            building.NumDocuments = await fileDocumentHandler
-                .GetBuildingDocumentCountAsync(building.Id, cancellationToken)
-                .ConfigureAwait(false);
-        }
-        catch (HttpRequestException)
-        {
-            building.NumDocuments = 0;
-        }
+        await favoriteHandler.StampFavoriteAsync(userToken.GetRequiredEmail(), building, cancellationToken);
 
         return Ok(building);
     }

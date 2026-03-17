@@ -2,10 +2,10 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
-using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Logic.Models;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Enums;
+using Umea.se.EstateService.Shared.Exceptions;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.Toolkit.Images;
 using ZiggyCreatures.Caching.Fusion;
@@ -30,7 +30,7 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IE
     {
         if (floorId <= 0)
         {
-            throw new FloorBlueprintValidationException("Floor id must be positive.");
+            throw new BusinessValidationException("Floor id must be positive.");
         }
 
         IDictionary<int, IReadOnlyList<string>>? workspaceTexts = await GetWorkspaceTextsAsync(floorId, includeWorkspaceTexts, cancellationToken).ConfigureAwait(false);
@@ -87,7 +87,7 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IE
         catch (SyntheticTimeoutException ex)
         {
             _logger.LogWarning("Blueprint generation timed out for floor {FloorId}. The result will be cached in the background for the next request.", floorId);
-            throw new FloorBlueprintUnavailableException($"Blueprint generation for floor {floorId} timed out. Try again shortly — the result is being generated in the background.", ex);
+            throw new ExternalServiceUnavailableException($"Blueprint generation for floor {floorId} timed out. Try again shortly — the result is being generated in the background.", ex);
         }
 
         return new FloorBlueprint(new MemoryStream(result.Data), result.ContentType, fileName, result.IsGzipped);
@@ -105,7 +105,7 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IE
         catch (HttpRequestException ex)
         {
             _logger.LogWarning(ex, "HTTP error while retrieving SVG blueprint for floor {FloorId}", floorId);
-            throw new FloorBlueprintUnavailableException("Pythagoras HTTP request failed.", ex);
+            throw new ExternalServiceUnavailableException("Pythagoras HTTP request failed.", ex);
         }
 
         using (response)
@@ -150,7 +150,7 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IE
         catch (HttpRequestException ex)
         {
             _logger.LogWarning(ex, "HTTP error while retrieving blueprint for floor {FloorId}", floorId);
-            throw new FloorBlueprintUnavailableException("Pythagoras HTTP request failed.", ex);
+            throw new ExternalServiceUnavailableException("Pythagoras HTTP request failed.", ex);
         }
 
         using (response)
@@ -186,7 +186,7 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IE
                 floorId,
                 errorDescription);
 
-            throw new KeyNotFoundException($"Blueprint for floor {floorId} was not found.");
+            throw new EntityNotFoundException($"Blueprint for floor {floorId} was not found.");
         }
 
         _logger.LogWarning(
@@ -199,7 +199,7 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IE
             ? response.StatusCode.ToString()
             : response.ReasonPhrase;
 
-        throw new FloorBlueprintUnavailableException($"Pythagoras returned {(int)response.StatusCode} ({reason}). Body: {errorDescription}");
+        throw new ExternalServiceUnavailableException($"Pythagoras returned {(int)response.StatusCode} ({reason}). Body: {errorDescription}");
     }
 
     private static string EnsureFileName(string fileName, int floorId, BlueprintFormat format)

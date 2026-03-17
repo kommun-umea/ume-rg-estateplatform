@@ -20,7 +20,7 @@ public class EstateControllerTests : ControllerTestCloud<TestApiFactory, Program
         _client.DefaultRequestHeaders.Add("X-Api-Key", TestApiFactory.ApiKey);
         _fakeClient = WebAppFactory.FakeClient;
 
-        MockManager.SetupUser(user => user.WithSsNo("1234567890"));
+        MockManager.SetupUser(user => user.WithSsNo("1234567890").WithEmail("test@example.com"));
 
         // Ensure a clean data store snapshot before each test.
         DataStoreSeeder.Clear(WebAppFactory.GetDataStore());

@@ -17,4 +17,8 @@ public class ApplicationConfig(IConfiguration configuration, Assembly? entryAsse
     public AuthenticationConfiguration Authentication => GetValue<AuthenticationConfiguration>("Authentication");
 
     public ImageCacheConfiguration ImageCache => GetValue<ImageCacheConfiguration>("ImageCache");
+
+    public WorkOrderConfiguration WorkOrderProcessing => GetValue<WorkOrderConfiguration>("WorkOrder");
+
+    public OpenAIConfiguration OpenAI => GetValue<OpenAIConfiguration>("OpenAI");
 }

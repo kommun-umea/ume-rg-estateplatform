@@ -23,7 +23,7 @@ public class RoomControllerTests : ControllerTestCloud<TestApiFactory, Program, 
         _client.DefaultRequestHeaders.Add("X-Api-Key", TestApiFactory.ApiKey);
         _fakeClient = WebAppFactory.FakeClient;
 
-        MockManager.SetupUser(user => user.WithName("Integration Tester").WithActualAuthorization());
+        MockManager.SetupUser(user => user.WithName("Integration Tester").WithEmail("test@example.com").WithActualAuthorization());
 
         // Ensure clean datastore before each room test
         DataStoreSeeder.Clear(WebAppFactory.GetDataStore());

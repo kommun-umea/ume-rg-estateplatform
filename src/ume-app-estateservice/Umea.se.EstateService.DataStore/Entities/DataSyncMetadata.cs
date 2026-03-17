@@ -8,4 +8,5 @@ public class DataSyncMetadata
     public int BuildingCount { get; set; }
     public int FloorCount { get; set; }
     public int RoomCount { get; set; }
+    public string? WorkOrderCategoriesJson { get; set; }
 }

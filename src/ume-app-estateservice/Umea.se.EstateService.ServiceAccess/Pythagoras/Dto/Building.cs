@@ -1,4 +1,4 @@
-﻿using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
+﻿using Umea.se.EstateService.ServiceAccess.Pythagoras.Enums;
 
 namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 

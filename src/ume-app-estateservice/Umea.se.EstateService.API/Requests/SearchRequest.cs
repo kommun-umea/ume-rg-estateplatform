@@ -45,6 +45,12 @@ public sealed record SearchRequest : IValidatableObject
     [FromQuery(Name = "east")]
     public double? EastLongitude { get; init; }
 
+    internal SearchFilter ToSearchFilter(IReadOnlyCollection<AutocompleteType>? typeOverride = null) => new()
+    {
+        Types = typeOverride ?? (Type is { Count: > 0 } ? Type : [AutocompleteType.Any]),
+        BusinessTypeIds = BusinessTypeIds ?? []
+    };
+
     [JsonIgnore]
     internal GeoFilter? GeoFilter
     {

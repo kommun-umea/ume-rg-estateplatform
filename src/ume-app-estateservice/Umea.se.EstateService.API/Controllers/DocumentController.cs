@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.FeatureManagement.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Shared.Models;
@@ -10,6 +11,7 @@ namespace Umea.se.EstateService.API.Controllers;
 [Produces("application/json")]
 [Route(ApiRoutes.Documents)]
 [Authorize]
+[FeatureGate("Documents")]
 public class DocumentController(IFileDocumentHandler fileDocumentHandler) : ControllerBase
 {
     /// <summary>

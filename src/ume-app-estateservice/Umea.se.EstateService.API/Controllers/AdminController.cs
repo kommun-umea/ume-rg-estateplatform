@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
+using Umea.se.EstateService.API.Responses;
 using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Logic.HostedServices;
-using Umea.se.EstateService.API.Responses;
 using Umea.se.EstateService.Logic.Models;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.Toolkit.Auth;
 
 namespace Umea.se.EstateService.API.Controllers;
@@ -12,7 +14,7 @@ namespace Umea.se.EstateService.API.Controllers;
 [Produces("application/json")]
 [Route(ApiRoutes.Admin)]
 [AuthorizeApiKey]
-public sealed class AdminController(DataSyncService dataSyncService, SearchHandler searchHandler) : ControllerBase
+public class AdminController(DataSyncService dataSyncService, SearchHandler searchHandler, IPythagorasClient pythagorasClient) : ControllerBase
 {
     /// <summary>
     /// Triggers a manual data sync from the external API, rebuilds the search index, and updates the cache.
@@ -77,5 +79,32 @@ public sealed class AdminController(DataSyncService dataSyncService, SearchHandl
         };
 
         return Ok(info);
+    }
+
+    [HttpGet("document-record-types")]
+    [SwaggerOperation(Summary = "Get document file record action types and their statuses")]
+    [ProducesResponseType(typeof(DocumentRecordTypesResponse), StatusCodes.Status200OK)]
+    public async Task<ActionResult<DocumentRecordTypesResponse>> GetDocumentRecordTypes(CancellationToken ct)
+    {
+        IReadOnlyList<DocumentFileRecordActionType> actionTypes = await pythagorasClient.GetDocumentRecordActionTypesAsync(ct: ct);
+        List<DocumentRecordTypeItem> result = [];
+
+        foreach (DocumentFileRecordActionType type in actionTypes)
+        {
+            IReadOnlyList<DocumentFileRecordActionTypeStatus> statuses = await pythagorasClient.GetDocumentRecordActionTypeStatusesAsync(type.Id, ct);
+            result.Add(new DocumentRecordTypeItem
+            {
+                Id = type.Id,
+                Name = type.Name,
+                Statuses = statuses.Select(s => new DocumentRecordTypeStatusItem
+                {
+                    Id = s.Id,
+                    Name = s.Name,
+                    ReceivedDateIsRelevant = s.ReceivedDateIsRelevant
+                }).ToList()
+            });
+        }
+
+        return Ok(new DocumentRecordTypesResponse { ActionTypes = result });
     }
 }

@@ -326,9 +326,8 @@ public sealed class InMemorySearchService
                 {
                     foreach (SymSpell.SuggestItem suggestion in _symSpell.Lookup(qt, SymSpell.Verbosity.Closest, maxEdits))
                     {
-                        if (!bucket.Contains(suggestion.term))
+                        if (bucket.Add(suggestion.term))
                         {
-                            bucket.Add(suggestion.term);
                             diagBuilder?.FuzzyMatches.Add($"{suggestion.term} (dist={suggestion.distance})");
                         }
                     }

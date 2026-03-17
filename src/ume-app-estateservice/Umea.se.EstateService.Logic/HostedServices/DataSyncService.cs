@@ -3,7 +3,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Umea.se.EstateService.Logic.Data;
 using Umea.se.EstateService.Logic.Handlers;
-using Umea.se.EstateService.Logic.Handlers.Images;
 using Umea.se.EstateService.Logic.Models;
 using Umea.se.EstateService.Shared.Data;
 using Umea.se.EstateService.Shared.Infrastructure;
@@ -19,7 +18,7 @@ public sealed class DataSyncService(
     IDataRefreshService dataRefreshService,
     IDataStore dataStore,
     IDataStorePersistence persistence,
-    BuildingImageIdCache imageIdCache,
+    BuildingBackgroundCache backgroundCache,
     SearchHandler searchHandler,
     ApplicationConfig appConfig,
     ILogger<DataSyncService> logger) : BackgroundService
@@ -41,28 +40,25 @@ public sealed class DataSyncService(
         TimeSpan interval = _options.RefreshInterval;
         bool loadedFromCache = false;
 
-        if (_options.CacheEnabled)
+        (DataSnapshot? snapshot, DateTimeOffset? lastRefresh) = await persistence.TryLoadAsync(stoppingToken).ConfigureAwait(false);
+        if (snapshot is not null)
         {
-            (DataSnapshot? snapshot, DateTimeOffset? lastRefresh) = await persistence.TryLoadAsync(stoppingToken).ConfigureAwait(false);
-            if (snapshot is not null)
+            loadedFromCache = true;
+            backgroundCache.SeedFrom(snapshot.Buildings);
+            dataStore.SetSnapshot(snapshot);
+
+            if (lastRefresh.HasValue)
             {
-                loadedFromCache = true;
-                imageIdCache.SeedFrom(snapshot.Buildings);
-                dataStore.SetSnapshot(snapshot);
+                dataStore.RecordRefreshAttempt(lastRefresh.Value);
+            }
 
-                if (lastRefresh.HasValue)
-                {
-                    dataStore.RecordRefreshAttempt(lastRefresh.Value);
-                }
-
-                try
-                {
-                    await searchHandler.RefreshIndexAsync(stoppingToken).ConfigureAwait(false);
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    logger.LogError(ex, "Search refresh from cache failed.");
-                }
+            try
+            {
+                await searchHandler.RefreshIndexAsync(stoppingToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogError(ex, "Search refresh from cache failed.");
             }
         }
 
@@ -70,6 +66,9 @@ public sealed class DataSyncService(
         {
             await RunStartupRefreshWithRetriesAsync(stoppingToken).ConfigureAwait(false);
         }
+
+        // Start background cache consumer (refreshes stale document counts + image IDs)
+        _ = backgroundCache.RunConsumerAsync(stoppingToken);
 
         if (interval > TimeSpan.Zero)
         {
@@ -228,13 +227,14 @@ public sealed class DataSyncService(
                 logger.LogError(ex, "Search refresh failed after data refresh.");
             }
 
-            if (_options.CacheEnabled)
-            {
-                DataSnapshot snapshot = dataStore.GetCurrentSnapshot();
-                imageIdCache.ApplyTo(snapshot.Buildings);
-                DateTimeOffset refreshTime = dataStore.LastRefreshUtc ?? DateTimeOffset.UtcNow;
-                await persistence.SaveAsync(snapshot, refreshTime, cancellationToken).ConfigureAwait(false);
-            }
+            DataSnapshot snapshot = dataStore.GetCurrentSnapshot();
+
+            // Persistence hydration: stamp cached values onto freshly-created snapshot entities
+            // before saving. The live entities are already up-to-date via write-through, but the
+            // snapshot may contain new entity instances from the refresh that haven't been touched yet.
+            backgroundCache.ApplyTo(snapshot.Buildings);
+            DateTimeOffset refreshTime = dataStore.LastRefreshUtc ?? DateTimeOffset.UtcNow;
+            await persistence.SaveAsync(snapshot, refreshTime, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

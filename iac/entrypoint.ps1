@@ -19,6 +19,13 @@ if ($environment -ne $parameters.environment.value) {
   throw "Environment parameter mismatch. Expected [$environment] but got [$($parameters.environment.value)]"
 }
 
+$sqlScriptBase64 = $env:SQL_SCRIPT_BASE64
+if ([string]::IsNullOrWhiteSpace($sqlScriptBase64)) {
+  throw "SQL script content was expected but SQL_SCRIPT_BASE64 was not provided."
+}
+$sqlBytes = [Convert]::FromBase64String($sqlScriptBase64)
+$sqlScriptContent = [System.Text.Encoding]::UTF8.GetString($sqlBytes)
+
 $companyPrefix = $parameters.companyPrefix.value
 $purpose = $parameters.purpose.value
 $location = $parameters.location.value
@@ -45,9 +52,25 @@ if ($null -ne $deployment) {
   throw "Deployment failed!"
 }
 
-# ------------ Outputs ------------
-# Pass sqlConfiguration to the pipeline as an output variable for subsequent steps
-$sqlConfigurationJson = $outputs.sqlConfiguration.value | ConvertTo-Json -Depth 10 -Compress
-Write-Host "##vso[task.setvariable variable=sqlConfiguration;isOutput=true]$sqlConfigurationJson"
+# ------------ SQL ------------
+Write-Host "Configuring SQL permissions..."
+# sqlConfiguration object structure:
+# {
+#   "serverName": "string",
+#   "serverPrincipalId": "string",
+#   "serverFullyQualifiedDomainName": "string",
+#   "databases": {
+#     "<databasePurpose>": {
+#       "id": "string",
+#       "name": "string",
+#       "users": [
+#         "string" // Name of Entra identity
+#       ]
+#     },
+#     ...
+#   }
+# }
+$scriptBlock = [ScriptBlock]::Create($sqlScriptContent)
+& $scriptBlock -environment $environment -sqlConfiguration $outputs.sqlConfiguration.value
 
 Write-Host "Finished deployment of [$resourceGroupName]"

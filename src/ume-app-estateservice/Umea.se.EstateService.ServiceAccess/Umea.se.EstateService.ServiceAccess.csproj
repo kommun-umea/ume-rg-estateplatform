@@ -5,6 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NoWarn>CA2007</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,6 +14,11 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Umea.se.EstateService.Test" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Storage.Blobs" />
+    <PackageReference Include="Umea.se.Toolkit" />
   </ItemGroup>
 
 </Project>

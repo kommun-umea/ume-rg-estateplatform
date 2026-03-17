@@ -1,11 +1,12 @@
-using System.Net;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Net.Http.Headers;
 using Swashbuckle.AspNetCore.Annotations;
+using Umea.se.EstateService.API.Extensions;
 using Umea.se.EstateService.API.Responses;
 using Umea.se.EstateService.Logic.Handlers.Images;
 using Umea.se.EstateService.Logic.Models;
+using Umea.se.EstateService.Shared.Exceptions;
 using Umea.se.Toolkit.Images;
 
 namespace Umea.se.EstateService.API.Controllers;
@@ -46,19 +47,11 @@ public class BuildingImagesController(IBuildingImageService buildingImageService
     )]
     [SwaggerResponse(StatusCodes.Status200OK, "List of image IDs", typeof(BuildingImagesResponse))]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Building has no images")]
-    public async Task<ActionResult<BuildingImagesResponse>> GetBuildingImageIds(int buildingId, CancellationToken cancellationToken)
+    public async Task<ActionResult<BuildingImagesResponse>> GetBuildingImageIds(
+        [Range(1, int.MaxValue, ErrorMessage = "Building id must be positive.")] int buildingId,
+        CancellationToken cancellationToken)
     {
-        if (buildingId <= 0)
-        {
-            return BadRequest("Building id must be positive.");
-        }
-
-        BuildingImageMetadata? metadata = await buildingImageService.GetImageMetadataAsync(buildingId, cancellationToken);
-
-        if (metadata is null)
-        {
-            return NotFound(new { message = "No images found for this building" });
-        }
+        BuildingImageMetadata? metadata = await buildingImageService.GetImageMetadataAsync(buildingId, cancellationToken) ?? throw new EntityNotFoundException("No images found for this building.");
 
         return Ok(new BuildingImagesResponse
         {
@@ -87,23 +80,13 @@ public class BuildingImagesController(IBuildingImageService buildingImageService
     [SwaggerResponse(StatusCodes.Status200OK, "The image", ContentTypes = ["image/webp", "image/svg+xml"])]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Building has no images or image not found")]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid parameters or image too large")]
-    public async Task<IActionResult> GetBuildingImage(int buildingId, [FromQuery] int? imageId, [FromQuery] int? w, [FromQuery] int? h, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetBuildingImage(
+        [Range(1, int.MaxValue, ErrorMessage = "Building id must be positive.")] int buildingId,
+        [FromQuery][Range(0, int.MaxValue, ErrorMessage = "Image id must not be negative.")] int? imageId,
+        [FromQuery][Range(0, int.MaxValue, ErrorMessage = "Width must not be negative.")] int? w,
+        [FromQuery][Range(0, int.MaxValue, ErrorMessage = "Height must not be negative.")] int? h,
+        CancellationToken cancellationToken)
     {
-        if (buildingId <= 0)
-        {
-            return BadRequest("Building id must be positive.");
-        }
-
-        if (w is < 0)
-        {
-            return BadRequest("Width must be positive.");
-        }
-
-        if (h is < 0)
-        {
-            return BadRequest("Height must be positive.");
-        }
-
         // Treat 0 as "no constraint"
         if (w is 0)
         {
@@ -119,44 +102,9 @@ public class BuildingImagesController(IBuildingImageService buildingImageService
         w = SnapToAllowedSize(w);
         h = SnapToAllowedSize(h);
 
-        if (imageId is < 0)
-        {
-            return BadRequest("Image id must be positive.");
-        }
+        ImageResult? result = await buildingImageService.GetImageResultAsync(buildingId, imageId, w, h, cancellationToken) ?? throw new EntityNotFoundException(imageId.HasValue ? "Image not found." : "No images found for this building.");
+        Response.SetPublicCacheHeaders(result.IsGzipped);
 
-        try
-        {
-            ImageResult? result = await buildingImageService.GetImageResultAsync(buildingId, imageId, w, h, cancellationToken);
-
-            if (result is null)
-            {
-                return NotFound(new { message = imageId.HasValue ? "Image not found" : "No images found for this building" });
-            }
-
-            Response.GetTypedHeaders().CacheControl = new CacheControlHeaderValue
-            {
-                Public = true,
-                MaxAge = TimeSpan.FromHours(24)
-            };
-
-            if (result.IsGzipped)
-            {
-                Response.Headers.ContentEncoding = "gzip";
-            }
-
-            return File(result.Data, result.ContentType);
-        }
-        catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
-        {
-            return NotFound(new { message = "Image not found" });
-        }
-        catch (ImageNotFoundException)
-        {
-            return NotFound(new { message = "Image not found" });
-        }
-        catch (ImageTooLargeException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        return File(result.Data, result.ContentType);
     }
 }

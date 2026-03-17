@@ -1,10 +1,14 @@
+using System.Text.Json.Serialization;
 using Umea.se.EstateService.Shared.Data;
+using Umea.se.EstateService.Shared.Search;
 using Umea.se.EstateService.Shared.ValueObjects;
 
 namespace Umea.se.EstateService.Shared.Models;
 
-public sealed class RoomModel : ISearchable
+public sealed class RoomModel : ISearchable, IFavoriteable
 {
+    [JsonIgnore]
+    public NodeType FavoriteNodeType => NodeType.Room;
     public int Id { get; init; }
     public int Version { get; init; }
     public long Created { get; init; }
@@ -25,5 +29,6 @@ public sealed class RoomModel : ISearchable
     public string? FloorPopularName { get; init; }
     public AddressModel? Address => null;
     public GeoPointModel? GeoLocation => null;
+    public bool? IsFavorite { get; set; }
     public DateTimeOffset UpdatedAt => DateTimeOffset.FromUnixTimeMilliseconds(Updated / 1000);
 }

@@ -1,9 +1,10 @@
-﻿using Microsoft.Extensions.Logging;
-using Umea.se.EstateService.Logic.Data.Mappers;
-using Umea.se.EstateService.Logic.Handlers.Images;
+﻿using System.Collections.Immutable;
+using Microsoft.Extensions.Logging;
+using Umea.se.EstateService.Logic.Data.Pythagoras.Mappers;
+using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Enums;
 using Umea.se.EstateService.Shared.Data;
 using Umea.se.EstateService.Shared.Data.Entities;
 using Umea.se.EstateService.Shared.Models;
@@ -17,7 +18,7 @@ namespace Umea.se.EstateService.Logic.Data.Pythagoras;
 public sealed class PythagorasDataRefreshService(
     IPythagorasClient pythagorasClient,
     IDataStore dataStore,
-    BuildingImageIdCache imageIdCache,
+    BuildingBackgroundCache backgroundCache,
     ILogger<PythagorasDataRefreshService> logger) : IDataRefreshService
 {
     private static readonly IReadOnlyCollection<int> _buildingExtendedPropertyIds = Array.AsReadOnly(
@@ -84,6 +85,7 @@ public sealed class PythagorasDataRefreshService(
         public required IReadOnlyList<BuildingInfo> Buildings { get; init; }
         public required IReadOnlyList<Floor> Floors { get; init; }
         public required IReadOnlyList<Workspace> Workspaces { get; init; }
+        public required IReadOnlyList<WorkOrderCategoryInfoDto> WorkOrderCategories { get; init; }
     }
 
     /// <inheritdoc />
@@ -127,12 +129,21 @@ public sealed class PythagorasDataRefreshService(
             BuildEntityRelationships(estates, buildings, floors, rooms);
             CalculateBuildingWorkspaceStats(buildings);
 
-            // Write cached image IDs onto the new building entities before snapshot creation
-            imageIdCache.ApplyTo(buildings);
+            // Write cached image IDs + document counts onto the new building entities before snapshot creation
+            backgroundCache.ApplyTo(buildings);
 
             // Build ascendant lookup using NavigationInfo from buildings
             Dictionary<int, BuildingAscendantTriplet> buildingAscendants = BuildAscendantLookupByName(
                 data.Buildings, data.Estates, data.Districts, data.Organizations);
+
+            // Map work order categories
+            ImmutableArray<WorkOrderCategoryNode> workOrderCategories = [.. data.WorkOrderCategories.Select(dto => new WorkOrderCategoryNode
+            {
+                Id = dto.Id,
+                ParentId = dto.ParentId,
+                Name = dto.Name ?? string.Empty,
+                WorkOrderTypeIds = dto.WorkOrderTypeIds ?? []
+            })];
 
             DateTimeOffset refreshTime = DateTimeOffset.UtcNow;
             DataSnapshot snapshot = new(
@@ -141,7 +152,8 @@ public sealed class PythagorasDataRefreshService(
                 floors: [.. floors],
                 rooms: [.. rooms],
                 buildingAscendants: buildingAscendants,
-                refreshUtc: refreshTime
+                refreshUtc: refreshTime,
+                workOrderCategories: workOrderCategories
             );
 
             dataStore.SetSnapshot(snapshot);
@@ -151,9 +163,9 @@ public sealed class PythagorasDataRefreshService(
             logger.LogInformation(
                 "Data refresh completed successfully in {Duration}ms. " +
                 "Estates: {EstateCount}, Buildings: {BuildingCount}, Floors: {FloorCount}, " +
-                "Rooms: {RoomCount}, Ascendants: {AscendantCount}",
+                "Rooms: {RoomCount}, Ascendants: {AscendantCount}, WorkOrderCategories: {CategoryCount}",
                 duration, estates.Count, buildings.Count, floors.Count, rooms.Count,
-                buildingAscendants.Count);
+                buildingAscendants.Count, workOrderCategories.Length);
         }
         catch (Exception ex)
         {
@@ -264,103 +276,6 @@ public sealed class PythagorasDataRefreshService(
         {
             building.NumFloors = building.Floors.Count;
             building.NumRooms = building.Rooms.Count;
-        }
-    }
-
-    /// <summary>
-    /// Fetches gallery image metadata for buildings that don't already have it.
-    /// Uses batching with controlled concurrency to avoid overwhelming the API.
-    /// First image in the array is the primary image (sorted by Updated desc, then Id).
-    /// </summary>
-    /// <remarks>
-    /// Currently unused - image metadata is lazy-loaded on first request via BuildingImageService.
-    /// Kept for potential future use as background pre-population during sync.
-    /// </remarks>
-    private async Task FetchBuildingImageMetadataAsync(
-        List<BuildingEntity> buildings,
-        CancellationToken cancellationToken)
-    {
-        // Only fetch for buildings without image metadata
-        List<BuildingEntity> buildingsNeedingImages = [.. buildings.Where(b => b.ImageIds is null)];
-
-        if (buildingsNeedingImages.Count == 0)
-        {
-            logger.LogDebug("All buildings already have image metadata cached");
-            return;
-        }
-
-        logger.LogDebug(
-            "Fetching image metadata for {Count} buildings (out of {Total} total)",
-            buildingsNeedingImages.Count,
-            buildings.Count);
-
-        const int batchSize = 50;
-        const int maxConcurrency = 10;
-
-        SemaphoreSlim semaphore = new(maxConcurrency);
-        int successCount = 0;
-        int failCount = 0;
-        int emptyCount = 0;
-
-        int totalBatches = (buildingsNeedingImages.Count + batchSize - 1) / batchSize;
-        int currentBatch = 0;
-
-        foreach (IEnumerable<BuildingEntity> batch in buildingsNeedingImages.Chunk(batchSize))
-        {
-            currentBatch++;
-            logger.LogDebug("Processing image metadata batch {CurrentBatch}/{TotalBatches}", currentBatch, totalBatches);
-
-            List<Task> tasks = [];
-
-            foreach (BuildingEntity building in batch)
-            {
-                tasks.Add(FetchImagesForBuildingAsync(building));
-            }
-
-            await Task.WhenAll(tasks).ConfigureAwait(false);
-        }
-
-        logger.LogInformation(
-            "Building image metadata fetch completed: {SuccessCount} with images, {EmptyCount} without images, {FailCount} failed",
-            successCount, emptyCount, failCount);
-
-        return;
-
-        async Task FetchImagesForBuildingAsync(BuildingEntity building)
-        {
-            await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-            try
-            {
-                IReadOnlyList<GalleryImageFile> images = await pythagorasClient
-                    .GetBuildingGalleryImagesAsync(building.Id, cancellationToken)
-                    .ConfigureAwait(false);
-
-                if (images.Count > 0)
-                {
-                    // Sort by Updated desc, then Id - first one is primary
-                    building.ImageIds = [.. images
-                        .OrderByDescending(i => i.Updated)
-                        .ThenBy(i => i.Id)
-                        .Select(i => i.Id)];
-
-                    Interlocked.Increment(ref successCount);
-                }
-                else
-                {
-                    building.ImageIds = [];
-                    Interlocked.Increment(ref emptyCount);
-                }
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                logger.LogInformation(ex, "Failed to fetch image metadata for building {BuildingId}", building.Id);
-                Interlocked.Increment(ref failCount);
-                // Leave ImageIds as null - will retry next refresh
-            }
-            finally
-            {
-                semaphore.Release();
-            }
         }
     }
 
@@ -504,6 +419,10 @@ public sealed class PythagorasDataRefreshService(
         IReadOnlyList<Floor> floors = await FetchFloorsViaWorkspaceBatchesAsync(workspaces, cancellationToken)
             .ConfigureAwait(false);
 
+        IReadOnlyList<WorkOrderCategoryInfoDto> workOrderCategories = await pythagorasClient
+            .GetWorkOrderCategoriesAsync(1, cancellationToken)
+            .ConfigureAwait(false);
+
         return new PythagorasData
         {
             Estates = estateResponse.Data,
@@ -511,7 +430,8 @@ public sealed class PythagorasDataRefreshService(
             Organizations = organizations,
             Buildings = buildingResponse.Data,
             Floors = floors,
-            Workspaces = workspaces
+            Workspaces = workspaces,
+            WorkOrderCategories = workOrderCategories
         };
     }
 

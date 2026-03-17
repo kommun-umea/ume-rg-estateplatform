@@ -16,9 +16,12 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Shouldly" />
     <PackageReference Include="Umea.se.TestToolkit" />
+    <PackageReference Include="Umea.se.Toolkit" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio">
       <PrivateAssets>all</PrivateAssets>
@@ -29,6 +32,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Umea.se.EstateService.API\Umea.se.EstateService.API.csproj" />
     <ProjectReference Include="..\Umea.se.EstateService.Logic\Umea.se.EstateService.Logic.csproj" />
+    <ProjectReference Include="..\Umea.se.EstateService.DataStore\Umea.se.EstateService.DataStore.csproj" />
     <ProjectReference Include="..\Umea.se.EstateService.ServiceAccess\Umea.se.EstateService.ServiceAccess.csproj" />
   </ItemGroup>
 

@@ -2,10 +2,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Umea.se.EstateService.Logic.Data;
 using Umea.se.EstateService.Logic.Handlers;
-using Umea.se.EstateService.Logic.Handlers.Images;
 using Umea.se.EstateService.Logic.HostedServices;
-using Umea.se.EstateService.Logic.Search.Providers;
 using Umea.se.EstateService.Logic.Models;
+using Umea.se.EstateService.Logic.Search.Providers;
 using Umea.se.EstateService.Shared.Infrastructure;
 using Umea.se.EstateService.Shared.Search;
 using Umea.se.EstateService.Test.TestHelpers;
@@ -24,7 +23,6 @@ public sealed class DataSyncServiceTests
         ApplicationConfig appConfig = BuildAppConfig(new Dictionary<string, string?>
         {
             ["DataSync:RefreshIntervalHours"] = "1",
-            ["DataSync:CacheEnabled"] = "false",
             ["DataSync:MaxRetries"] = "0",
             ["DataSync:RetryBaseDelaySeconds"] = "1"
         });
@@ -35,7 +33,7 @@ public sealed class DataSyncServiceTests
             dataRefreshService,
             dataStore,
             persistence,
-            new BuildingImageIdCache(),
+            new BuildingBackgroundCache(new FakePythagorasClient(), dataStore, NullLogger<BuildingBackgroundCache>.Instance),
             searchHandler,
             appConfig,
             NullLogger<DataSyncService>.Instance);

@@ -1,15 +1,22 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Azure.AI.OpenAI;
+using Azure.Identity;
+using Azure.Storage.Blobs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.AI;
 using Microsoft.IdentityModel.Tokens;
 using Polly;
 using Umea.se.EstateService.API;
 using Umea.se.EstateService.API.Infrastructure;
 using Umea.se.EstateService.DataStore;
 using Umea.se.EstateService.Logic;
+using Umea.se.EstateService.Logic.Handlers.WorkOrder;
 using Umea.se.EstateService.ServiceAccess;
+using Umea.se.EstateService.ServiceAccess.FileStorage;
 using Umea.se.EstateService.Shared;
 using Umea.se.EstateService.Shared.Infrastructure;
+using Umea.se.EstateService.Shared.Infrastructure.ConfigurationModels;
 using Umea.se.Toolkit.EntryPoints;
 using Umea.se.Toolkit.Filters;
 using Umea.se.Toolkit.Images;
@@ -26,6 +33,10 @@ else
 {
     builder.Logging.ClearProviders();
 }
+
+builder.Services.AddProblemDetails();
+
+builder.Services.AddFeatureFlags();
 
 // ImageService must be registered before AddLogicDependencies (BuildingImageService depends on it)
 builder.Services.AddImageService(
@@ -48,10 +59,55 @@ builder.Services
     .AddApplicationConfig(config)
     .AddApiDependencies()
     .AddLogicDependencies()
-    .AddDataStorePersistence(builder.Configuration.GetConnectionString("EstateService"), config.DataSync)
+    .AddDataStorePersistence(builder.Configuration.GetConnectionString("EstateService"))
     .AddServiceAccessDependencies()
     .AddSharedDependencies()
 ;
+
+builder.Services.AddSingleton<IWorkOrderFileStorage>(sp =>
+{
+    ApplicationConfig appConfig = sp.GetRequiredService<ApplicationConfig>();
+    WorkOrderConfiguration woConfig = appConfig.WorkOrderProcessing;
+    return woConfig.ResolvedStorageType switch
+    {
+        FileStorageType.BlobUrl => CreateBlobStorage(
+            new Azure.Storage.Blobs.BlobServiceClient(new Uri(woConfig.FileStorage), new DefaultAzureCredential()),
+            woConfig.FileStorageContainer),
+        FileStorageType.BlobConnectionString => CreateBlobStorage(
+            new Azure.Storage.Blobs.BlobServiceClient(woConfig.FileStorage),
+            woConfig.FileStorageContainer),
+        _ => new LocalWorkOrderFileStorage(appConfig)
+    };
+
+    static BlobWorkOrderFileStorage CreateBlobStorage(Azure.Storage.Blobs.BlobServiceClient serviceClient, string containerName)
+    {
+        BlobContainerClient container = serviceClient.GetBlobContainerClient(containerName);
+        if (!container.Exists())
+        {
+            container.Create();
+        }
+
+        return new BlobWorkOrderFileStorage(container);
+    }
+});
+
+builder.Services.AddSingleton(sp =>
+{
+    ApplicationConfig appConfig = sp.GetRequiredService<ApplicationConfig>();
+    return new AzureOpenAIClient(new Uri(appConfig.OpenAI.Endpoint), new DefaultAzureCredential())
+        .GetChatClient(appConfig.OpenAI.Model)
+        .AsIChatClient();
+});
+
+builder.Services.AddScoped<IWorkOrderCategoryClassifier>(sp =>
+{
+    ApplicationConfig appConfig = sp.GetRequiredService<ApplicationConfig>();
+    if (appConfig.OpenAI.Enabled)
+    {
+        return ActivatorUtilities.CreateInstance<WorkOrderCategoryClassifier>(sp);
+    }
+    return new NullWorkOrderCategoryClassifier();
+});
 
 builder.Services.AddHttpClient(HttpClientNames.Pythagoras, client =>
 {
@@ -80,7 +136,7 @@ builder.Services
             ValidIssuer = config.Authentication.TokenServiceUrl,
             ValidateAudience = true,
             ValidAudience = config.Authentication.Audience,
-            ValidateLifetime = false,
+            ValidateLifetime = !builder.Environment.IsDevelopment(),
             ClockSkew = TimeSpan.Zero,
         };
     });
@@ -108,6 +164,7 @@ builder.Services.AddResponseCompression(options =>
 
 builder.Services.AddControllers(options =>
 {
+    options.Filters.Add<EstateServiceExceptionFilter>();
     options.Filters.Add<HttpResponseExceptionFilter>();
 })
 .AddJsonOptions(options =>
@@ -117,17 +174,20 @@ builder.Services.AddControllers(options =>
 
 WebApplication app = builder.Build();
 
+await app.Services.EnsureDatabaseCreatedAsync();
+
 app.UseResponseCompression();
 
 if (!app.Environment.IsEnvironment("IntegrationTest"))
 {
     app.UseDefaultSwagger(config);
+    app.UseHttpsRedirection();
 }
-app.UseHttpsRedirection();
 app.UseAllowedOriginsCorsPolicy();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<EstateServiceFeatureGateMiddleware>();
 app.MapControllers();
 
 app.Run();

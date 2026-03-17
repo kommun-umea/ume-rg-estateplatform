@@ -1,8 +1,11 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Umea.se.EstateService.DataStore;
 using Umea.se.EstateService.Logic.Data;
 using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Logic.Handlers.Images;
@@ -18,6 +21,9 @@ namespace Umea.se.EstateService.Test.TestHelpers;
 /// </summary>
 public sealed class TestApiFactory : WebAppFactoryBase<Program, HttpClientNames>
 {
+    // Keep the SQLite connection open so the in-memory database persists across DbContext instances
+    private readonly SqliteConnection _dbConnection = new("DataSource=:memory:");
+
     public const string ApiKey = "test-api-key-for-integration-tests";
     public const string PythagorasBaseUrl = "https://localhost/";
 
@@ -38,13 +44,22 @@ public sealed class TestApiFactory : WebAppFactoryBase<Program, HttpClientNames>
             Dictionary<string, string?> overrides = new()
             {
                 ["ASPNETCORE_ENVIRONMENT"] = "IntegrationTest",
+                ["ConnectionStrings:EstateService"] = "DataSource=:memory:",
                 ["Api:Keys:Default"] = ApiKey,
                 ["suppressKeyVaultConfigs"] = "true",
                 ["KeyVaultUrl"] = "https://localhost/",
                 ["Pythagoras-Base-Url"] = PythagorasBaseUrl,
                 ["Pythagoras-Api-Key"] = "pythagoras-test-key",
+                // Enable all features for integration tests
+                ["Features"] = "EstateService,ContactPersons,Documents,ErrorReport",
                 // Disable automatic data store refresh during tests to avoid interference
-                ["DataSync:RefreshIntervalHours"] = "0"
+                ["DataSync:RefreshIntervalHours"] = "0",
+                // Work order submission config for tests
+                ["WorkOrder:FileStorage"] = "./test-workorder-files",
+                ["WorkOrder:ProcessingIntervalSeconds"] = "9999",
+                ["WorkOrder:MaxRetries"] = "3",
+                ["WorkOrder:RetryBaseDelaySeconds"] = "1",
+                ["WorkOrder:StatusCheckIntervalMinutes"] = "60"
             };
 
             configurationBuilder.AddInMemoryCollection(overrides);
@@ -56,7 +71,7 @@ public sealed class TestApiFactory : WebAppFactoryBase<Program, HttpClientNames>
             services.RemoveAll<IEstateDataQueryHandler>();
             services.RemoveAll<IBuildingImageService>();
             services.RemoveAll<IDataStore>();
-            services.RemoveAll<BuildingImageIdCache>();
+            services.RemoveAll<BuildingBackgroundCache>();
             services.RemoveAll<IDataStorePersistence>();
             services.RemoveAll<InMemoryDataStore>();
 
@@ -68,10 +83,33 @@ public sealed class TestApiFactory : WebAppFactoryBase<Program, HttpClientNames>
             services.AddSingleton<InMemoryDataStore>();
             services.AddSingleton<IDataStore>(sp => sp.GetRequiredService<InMemoryDataStore>());
             services.AddSingleton<IEstateDataQueryHandler>(sp => new EstateDataQueryHandler(sp.GetRequiredService<IDataStore>()));
-            services.AddSingleton<BuildingImageIdCache>();
+            services.AddSingleton<BuildingBackgroundCache>();
 
             // Add no-op persistence for tests
             services.AddSingleton<IDataStorePersistence, NullDataStorePersistence>();
+
+            // Add in-memory SQLite database for work order tests
+            _dbConnection.Open();
+            services.RemoveAll<IDbContextFactory<EstateDbContext>>();
+            services.AddDbContextFactory<EstateDbContext>(options =>
+                options.UseSqlite(_dbConnection));
+
+            // Register repositories (shared with production via AddRepositories)
+            services.AddRepositories();
+
+            // Ensure the database schema is created
+            using EstateDbContext tempContext = new(
+                new DbContextOptionsBuilder<EstateDbContext>().UseSqlite(_dbConnection).Options);
+            tempContext.Database.EnsureCreated();
         });
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        if (disposing)
+        {
+            _dbConnection.Dispose();
+        }
     }
 }

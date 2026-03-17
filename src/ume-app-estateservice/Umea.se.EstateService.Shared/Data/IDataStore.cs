@@ -8,6 +8,7 @@ public interface IDataStore
     IEnumerable<BuildingEntity> Buildings { get; }
     IEnumerable<FloorEntity> Floors { get; }
     IEnumerable<RoomEntity> Rooms { get; }
+    IEnumerable<WorkOrderCategoryNode> WorkOrderCategories { get; }
 
     /// <summary>
     /// Maps building IDs to their pre-computed ascendant hierarchy.
@@ -42,6 +43,8 @@ public interface IDataStore
     /// Provides O(log n) lookups with true immutability guarantees.
     /// </summary>
     IReadOnlyDictionary<int, RoomEntity> RoomsById { get; }
+
+    IReadOnlyDictionary<int, WorkOrderCategoryNode> WorkOrderCategoriesById { get; }
 
     bool IsReady { get; }
     DateTimeOffset? LastRefreshUtc { get; }

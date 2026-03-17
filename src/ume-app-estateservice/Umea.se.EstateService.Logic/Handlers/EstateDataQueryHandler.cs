@@ -1,7 +1,9 @@
 using Umea.se.EstateService.Logic.Models;
 using Umea.se.EstateService.Shared.Data;
 using Umea.se.EstateService.Shared.Data.Entities;
+using Umea.se.EstateService.Shared.Exceptions;
 using Umea.se.EstateService.Shared.Models;
+using Umea.se.EstateService.Shared.Search;
 
 namespace Umea.se.EstateService.Logic.Handlers;
 
@@ -15,6 +17,33 @@ public class EstateDataQueryHandler(IDataStore dataStore) : IEstateDataQueryHand
     //  - Stores them as a dictionary in IDataStore for O(1) lookup
     //
     // Ascendants are always included from the cache when available.
+
+    /// <summary>
+    /// Stamps ImageUrl on building documents from live entity data
+    /// (kept fresh by write-through from BuildingBackgroundCache).
+    /// </summary>
+    public void StampBuildingImageUrls(IEnumerable<PythagorasDocument> documents)
+    {
+        foreach (PythagorasDocument doc in documents)
+        {
+            if (doc.Type != NodeType.Building)
+            {
+                continue;
+            }
+
+            if (dataStore.BuildingsById.TryGetValue(doc.Id, out BuildingEntity? building))
+            {
+                doc.ImageUrl = GetBuildingImageUrl(building);
+            }
+        }
+    }
+
+    internal static string? GetBuildingImageUrl(BuildingEntity building)
+    {
+        return building.ImageIds is { Count: 0 }
+            ? null
+            : $"/api/buildings/{building.Id}/image";
+    }
 
     public Task<IReadOnlyList<BuildingInfoModel>> GetBuildingsAsync(int[]? buildingIds = null, int? estateId = null, QueryArgs? queryArgs = null, CancellationToken cancellationToken = default)
     {
@@ -38,10 +67,10 @@ public class EstateDataQueryHandler(IDataStore dataStore) : IEstateDataQueryHand
 
         buildings = ApplyQueryOptions(buildings, queryArgs);
 
-        return Task.FromResult<IReadOnlyList<BuildingInfoModel>>([.. buildings.Select(MapBuildingWithAscendants)]);
+        return Task.FromResult<IReadOnlyList<BuildingInfoModel>>([.. buildings.Select(MapBuildingInfoWithAscendants)]);
     }
 
-    private BuildingInfoModel MapBuildingWithAscendants(BuildingEntity building)
+    private BuildingInfoModel MapBuildingInfoWithAscendants(BuildingEntity building)
     {
         BuildingAscendantModel? estateAsc = null;
         BuildingAscendantModel? regionAsc = null;
@@ -55,27 +84,21 @@ public class EstateDataQueryHandler(IDataStore dataStore) : IEstateDataQueryHand
             orgAsc = triplet.Organization;
         }
 
-        return MapEntityToBuildingInfoModel(building, estateAsc, regionAsc, orgAsc);
+        return EstateModelMapper.MapBuildingInfo(building, estateAsc, regionAsc, orgAsc);
     }
 
-    public Task<BuildingInfoModel?> GetBuildingByIdAsync(int buildingId, CancellationToken cancellationToken = default)
+    public Task<BuildingInfoModel> GetBuildingByIdAsync(int buildingId, CancellationToken cancellationToken = default)
     {
-        ValidatePositiveId(buildingId, nameof(buildingId));
-
-        dataStore.BuildingsById.TryGetValue(buildingId, out BuildingEntity? entity);
-
-        if (entity is null)
+        if (!dataStore.BuildingsById.TryGetValue(buildingId, out BuildingEntity? entity))
         {
-            return Task.FromResult<BuildingInfoModel?>(null);
+            throw new EntityNotFoundException($"Building with id {buildingId} not found.");
         }
 
-        return Task.FromResult<BuildingInfoModel?>(MapBuildingWithAscendants(entity));
+        return Task.FromResult(MapBuildingInfoWithAscendants(entity));
     }
 
     public Task<IReadOnlyList<RoomModel>> GetBuildingWorkspacesAsync(int buildingId, int? floorId = null, QueryArgs? queryArgs = null, CancellationToken cancellationToken = default)
     {
-        ValidatePositiveId(buildingId, nameof(buildingId));
-
         dataStore.BuildingsById.TryGetValue(buildingId, out BuildingEntity? building);
 
         IEnumerable<RoomEntity> rooms = building?.Rooms ?? [];
@@ -97,7 +120,7 @@ public class EstateDataQueryHandler(IDataStore dataStore) : IEstateDataQueryHand
         RoomModel[] payload = [.. rooms.Select(r =>
         {
             FloorEntity? floor = r.FloorId.HasValue ? floorsById.GetValueOrDefault(r.FloorId.Value) : null;
-            return MapRoomEntityToModel(r, building, floor);
+            return EstateModelMapper.MapRoom(r, building, floor);
         })];
 
         return Task.FromResult<IReadOnlyList<RoomModel>>(payload);
@@ -105,8 +128,6 @@ public class EstateDataQueryHandler(IDataStore dataStore) : IEstateDataQueryHand
 
     public Task<IReadOnlyList<FloorInfoModel>> GetBuildingFloorsAsync(int buildingId, bool includeRooms = false, QueryArgs? floorsQueryArgs = null, QueryArgs? roomsQueryArgs = null, CancellationToken cancellationToken = default)
     {
-        ValidatePositiveId(buildingId, nameof(buildingId));
-
         dataStore.BuildingsById.TryGetValue(buildingId, out BuildingEntity? building);
 
         IEnumerable<FloorEntity> floors = building?.Floors ?? [];
@@ -127,7 +148,7 @@ public class EstateDataQueryHandler(IDataStore dataStore) : IEstateDataQueryHand
         if (!includeRooms)
         {
             return Task.FromResult<IReadOnlyList<FloorInfoModel>>(
-                [.. floorList.Select(f => MapFloorEntityToModel(f, building))]);
+                [.. floorList.Select(f => EstateModelMapper.MapFloor(f, building))]);
         }
 
         // Group rooms by floor, applying optional paging
@@ -146,9 +167,9 @@ public class EstateDataQueryHandler(IDataStore dataStore) : IEstateDataQueryHand
         {
             roomsByFloorId.TryGetValue(f.Id, out List<RoomEntity>? floorRooms);
             IReadOnlyList<RoomModel>? roomModels = floorRooms is { Count: > 0 }
-                ? [.. floorRooms.Select(r => MapRoomEntityToModel(r, building, f))]
+                ? [.. floorRooms.Select(r => EstateModelMapper.MapRoom(r, building, f))]
                 : null;
-            return MapFloorEntityToModel(f, building, roomModels);
+            return EstateModelMapper.MapFloor(f, building, roomModels);
         })]);
     }
 
@@ -184,7 +205,7 @@ public class EstateDataQueryHandler(IDataStore dataStore) : IEstateDataQueryHand
         IReadOnlyDictionary<int, BuildingEntity> buildingsById = dataStore.BuildingsById;
         IReadOnlyDictionary<int, FloorEntity> floorsById = dataStore.FloorsById;
 
-        return Task.FromResult<IReadOnlyList<RoomModel>>([.. rooms.Select(r => MapRoomEntityToModel(r, buildingsById, floorsById))]);
+        return Task.FromResult<IReadOnlyList<RoomModel>>([.. rooms.Select(r => EstateModelMapper.MapRoom(r, buildingsById, floorsById))]);
     }
 
     public Task<IReadOnlyDictionary<int, BuildingWorkspaceStatsModel>> GetBuildingWorkspaceStatsAsync(QueryArgs? queryArgs = null, CancellationToken cancellationToken = default)
@@ -221,7 +242,7 @@ public class EstateDataQueryHandler(IDataStore dataStore) : IEstateDataQueryHand
 
         estates = ApplyQueryOptions(estates, queryArgs);
 
-        return Task.FromResult<IReadOnlyList<EstateModel>>([.. estates.Select(e => MapEstateToModel(e, includeBuildings))]);
+        return Task.FromResult<IReadOnlyList<EstateModel>>([.. estates.Select(e => EstateModelMapper.MapEstate(e, includeBuildings))]);
     }
 
     public Task<IReadOnlyList<BusinessTypeModel>> GetBusinessTypesAsync(CancellationToken cancellationToken = default)
@@ -249,17 +270,14 @@ public class EstateDataQueryHandler(IDataStore dataStore) : IEstateDataQueryHand
         return Task.FromResult<IReadOnlyList<BuildingLocationModel>>(locations);
     }
 
-    public Task<EstateModel?> GetEstateByIdAsync(int estateId, bool includeBuildings = false, CancellationToken cancellationToken = default)
+    public Task<EstateModel> GetEstateByIdAsync(int estateId, bool includeBuildings = false, CancellationToken cancellationToken = default)
     {
-        ValidatePositiveId(estateId, nameof(estateId));
+        if (!dataStore.EstatesById.TryGetValue(estateId, out EstateEntity? estate))
+        {
+            throw new EntityNotFoundException($"Estate with id {estateId} not found.");
+        }
 
-        dataStore.EstatesById.TryGetValue(estateId, out EstateEntity? estate);
-
-        EstateModel? result = estate is not null
-            ? MapEstateToModel(estate, includeBuildings)
-            : null;
-
-        return Task.FromResult(result);
+        return Task.FromResult(EstateModelMapper.MapEstate(estate, includeBuildings));
     }
 
     public Task<IReadOnlyList<FloorInfoModel>> GetFloorsAsync(int[]? floorIds = null, QueryArgs? queryArgs = null, CancellationToken cancellationToken = default)
@@ -284,213 +302,9 @@ public class EstateDataQueryHandler(IDataStore dataStore) : IEstateDataQueryHand
         return Task.FromResult<IReadOnlyList<FloorInfoModel>>([.. floors.Select(f =>
         {
             buildingsById.TryGetValue(f.BuildingId, out BuildingEntity? building);
-            return MapFloorEntityToModel(f, building);
+            return EstateModelMapper.MapFloor(f, building);
         })]);
     }
-
-    private static FloorInfoModel MapFloorEntityToModel(FloorEntity floor, BuildingEntity? building, IReadOnlyList<RoomModel>? rooms = null)
-    {
-        return new FloorInfoModel
-        {
-            Id = floor.Id,
-            Uid = floor.Uid,
-            Name = floor.Name,
-            PopularName = floor.PopularName,
-            Height = floor.Height,
-            GrossArea = floor.GrossArea,
-            NetArea = floor.NetArea,
-            BuildingId = floor.BuildingId,
-            BuildingName = building?.Name,
-            BuildingPopularName = building?.PopularName,
-            Rooms = rooms
-        };
-    }
-
-    private static RoomModel MapRoomEntityToModel(RoomEntity room, BuildingEntity? building, FloorEntity? floor)
-    {
-        return new RoomModel
-        {
-            Id = room.Id,
-            Name = room.Name,
-            PopularName = room.PopularName,
-            GrossArea = room.GrossArea,
-            NetArea = room.NetArea,
-            Capacity = room.Capacity,
-            BuildingId = room.BuildingId,
-            BuildingName = building?.Name,
-            BuildingPopularName = building?.PopularName,
-            FloorId = room.FloorId,
-            FloorName = floor?.Name,
-            FloorPopularName = floor?.PopularName
-        };
-    }
-
-    private static RoomModel MapRoomEntityToModel(
-        RoomEntity room,
-        IReadOnlyDictionary<int, BuildingEntity> buildingsById,
-        IReadOnlyDictionary<int, FloorEntity> floorsById)
-    {
-        buildingsById.TryGetValue(room.BuildingId, out BuildingEntity? building);
-
-        FloorEntity? floor = null;
-        if (room.FloorId.HasValue)
-        {
-            floorsById.TryGetValue(room.FloorId.Value, out floor);
-        }
-
-        return MapRoomEntityToModel(room, building, floor);
-    }
-
-    private static EstateModel MapEstateToModel(EstateEntity estate, bool includeBuildings = true)
-    {
-        ExternalOwnerInfoModel? externalOwnerInfo = null;
-        if (!string.IsNullOrEmpty(estate.ExternalOwnerStatus) ||
-            !string.IsNullOrEmpty(estate.ExternalOwnerName) ||
-            !string.IsNullOrEmpty(estate.ExternalOwnerNote))
-        {
-            externalOwnerInfo = new ExternalOwnerInfoModel
-            {
-                Status = estate.ExternalOwnerStatus,
-                Name = estate.ExternalOwnerName,
-                Note = estate.ExternalOwnerNote
-            };
-        }
-
-        return new EstateModel
-        {
-            Id = estate.Id,
-            Uid = estate.Uid,
-            Name = estate.Name,
-            PopularName = estate.PopularName,
-            GrossArea = estate.GrossArea,
-            NetArea = estate.NetArea,
-            Address = estate.Address,
-            GeoLocation = estate.GeoLocation,
-            BuildingCount = estate.BuildingCount,
-            Buildings = includeBuildings ? [.. estate.Buildings.Select(MapEntityToBuildingModel)] : [],
-            ExtendedProperties = new EstateExtendedPropertiesModel
-            {
-                PropertyDesignation = estate.PropertyDesignation,
-                OperationalArea = estate.OperationalArea,
-                AdministrativeArea = estate.AdministrativeArea,
-                MunicipalityArea = estate.MunicipalityArea,
-                ExternalOwnerInfo = externalOwnerInfo
-            }
-        };
-    }
-
-    private static BuildingModel MapEntityToBuildingModel(BuildingEntity building)
-    {
-        BuildingModel model = new()
-        {
-            Id = building.Id,
-            Uid = building.Uid,
-            Name = building.Name,
-            PopularName = building.PopularName,
-            Address = building.Address,
-            GeoLocation = building.GeoLocation,
-        };
-
-        return model;
-    }
-
-    private static BuildingInfoModel MapEntityToBuildingInfoModel(
-        BuildingEntity building,
-        BuildingAscendantModel? estateAscendant = null,
-        BuildingAscendantModel? regionAscendant = null,
-        BuildingAscendantModel? organizationAscendant = null)
-    {
-        BuildingNoticeBoardModel? noticeBoardModel = null;
-        if (building.NoticeBoard != null)
-        {
-            noticeBoardModel = new BuildingNoticeBoardModel
-            {
-                Text = building.NoticeBoard.Text,
-                StartDate = building.NoticeBoard.StartDate,
-                EndDate = building.NoticeBoard.EndDate
-            };
-        }
-
-        // Always include extended properties (they're always available from cache)
-        ExternalOwnerInfoModel? externalOwnerInfo = null;
-        if (!string.IsNullOrEmpty(building.ExternalOwnerStatus) ||
-            !string.IsNullOrEmpty(building.ExternalOwnerName) ||
-            !string.IsNullOrEmpty(building.ExternalOwnerNote))
-        {
-            externalOwnerInfo = new ExternalOwnerInfoModel
-            {
-                Status = building.ExternalOwnerStatus,
-                Name = building.ExternalOwnerName,
-                Note = building.ExternalOwnerNote
-            };
-        }
-
-        BuildingExtendedPropertiesModel extendedProperties = new()
-        {
-            BlueprintAvailable = building.BlueprintAvailable,
-            YearOfConstruction = building.YearOfConstruction,
-            ExternalOwnerInfo = externalOwnerInfo,
-            PropertyDesignation = building.PropertyDesignation,
-            NoticeBoard = noticeBoardModel,
-            ContactPersons = building.ContactPersons
-        };
-
-        // ImageUrl logic:
-        // - null ImageIds = unknown (not yet fetched) → provide URL (will lazy-load on request)
-        // - empty ImageIds = confirmed no images → null URL
-        // - has ImageIds = has images → provide URL
-        string? imageUrl = building.ImageIds is { Count: 0 }
-            ? null
-            : $"/api/buildings/{building.Id}/image";
-
-        BuildingInfoModel model = new()
-        {
-            // Identity
-            Id = building.Id,
-            Uid = building.Uid,
-
-            // Basic
-            Name = building.Name,
-            PopularName = building.PopularName,
-
-            // Location
-            Address = building.Address,
-            GeoLocation = building.GeoLocation,
-
-            // Measurements
-            GrossArea = building.GrossArea,
-            NetArea = building.NetArea,
-
-            // Hierarchy - not populated here
-            Estate = estateAscendant,
-            Region = regionAscendant,
-            Organization = organizationAscendant,
-
-            // Extended
-            ExtendedProperties = extendedProperties,
-
-            // Workspace stats
-            NumFloors = building.NumFloors,
-            NumRooms = building.NumRooms,
-
-            // Image
-            ImageUrl = imageUrl
-        };
-
-        return model;
-    }
-
-    #region Private Helper Methods
-
-    private static void ValidatePositiveId(int id, string paramName)
-    {
-        if (id <= 0)
-        {
-            throw new ArgumentOutOfRangeException(paramName, "ID must be a positive number.");
-        }
-    }
-
-    #endregion
 
     private static IEnumerable<T> ApplyQueryOptions<T>(IEnumerable<T> enumerable, QueryArgs? args)
     {

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Umea.se.EstateService.DataStore.Entities;
 using Umea.se.EstateService.Shared.Data.Entities;
@@ -19,6 +20,9 @@ public class EstateDbContext(DbContextOptions<EstateDbContext> options) : DbCont
     public DbSet<RoomEntity> Rooms => Set<RoomEntity>();
     public DbSet<BuildingAscendantDbEntity> BuildingAscendants => Set<BuildingAscendantDbEntity>();
     public DbSet<DataSyncMetadata> SyncMetadata => Set<DataSyncMetadata>();
+    public DbSet<WorkOrderEntity> WorkOrders => Set<WorkOrderEntity>();
+    public DbSet<WorkOrderFileEntity> WorkOrderFiles => Set<WorkOrderFileEntity>();
+    public DbSet<FavoriteEntity> Favorites => Set<FavoriteEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -30,6 +34,45 @@ public class EstateDbContext(DbContextOptions<EstateDbContext> options) : DbCont
         ConfigureRoom(modelBuilder);
         ConfigureBuildingAscendant(modelBuilder);
         ConfigureSyncMetadata(modelBuilder);
+        ConfigureWorkOrder(modelBuilder);
+        ConfigureWorkOrderFile(modelBuilder);
+        ConfigureFavorite(modelBuilder);
+
+        if (Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite")
+        {
+            ApplySqliteDateTimeOffsetConversions(modelBuilder);
+        }
+    }
+
+    /// <summary>
+    /// SQLite does not natively support DateTimeOffset in ORDER BY.
+    /// This converts DateTimeOffset properties to ticks for storage, enabling sorting.
+    /// Only applied when running under SQLite (tests).
+    /// </summary>
+    private static void ApplySqliteDateTimeOffsetConversions(ModelBuilder modelBuilder)
+    {
+        ValueConverter<DateTimeOffset, long> dateTimeOffsetConverter = new(
+            v => v.ToUnixTimeMilliseconds(),
+            v => DateTimeOffset.FromUnixTimeMilliseconds(v));
+
+        ValueConverter<DateTimeOffset?, long?> nullableDateTimeOffsetConverter = new(
+            v => v.HasValue ? v.Value.ToUnixTimeMilliseconds() : null,
+            v => v.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(v.Value) : null);
+
+        foreach (IMutableEntityType entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            foreach (IMutableProperty property in entityType.GetProperties())
+            {
+                if (property.ClrType == typeof(DateTimeOffset))
+                {
+                    property.SetValueConverter(dateTimeOffsetConverter);
+                }
+                else if (property.ClrType == typeof(DateTimeOffset?))
+                {
+                    property.SetValueConverter(nullableDateTimeOffsetConverter);
+                }
+            }
+        }
     }
 
     private static void ConfigureEstate(ModelBuilder modelBuilder)
@@ -166,14 +209,14 @@ public class EstateDbContext(DbContextOptions<EstateDbContext> options) : DbCont
             });
 
             // Configure ImageIds as JSON column
-            ValueConverter<List<int>?, string?> imageIdsConverter = new(
+            ValueConverter<IReadOnlyList<int>?, string?> imageIdsConverter = new(
                 v => v == null || v.Count == 0 ? null : JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
                 v => string.IsNullOrEmpty(v) ? null : JsonSerializer.Deserialize<List<int>>(v, (JsonSerializerOptions?)null));
 
-            ValueComparer<List<int>?> imageIdsComparer = new(
+            ValueComparer<IReadOnlyList<int>?> imageIdsComparer = new(
                 (c1, c2) => (c1 == null && c2 == null) || (c1 != null && c2 != null && c1.SequenceEqual(c2)),
                 c => c == null ? 0 : c.Aggregate(0, (a, v) => HashCode.Combine(a, v)),
-                c => c == null ? null : c.ToList());
+                c => c == null ? null : (IReadOnlyList<int>)c.ToList());
 
             entity.Property(e => e.ImageIds)
                 .HasConversion(imageIdsConverter)
@@ -182,6 +225,12 @@ public class EstateDbContext(DbContextOptions<EstateDbContext> options) : DbCont
             entity.Property(e => e.ImageIds)
                 .HasColumnName("ImageIds")
                 .HasMaxLength(4000);
+
+            entity.Property(e => e.NumDocuments)
+                .HasColumnName("NumDocuments");
+
+            entity.Property(e => e.BackgroundCacheFetchedAtUtc)
+                .HasColumnName("BackgroundCacheFetchedAtUtc");
 
             // Ignore navigation properties for EF mapping
             entity.Ignore(e => e.Floors);
@@ -287,6 +336,116 @@ public class EstateDbContext(DbContextOptions<EstateDbContext> options) : DbCont
             // Id is explicitly set, not auto-generated
             entity.Property(e => e.Id)
                 .ValueGeneratedNever();
+
+            entity.Property(e => e.WorkOrderCategoriesJson);
+        });
+    }
+
+    private static void ConfigureWorkOrder(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<WorkOrderEntity>(entity =>
+        {
+            entity.ToTable("WorkOrders");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Location)
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .IsRequired();
+
+            entity.Property(e => e.SyncStatus)
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .HasColumnName("SyncStatus")
+                .IsRequired();
+
+            entity.Property(e => e.Description)
+                .HasMaxLength(4000)
+                .IsRequired();
+
+            entity.Property(e => e.ErrorMessage)
+                .HasMaxLength(2000);
+
+            entity.Property(e => e.BuildingName)
+                .HasMaxLength(500)
+                .IsRequired();
+
+            entity.Property(e => e.RoomName)
+                .HasMaxLength(500);
+
+            entity.Property(e => e.CreatedByEmail)
+                .HasMaxLength(200)
+                .IsRequired();
+
+            entity.Property(e => e.NotifierEmail)
+                .HasMaxLength(200);
+
+            entity.Property(e => e.NotifierName)
+                .HasMaxLength(200);
+
+            entity.Property(e => e.PythagorasStatusName)
+                .HasMaxLength(200);
+
+            entity.HasMany(e => e.Files)
+                .WithOne(f => f.WorkOrder)
+                .HasForeignKey(f => f.WorkOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => e.NextSyncAt);
+            entity.HasIndex(e => e.SyncStatus);
+            entity.HasIndex(e => e.BuildingId);
+            entity.HasIndex(e => e.Uid);
+        });
+    }
+
+    private static void ConfigureWorkOrderFile(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<WorkOrderFileEntity>(entity =>
+        {
+            entity.ToTable("WorkOrderFiles");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.FileName)
+                .HasMaxLength(500)
+                .IsRequired();
+
+            entity.Property(e => e.ContentType)
+                .HasMaxLength(200)
+                .IsRequired();
+
+            entity.Property(e => e.StoragePath)
+                .HasMaxLength(1000)
+                .IsRequired();
+
+            entity.HasIndex(e => e.WorkOrderId);
+        });
+    }
+
+    private static void ConfigureFavorite(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<FavoriteEntity>(entity =>
+        {
+            entity.ToTable("Favorites", t => t.HasCheckConstraint(
+                "CK_Favorites_NodeType",
+                "[NodeType] IN ('Estate', 'Building', 'Room')"));
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.UserEmail)
+                .HasMaxLength(200)
+                .IsRequired();
+
+            entity.Property(e => e.NodeType)
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .IsRequired();
+
+            entity.HasIndex(e => e.UserEmail);
+
+            entity.HasIndex(e => new { e.UserEmail, e.NodeType, e.NodeId })
+                .IsUnique();
         });
     }
 }

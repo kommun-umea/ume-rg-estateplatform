@@ -1,12 +1,21 @@
+using Umea.se.EstateService.Logic.Models;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 
 namespace Umea.se.EstateService.API.Requests;
 
 /// <summary>
-/// Extension helpers for translating <see cref="PagedQueryRequest"/> into <see cref="PythagorasQuery{T}"/>.
+/// Extension helpers for translating <see cref="PagedQueryRequest"/> into query types.
 /// </summary>
 public static class PagedQueryRequestExtensions
 {
+    /// <summary>
+    /// Converts a paged query request to <see cref="QueryArgs"/> for DataStore queries.
+    /// </summary>
+    public static QueryArgs ToQueryArgs(this PagedQueryRequest request) => QueryArgs.Create(
+        skip: request.Offset > 0 ? request.Offset : null,
+        take: request.Limit > 0 ? request.Limit : null,
+        searchTerm: request.SearchTerm);
+
     /// <summary>
     /// Applies paging information from the request onto the provided query.
     /// </summary>

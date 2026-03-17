@@ -1,13 +1,14 @@
-using Microsoft.Extensions.Logging;
+using System.Net;
+using Umea.se.EstateService.Logic.Models;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
-using Umea.se.EstateService.Logic.Models;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Enums;
+using Umea.se.EstateService.Shared.Exceptions;
 using Umea.se.Toolkit.Images;
 
 namespace Umea.se.EstateService.Logic.Handlers.Images;
 
-public sealed class BuildingImageService(IPythagorasClient pythagorasClient, BuildingImageIdCache metadataCache, ImageService imageService, ILogger<BuildingImageService> logger) : IBuildingImageService
+public sealed class BuildingImageService(IPythagorasClient pythagorasClient, BuildingBackgroundCache backgroundCache, ImageService imageService) : IBuildingImageService
 {
     public async Task<ImageResult?> GetImageResultAsync(int buildingId, int? imageId, int? maxWidth, int? maxHeight, CancellationToken cancellationToken = default)
     {
@@ -17,15 +18,18 @@ public sealed class BuildingImageService(IPythagorasClient pythagorasClient, Bui
             ArgumentOutOfRangeException.ThrowIfNegativeOrZero(imageId.Value);
         }
 
-        int? resolvedImageId = imageId ?? await GetPrimaryImageIdAsync(buildingId, cancellationToken);
+        // Ensure image IDs are cached — falls back to inline Pythagoras fetch on miss
+        IReadOnlyList<int>? imageIds = await backgroundCache.GetOrFetchImageIdsAsync(buildingId, cancellationToken);
 
-        if (resolvedImageId is null)
+        if (imageIds is null or { Count: 0 })
         {
             return null;
         }
 
+        int resolvedImageId = imageId ?? imageIds[0];
+
         // If specific imageId was requested, validate it belongs to this building
-        if (imageId.HasValue && !await ValidateImageBelongsToBuildingAsync(buildingId, imageId.Value, cancellationToken))
+        if (imageId.HasValue && !imageIds.Contains(imageId.Value))
         {
             return null;
         }
@@ -36,9 +40,29 @@ public sealed class BuildingImageService(IPythagorasClient pythagorasClient, Bui
             maxHeight,
             fetchOriginal: async ct =>
             {
-                using HttpResponseMessage response = await pythagorasClient.GetGalleryImageDataAsync(resolvedImageId.Value, GalleryImageVariant.Original, ct);
-                response.EnsureSuccessStatusCode();
-                return await response.Content.ReadAsByteArrayAsync(ct);
+                HttpResponseMessage response;
+                try
+                {
+                    response = await pythagorasClient.GetGalleryImageDataAsync(resolvedImageId, GalleryImageVariant.Original, ct);
+                }
+                catch (HttpRequestException ex)
+                {
+                    throw ex.StatusCode == HttpStatusCode.NotFound
+                        ? new ImageNotFoundException($"Image {resolvedImageId} not found in Pythagoras.")
+                        : new ExternalServiceUnavailableException($"Pythagoras returned {ex.StatusCode} for image {resolvedImageId}.", ex);
+                }
+
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                {
+                    response.Dispose();
+                    throw new ImageNotFoundException($"Image {resolvedImageId} not found in Pythagoras.");
+                }
+
+                using (response)
+                {
+                    response.EnsureSuccessStatusCode();
+                    return await response.Content.ReadAsByteArrayAsync(ct);
+                }
             },
             cancellationToken);
     }
@@ -47,62 +71,20 @@ public sealed class BuildingImageService(IPythagorasClient pythagorasClient, Bui
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(buildingId);
 
-        int? primaryImageId = await GetPrimaryImageIdAsync(buildingId, cancellationToken);
-        if (primaryImageId is null)
+        IReadOnlyList<int>? imageIds = await backgroundCache.GetOrFetchImageIdsAsync(buildingId, cancellationToken);
+
+        if (imageIds is null or { Count: 0 })
         {
             return null;
         }
 
-        IReadOnlyList<int>? imageIds = await metadataCache.GetAllImageIdsAsync(buildingId, cancellationToken);
-
-        return new BuildingImageMetadata(buildingId, primaryImageId, imageIds ?? []);
+        return new BuildingImageMetadata(buildingId, imageIds[0], imageIds);
     }
 
     public Task InvalidateCacheAsync(int buildingId, CancellationToken cancellationToken = default)
-        => metadataCache.InvalidateAsync(buildingId, cancellationToken);
-
-    private async Task<bool> ValidateImageBelongsToBuildingAsync(int buildingId, int imageId, CancellationToken cancellationToken)
     {
-        IReadOnlyList<int>? imageIds = await metadataCache.GetAllImageIdsAsync(buildingId, cancellationToken);
-
-        if (imageIds?.Contains(imageId) == true)
-        {
-            return true;
-        }
-
-        IReadOnlyList<GalleryImageFile> images = await RefreshImageMetadataAsync(buildingId, cancellationToken);
-        return images.Any(i => i.Id == imageId);
-    }
-
-    private async Task<int?> GetPrimaryImageIdAsync(int buildingId, CancellationToken cancellationToken)
-    {
-        // Use GetAllImageIdsAsync to detect cache hits - it returns non-null even for empty (no images)
-        IReadOnlyList<int>? cachedImageIds = await metadataCache.GetAllImageIdsAsync(buildingId, cancellationToken);
-        if (cachedImageIds is not null)
-        {
-            // Cache hit - return primary from cache (may be null if no images)
-            return await metadataCache.GetPrimaryImageIdAsync(buildingId, cancellationToken);
-        }
-
-        logger.LogDebug("Fetching image list for building {BuildingId} from Pythagoras", buildingId);
-
-        IReadOnlyList<GalleryImageFile> images = await RefreshImageMetadataAsync(buildingId, cancellationToken);
-        return images.Count > 0 ? SelectPrimaryImage(images).Id : null;
-    }
-
-    private async Task<IReadOnlyList<GalleryImageFile>> RefreshImageMetadataAsync(int buildingId, CancellationToken cancellationToken)
-    {
-        using CancellationTokenSource timeoutCts = new(TimeSpan.FromSeconds(5));
-        using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
-
-        IReadOnlyList<GalleryImageFile> images = await pythagorasClient.GetBuildingGalleryImagesAsync(buildingId, linkedCts.Token);
-
-        // Always cache the result - even empty arrays (building has no images)
-        int? primaryImageId = images.Count > 0 ? SelectPrimaryImage(images).Id : null;
-        IReadOnlyList<int> allImageIds = [.. images.Select(i => i.Id)];
-        await metadataCache.SetImageMetadataAsync(buildingId, allImageIds, primaryImageId, cancellationToken: cancellationToken);
-
-        return images;
+        // Cache handles its own staleness — no-op
+        return Task.CompletedTask;
     }
 
     public static GalleryImageFile SelectPrimaryImage(IReadOnlyList<GalleryImageFile> images)

@@ -1,9 +1,10 @@
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Enums;
 using Umea.se.EstateService.Shared.Data.Entities;
 using Umea.se.EstateService.Shared.ValueObjects;
+using static Umea.se.EstateService.Logic.Data.Pythagoras.Mappers.MapperUtilities;
 
-namespace Umea.se.EstateService.Logic.Data.Mappers;
+namespace Umea.se.EstateService.Logic.Data.Pythagoras.Mappers;
 
 /// <summary>
 /// Maps NavigationFolder DTOs from Pythagoras API to EstateEntity objects.
@@ -27,7 +28,7 @@ public static class EstateEntityMapper
             PopularName = dto.PopularName ?? string.Empty,
             GrossArea = dto.Grossarea ?? 0m,
             NetArea = dto.Netarea ?? 0m,
-            GeoLocation = CreateGeoPoint(dto),
+            GeoLocation = CreateGeoPoint(dto.GeoX, dto.GeoY),
             Address = CreateAddress(dto),
             PropertyDesignation = TryGetPropertyValue(dto.PropertyValues, PropertyCategoryId.PropertyDesignation),
             OperationalArea = TryGetPropertyValue(dto.PropertyValues, PropertyCategoryId.OperationalArea),
@@ -45,42 +46,8 @@ public static class EstateEntityMapper
     /// <summary>
     /// Converts a collection of NavigationFolder DTOs to EstateEntity objects.
     /// </summary>
-    /// <param name="dtos">The collection of NavigationFolder DTOs.</param>
-    /// <returns>A list of mapped EstateEntity objects.</returns>
     public static List<EstateEntity> ToEntities(IReadOnlyList<NavigationFolder> dtos)
-    {
-        ArgumentNullException.ThrowIfNull(dtos);
-
-        if (dtos.Count == 0)
-        {
-            return [];
-        }
-
-        List<EstateEntity> entities = new(dtos.Count);
-        foreach (NavigationFolder dto in dtos)
-        {
-            entities.Add(ToEntity(dto));
-        }
-
-        return entities;
-    }
-
-    /// <summary>
-    /// Creates a GeoPointModel from NavigationFolder coordinates.
-    /// Returns null if both coordinates are zero.
-    /// </summary>
-    private static GeoPointModel? CreateGeoPoint(NavigationFolder dto)
-    {
-        double x = dto.GeoX;
-        double y = dto.GeoY;
-
-        if (Math.Abs(x) < double.Epsilon && Math.Abs(y) < double.Epsilon)
-        {
-            return null;
-        }
-
-        return new GeoPointModel(x, y);
-    }
+        => MapperUtilities.ToEntities(dtos, ToEntity);
 
     /// <summary>
     /// Creates an AddressModel from NavigationFolder address fields.
@@ -108,24 +75,4 @@ public static class EstateEntityMapper
             dto.AddressExtra ?? string.Empty);
     }
 
-    /// <summary>
-    /// Attempts to retrieve a property value from the PropertyValues dictionary.
-    /// Returns null if propertyValues is null or the property is not found.
-    /// </summary>
-    private static string? TryGetPropertyValue(
-        Dictionary<int, PropertyValueDto>? propertyValues,
-        PropertyCategoryId propertyId)
-    {
-        if (propertyValues is null)
-        {
-            return null;
-        }
-
-        if (propertyValues.TryGetValue((int)propertyId, out PropertyValueDto? propertyDto))
-        {
-            return propertyDto.Value;
-        }
-
-        return null;
-    }
 }

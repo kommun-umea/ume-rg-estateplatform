@@ -1,9 +1,10 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
+using Umea.se.EstateService.API.Extensions;
 using Umea.se.EstateService.API.Requests;
-using Umea.se.EstateService.Logic.Handlers.Blueprint;
 using Umea.se.EstateService.Logic.Handlers;
+using Umea.se.EstateService.Logic.Handlers.Blueprint;
 using Umea.se.EstateService.Logic.Models;
 using Umea.se.EstateService.Shared.Models;
 
@@ -13,11 +14,8 @@ namespace Umea.se.EstateService.API.Controllers;
 [Produces("application/json")]
 [Route(ApiRoutes.Floors)]
 [Authorize]
-public sealed class FloorController(IFloorBlueprintService blueprintService, IEstateDataQueryHandler pythagorasHandler, ILogger<FloorController> logger) : ControllerBase
+public class FloorController(IFloorBlueprintService blueprintService, IEstateDataQueryHandler pythagorasHandler) : ControllerBase
 {
-    private readonly IFloorBlueprintService _blueprintService = blueprintService;
-    private readonly IEstateDataQueryHandler _pythagorasHandler = pythagorasHandler;
-    private readonly ILogger<FloorController> _logger = logger;
 
     /// <summary>
     /// Retrieves metadata for a specific floor.
@@ -36,7 +34,7 @@ public sealed class FloorController(IFloorBlueprintService blueprintService, IEs
         int floorId,
         CancellationToken cancellationToken)
     {
-        IReadOnlyList<FloorInfoModel> floors = await _pythagorasHandler
+        IReadOnlyList<FloorInfoModel> floors = await pythagorasHandler
             .GetFloorsAsync([floorId], queryArgs: null, cancellationToken)
             .ConfigureAwait(false);
 
@@ -72,96 +70,14 @@ public sealed class FloorController(IFloorBlueprintService blueprintService, IEs
         [FromQuery] FloorBlueprintRequest request,
         CancellationToken cancellationToken)
     {
-        if (!ModelState.IsValid)
-        {
-            ValidationProblemDetails validationProblem = new(ModelState)
-            {
-                Status = StatusCodes.Status400BadRequest
-            };
+        FloorBlueprint blueprint = await blueprintService
+            .GetBlueprintAsync(floorId, request.Format, request.IncludeWorkspaceTexts, cancellationToken)
+            .ConfigureAwait(false);
 
-            return BadRequest(validationProblem);
-        }
+        blueprint.Content.Position = 0;
 
-        try
-        {
-            FloorBlueprint blueprint = await _blueprintService
-                .GetBlueprintAsync(floorId, request.Format, request.IncludeWorkspaceTexts, cancellationToken)
-                .ConfigureAwait(false);
+        Response.SetPublicCacheHeaders(blueprint.IsGzipped);
 
-            blueprint.Content.Position = 0;
-
-            Response.GetTypedHeaders().CacheControl = new Microsoft.Net.Http.Headers.CacheControlHeaderValue
-            {
-                Public = true,
-                MaxAge = TimeSpan.FromHours(24)
-            };
-
-            if (blueprint.IsGzipped)
-            {
-                Response.Headers.ContentEncoding = "gzip";
-            }
-
-            return File(blueprint.Content, blueprint.ContentType, blueprint.FileName);
-        }
-        catch (FloorBlueprintValidationException ex)
-        {
-            _logger.LogWarning(ex, "Validation error while generating blueprint for floor {FloorId}", floorId);
-            ProblemDetails problem = new()
-            {
-                Status = StatusCodes.Status400BadRequest,
-                Title = "Invalid blueprint request",
-                Detail = ex.Message
-            };
-
-            return BadRequest(problem);
-        }
-        catch (FloorBlueprintUnavailableException ex)
-        {
-            _logger.LogWarning(ex, "Blueprint unavailable for floor {FloorId}", floorId);
-            ProblemDetails problem = new()
-            {
-                Status = StatusCodes.Status502BadGateway,
-                Title = "Blueprint unavailable",
-                Detail = ex.Message
-            };
-
-            return StatusCode(StatusCodes.Status502BadGateway, problem);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            _logger.LogWarning(ex, "Floor {FloorId} not found when requesting blueprint", floorId);
-            ProblemDetails problem = new()
-            {
-                Status = StatusCodes.Status404NotFound,
-                Title = "Floor not found",
-                Detail = "The requested floor could not be located."
-            };
-
-            return NotFound(problem);
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.LogWarning(ex, "Conflict while generating blueprint for floor {FloorId}", floorId);
-            ProblemDetails problem = new()
-            {
-                Status = StatusCodes.Status409Conflict,
-                Title = "Blueprint generation conflict",
-                Detail = ex.Message
-            };
-
-            return Conflict(problem);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Unexpected error while generating blueprint for floor {FloorId}", floorId);
-            ProblemDetails problem = new()
-            {
-                Status = StatusCodes.Status500InternalServerError,
-                Title = "Blueprint generation failed",
-                Detail = "Unexpected error while generating blueprint."
-            };
-
-            return StatusCode(StatusCodes.Status500InternalServerError, problem);
-        }
+        return File(blueprint.Content, blueprint.ContentType, blueprint.FileName);
     }
 }

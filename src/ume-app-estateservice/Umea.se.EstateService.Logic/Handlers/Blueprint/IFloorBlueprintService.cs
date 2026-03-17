@@ -1,5 +1,5 @@
 using Umea.se.EstateService.Logic.Models;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Enums;
 
 namespace Umea.se.EstateService.Logic.Handlers.Blueprint;
 

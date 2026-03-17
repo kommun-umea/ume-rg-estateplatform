@@ -23,7 +23,7 @@ public class BuildingControllerTests : ControllerTestCloud<TestApiFactory, Progr
         _fakeClient = WebAppFactory.FakeClient;
         _stubImageService = WebAppFactory.StubImageService;
 
-        MockManager.SetupUser(user => user.WithActualAuthorization());
+        MockManager.SetupUser(user => user.WithEmail("test@example.com").WithActualAuthorization());
 
         // Ensure a clean datastore snapshot before each test in this class.
         DataStoreSeeder.Clear(WebAppFactory.GetDataStore());
@@ -146,21 +146,21 @@ public class BuildingControllerTests : ControllerTestCloud<TestApiFactory, Progr
     }
 
     [Fact]
-     public async Task GetBuildingFloorsAsync_IncludeRoomsFalse_DoesNotFetchRooms()
+    public async Task GetBuildingFloorsAsync_IncludeRoomsFalse_DoesNotFetchRooms()
     {
         DataStoreSeeder.Seed(
             WebAppFactory.GetDataStore(),
-            buildings: new[]
-            {
+            buildings:
+            [
                 new BuildingEntity
                 {
                     Id = 1,
                     Name = "Building 1",
                     PopularName = "Building 1"
                 }
-            },
-            floors: new[]
-            {
+            ],
+            floors:
+            [
                 new FloorEntity
                 {
                     Id = 8,
@@ -169,7 +169,7 @@ public class BuildingControllerTests : ControllerTestCloud<TestApiFactory, Progr
                     Name = "Floor 2",
                     PopularName = "Floor 2"
                 }
-            });
+            ]);
 
         HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.Buildings}/1/floors?includeRooms=false");
 

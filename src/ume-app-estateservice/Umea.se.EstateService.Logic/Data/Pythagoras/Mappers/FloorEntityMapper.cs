@@ -1,7 +1,7 @@
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Data.Entities;
 
-namespace Umea.se.EstateService.Logic.Data.Mappers;
+namespace Umea.se.EstateService.Logic.Data.Pythagoras.Mappers;
 
 /// <summary>
 /// Maps Floor DTOs from Pythagoras API to FloorEntity objects.
@@ -35,23 +35,6 @@ public static class FloorEntityMapper
     /// <summary>
     /// Converts a collection of Floor DTOs to FloorEntity objects.
     /// </summary>
-    /// <param name="dtos">The collection of Floor DTOs.</param>
-    /// <returns>A list of mapped FloorEntity objects.</returns>
     public static List<FloorEntity> ToEntities(IReadOnlyList<Floor> dtos)
-    {
-        ArgumentNullException.ThrowIfNull(dtos);
-
-        if (dtos.Count == 0)
-        {
-            return [];
-        }
-
-        List<FloorEntity> entities = new(dtos.Count);
-        foreach (Floor dto in dtos)
-        {
-            entities.Add(ToEntity(dto));
-        }
-
-        return entities;
-    }
+        => MapperUtilities.ToEntities(dtos, ToEntity);
 }

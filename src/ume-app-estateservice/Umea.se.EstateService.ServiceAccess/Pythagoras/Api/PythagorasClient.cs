@@ -2,9 +2,8 @@ using System.Globalization;
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Api.Request;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Enums;
 using Umea.se.Toolkit.ExternalService;
 
 namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
@@ -21,6 +20,11 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : Ext
         {
             new UnixMillisDateTimeConverter()
         }
+    };
+
+    private static readonly JsonSerializerOptions _workOrderSerializerOptions = new(JsonSerializerDefaults.Web)
+    {
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
     };
 
     protected override string PingUrl => "";
@@ -520,5 +524,240 @@ where TValue : class
 
         HttpRequestMessage request = new(HttpMethod.Get, requestUri);
         return HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+    }
+
+    public async Task<WorkOrderDto?> CreateWorkOrderAsync(PythagorasWorkOrderType workOrderType, PythagorasWorkOrderOrigin origin, CreatePythagorasWorkOrderRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        int typeId = (int)workOrderType;
+        string endpoint = $"rest/v1/workordertype/{typeId}/workorder/newdefault";
+        string queryString = FormQueryParameter("origin", origin.ToString());
+        string requestUri = BuildRequestUri(NormalizeEndpoint(endpoint), queryString);
+
+        string json = JsonSerializer.Serialize(request, _workOrderSerializerOptions);
+
+        using HttpRequestMessage message = new(HttpMethod.Post, requestUri)
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+
+        using HttpResponseMessage response = await HttpClient
+            .SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+            .ConfigureAwait(false);
+
+        string responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new PythagorasApiException(
+                $"CreateWorkOrder failed: {(int)response.StatusCode} {response.ReasonPhrase}. Request: {json}. Response: {responseBody}",
+                response.StatusCode,
+                responseBody);
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<WorkOrderDto>(responseBody, _serializerOptions);
+        }
+        catch (JsonException ex)
+        {
+            // Even if full deserialization fails, try to extract the ID so retries don't create duplicates
+            int? id = TryExtractWorkOrderId(responseBody);
+            if (id.HasValue)
+            {
+                return new WorkOrderDto { Id = id.Value };
+            }
+
+            throw new PythagorasApiException(
+                $"CreateWorkOrder succeeded but response deserialization failed. Response: {responseBody}",
+                response.StatusCode,
+                responseBody,
+                ex);
+        }
+    }
+
+    private static int? TryExtractWorkOrderId(string json)
+    {
+        try
+        {
+            using JsonDocument doc = JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("id", out JsonElement idElement) && idElement.TryGetInt32(out int id))
+            {
+                return id;
+            }
+        }
+        catch
+        {
+            // Ignore parse failures
+        }
+
+        return null;
+    }
+
+    public async Task UploadWorkOrderDocumentAsync(int workOrderId, Stream fileStream, string fileName, long fileSize, int? parentId = null, int? actionTypeId = null, int? actionTypeStatusId = null, CancellationToken cancellationToken = default)
+    {
+        if (workOrderId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(workOrderId), "Work order id must be positive.");
+        }
+
+        string endpoint = $"rest/v1/workorder/{workOrderId}/documentfile/record";
+        string requestUri = NormalizeEndpoint(endpoint);
+
+        using MultipartFormDataContent content = new();
+        StreamContent fileContent = new(fileStream);
+        content.Add(fileContent, "file", fileName);
+        content.Add(new StringContent(fileName), "fileName");
+        content.Add(new StringContent(fileSize.ToString(CultureInfo.InvariantCulture)), "fileSize");
+        content.Add(new StringContent((parentId ?? 0).ToString(CultureInfo.InvariantCulture)), "parentId");
+
+        if (actionTypeId.HasValue)
+        {
+            var fileRecordData = new
+            {
+                actionTypeId = actionTypeId.Value,
+                actionTypeStatusId = actionTypeStatusId,
+                receivedDate = (string?)null,
+                isRecorded = false,
+                isGDPR = false,
+                removalProcess = (string?)null
+            };
+            string fileRecordDataJson = JsonSerializer.Serialize(fileRecordData, _workOrderSerializerOptions);
+            content.Add(new StringContent(fileRecordDataJson), "fileRecordData");
+        }
+
+        using HttpResponseMessage response = await HttpClient
+            .PostAsync(requestUri, content, cancellationToken)
+            .ConfigureAwait(false);
+
+        response.EnsureSuccessStatusCode();
+    }
+
+    public Task<WorkOrderDto?> GetWorkOrderAsync(int workOrderId, CancellationToken cancellationToken = default)
+    {
+        if (workOrderId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(workOrderId), "Work order id must be positive.");
+        }
+
+        string endpoint = $"rest/v1/workorder/{workOrderId}/info";
+        return GetAsync<WorkOrderDto>(endpoint, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<WorkOrderDto>> GetWorkOrdersByIdsAsync(IReadOnlyList<int> workOrderIds, CancellationToken cancellationToken = default)
+    {
+        if (workOrderIds is not { Count: > 0 })
+        {
+            return Task.FromResult<IReadOnlyList<WorkOrderDto>>([]);
+        }
+
+        PythagorasQuery<WorkOrderDto> query = new PythagorasQuery<WorkOrderDto>()
+            .WithIds([.. workOrderIds]);
+
+        return QueryAsync("rest/v1/workorder", query, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<WorkOrderInfoDto>> GetWorkOrderInfosByIdsAsync(IReadOnlyList<int> workOrderIds, CancellationToken cancellationToken = default)
+    {
+        if (workOrderIds is not { Count: > 0 })
+        {
+            return [];
+        }
+
+        string requestUri = NormalizeEndpoint("rest/v1/workorder/info");
+        string json = JsonSerializer.Serialize(workOrderIds, _serializerOptions);
+
+        using HttpRequestMessage message = new(HttpMethod.Post, requestUri)
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+
+        using HttpResponseMessage response = await HttpClient
+            .SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            string? errorBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            throw new PythagorasApiException(
+                $"GetWorkOrderInfosByIds failed: {(int)response.StatusCode} {response.ReasonPhrase}.",
+                response.StatusCode,
+                errorBody);
+        }
+
+        await using Stream contentStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        List<WorkOrderInfoDto>? result = await JsonSerializer.DeserializeAsync<List<WorkOrderInfoDto>>(contentStream, _serializerOptions, cancellationToken).ConfigureAwait(false);
+
+        return result ?? [];
+    }
+
+    public Task<IReadOnlyList<WorkOrderCategoryInfoDto>> GetWorkOrderCategoriesAsync(int moduleId, CancellationToken cancellationToken = default)
+    {
+        if (moduleId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(moduleId), "Module id must be positive.");
+        }
+
+        string endpoint = $"rest/v1/workordermodule/{moduleId}/workordercategory/info";
+        PythagorasQuery<WorkOrderCategoryInfoDto> query = new();
+        return QueryAsync(endpoint, query, cancellationToken);
+    }
+
+    public async Task<WorkOrderDto?> SetWorkOrderCategoryAsync(int workOrderId, int categoryId, CancellationToken cancellationToken = default)
+    {
+        if (workOrderId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(workOrderId), "Work order id must be positive.");
+        }
+
+        if (categoryId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(categoryId), "Category id must be positive.");
+        }
+
+        string endpoint = $"rest/v1/workorder/{workOrderId}/category";
+        string requestUri = NormalizeEndpoint(endpoint);
+        string json = JsonSerializer.Serialize(categoryId);
+
+        using HttpRequestMessage message = new(HttpMethod.Put, requestUri)
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+
+        using HttpResponseMessage response = await HttpClient
+            .SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+            .ConfigureAwait(false);
+
+        return await ProcessResponseAsync<WorkOrderDto>(response, cancellationToken).ConfigureAwait(false);
+    }
+
+    public Task<IReadOnlyList<DocumentFileRecordActionType>> GetDocumentRecordActionTypesAsync(PythagorasQuery<DocumentFileRecordActionType>? query = null, CancellationToken ct = default)
+    {
+        query ??= new PythagorasQuery<DocumentFileRecordActionType>();
+        return QueryAsync("rest/v1/documentfilerecordactiontype", query, ct);
+    }
+
+    public Task<IReadOnlyList<DocumentFileRecordActionTypeStatus>> GetDocumentRecordActionTypeStatusesAsync(int actionTypeId, CancellationToken ct = default)
+    {
+        if (actionTypeId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(actionTypeId), "Action type id must be positive.");
+        }
+
+        string endpoint = $"rest/v1/documentfilerecordactiontype/{actionTypeId}/status";
+        PythagorasQuery<DocumentFileRecordActionTypeStatus> query = new();
+        return QueryAsync(endpoint, query, ct);
+    }
+
+    public Task<IReadOnlyList<FileDocumentDirectory>> GetWorkOrderDocumentFoldersAsync(int workOrderId, PythagorasQuery<FileDocumentDirectory>? query = null, CancellationToken ct = default)
+    {
+        if (workOrderId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(workOrderId), "Work order id must be positive.");
+        }
+
+        query ??= new PythagorasQuery<FileDocumentDirectory>();
+        return QueryAsync($"rest/v1/workorder/{workOrderId}/documentfolder/info/root", query, ct);
     }
 }

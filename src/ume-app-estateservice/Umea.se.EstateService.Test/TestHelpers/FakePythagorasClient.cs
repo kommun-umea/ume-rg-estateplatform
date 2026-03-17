@@ -1,8 +1,7 @@
 using System.Collections.Concurrent;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Api.Request;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Enums;
 
 namespace Umea.se.EstateService.Test.TestHelpers;
 
@@ -262,6 +261,84 @@ public sealed class FakePythagorasClient : IPythagorasClient
         return _results.GetOrAdd(dtoType, _ => new Queue<object>());
     }
 
+    // --- WorkOrder methods ---
+
+    private WorkOrderDto? _createWorkOrderResult;
+    private WorkOrderDto? _getWorkOrderResult;
+    public List<WorkOrderRequestCapture> WorkOrderRequests { get; } = [];
+
+    public void SetCreateWorkOrderResult(WorkOrderDto? result) => _createWorkOrderResult = result;
+    public void SetGetWorkOrderResult(WorkOrderDto? result) => _getWorkOrderResult = result;
+
+    public Task<WorkOrderDto?> CreateWorkOrderAsync(PythagorasWorkOrderType workOrderType, PythagorasWorkOrderOrigin origin, CreatePythagorasWorkOrderRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        WorkOrderRequests.Add(new WorkOrderRequestCapture("CreateWorkOrder", (int)workOrderType, $"origin={origin}"));
+        return Task.FromResult(_createWorkOrderResult);
+    }
+
+    public Task UploadWorkOrderDocumentAsync(int workOrderId, Stream fileStream, string fileName, long fileSize, int? parentId = null, int? actionTypeId = null, int? actionTypeStatusId = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(workOrderId, 0);
+        WorkOrderRequests.Add(new WorkOrderRequestCapture("UploadDocument", workOrderId, $"fileName={fileName}&fileSize={fileSize}&parentId={parentId}&actionTypeId={actionTypeId}&actionTypeStatusId={actionTypeStatusId}"));
+        return Task.CompletedTask;
+    }
+
+    public Task<WorkOrderDto?> GetWorkOrderAsync(int workOrderId, CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(workOrderId, 0);
+        WorkOrderRequests.Add(new WorkOrderRequestCapture("GetWorkOrder", workOrderId, null));
+        return Task.FromResult(_getWorkOrderResult);
+    }
+
+    public Task<IReadOnlyList<WorkOrderDto>> GetWorkOrdersByIdsAsync(IReadOnlyList<int> workOrderIds, CancellationToken cancellationToken = default)
+    {
+        WorkOrderRequests.Add(new WorkOrderRequestCapture("GetWorkOrdersByIds", 0, $"ids={string.Join(',', workOrderIds)}"));
+        return Task.FromResult<IReadOnlyList<WorkOrderDto>>([]);
+    }
+
+    private List<WorkOrderInfoDto> _workOrderInfoResults = [];
+
+    public void SetWorkOrderInfoResults(List<WorkOrderInfoDto> results) => _workOrderInfoResults = results;
+
+    public Task<IReadOnlyList<WorkOrderInfoDto>> GetWorkOrderInfosByIdsAsync(IReadOnlyList<int> workOrderIds, CancellationToken cancellationToken = default)
+    {
+        WorkOrderRequests.Add(new WorkOrderRequestCapture("GetWorkOrderInfosByIds", 0, $"ids={string.Join(',', workOrderIds)}"));
+        return Task.FromResult<IReadOnlyList<WorkOrderInfoDto>>(_workOrderInfoResults);
+    }
+
+    public Task<IReadOnlyList<WorkOrderCategoryInfoDto>> GetWorkOrderCategoriesAsync(int moduleId, CancellationToken cancellationToken = default)
+        => CaptureAsync<WorkOrderCategoryInfoDto>($"rest/v1/workordermodule/{moduleId}/workordercategory/info", query: null, cancellationToken);
+
+    private WorkOrderDto? _setWorkOrderCategoryResult;
+
+    public void SetSetWorkOrderCategoryResult(WorkOrderDto? result) => _setWorkOrderCategoryResult = result;
+
+    public Task<WorkOrderDto?> SetWorkOrderCategoryAsync(int workOrderId, int categoryId, CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(workOrderId, 0);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(categoryId, 0);
+        WorkOrderRequests.Add(new WorkOrderRequestCapture("SetWorkOrderCategory", workOrderId, $"categoryId={categoryId}"));
+        return Task.FromResult(_setWorkOrderCategoryResult);
+    }
+
+    public Task<IReadOnlyList<DocumentFileRecordActionType>> GetDocumentRecordActionTypesAsync(PythagorasQuery<DocumentFileRecordActionType>? query = null, CancellationToken ct = default)
+        => CaptureAsync("rest/v1/documentfilerecordactiontype", query, ct);
+
+    public Task<IReadOnlyList<DocumentFileRecordActionTypeStatus>> GetDocumentRecordActionTypeStatusesAsync(int actionTypeId, CancellationToken ct = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(actionTypeId, 0);
+        return CaptureAsync<DocumentFileRecordActionTypeStatus>($"rest/v1/documentfilerecordactiontype/{actionTypeId}/status", query: null, ct);
+    }
+
+    public Task<IReadOnlyList<FileDocumentDirectory>> GetWorkOrderDocumentFoldersAsync(int workOrderId, PythagorasQuery<FileDocumentDirectory>? query = null, CancellationToken ct = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(workOrderId, 0);
+        return CaptureAsync($"rest/v1/workorder/{workOrderId}/documentfolder/info/root", query, ct);
+    }
+
+    public readonly record struct WorkOrderRequestCapture(string Method, int EntityId, string? Parameters);
+
     /// <summary>
     /// Clears configured results and captured requests.
     /// </summary>
@@ -279,6 +356,11 @@ public sealed class FakePythagorasClient : IPythagorasClient
         _directoryResult = null;
         _documentResult = null;
         _buildingDocumentListResult = null;
+        _createWorkOrderResult = null;
+        _getWorkOrderResult = null;
+        _setWorkOrderCategoryResult = null;
+        _workOrderInfoResults = [];
+        WorkOrderRequests.Clear();
     }
 
     /// <summary>

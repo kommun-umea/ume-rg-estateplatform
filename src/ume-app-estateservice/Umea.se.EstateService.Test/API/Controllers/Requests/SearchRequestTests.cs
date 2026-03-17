@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Umea.se.EstateService.API.Requests;
 
-namespace Umea.se.EstateService.Test.API.Requests;
+namespace Umea.se.EstateService.Test.API.Controllers.Requests;
 
 public class SearchRequestTests
 {

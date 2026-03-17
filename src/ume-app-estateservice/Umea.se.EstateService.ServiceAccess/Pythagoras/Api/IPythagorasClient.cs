@@ -1,6 +1,5 @@
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Api.Request;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Enum;
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Enums;
 
 namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 
@@ -27,4 +26,16 @@ public interface IPythagorasClient
     Task<HttpResponseMessage> GetFloorBlueprintAsync(int floorId, BlueprintFormat format, IDictionary<int, IReadOnlyList<string>>? workspaceTexts, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<GalleryImageFile>> GetBuildingGalleryImagesAsync(int buildingId, CancellationToken cancellationToken = default);
     Task<HttpResponseMessage> GetGalleryImageDataAsync(int imageId, GalleryImageVariant variant, CancellationToken cancellationToken = default);
+
+    Task<WorkOrderDto?> CreateWorkOrderAsync(PythagorasWorkOrderType workOrderType, PythagorasWorkOrderOrigin origin, CreatePythagorasWorkOrderRequest request, CancellationToken cancellationToken = default);
+    Task UploadWorkOrderDocumentAsync(int workOrderId, Stream fileStream, string fileName, long fileSize, int? parentId = null, int? actionTypeId = null, int? actionTypeStatusId = null, CancellationToken cancellationToken = default);
+    Task<WorkOrderDto?> GetWorkOrderAsync(int workOrderId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<WorkOrderDto>> GetWorkOrdersByIdsAsync(IReadOnlyList<int> workOrderIds, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<WorkOrderInfoDto>> GetWorkOrderInfosByIdsAsync(IReadOnlyList<int> workOrderIds, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<WorkOrderCategoryInfoDto>> GetWorkOrderCategoriesAsync(int moduleId, CancellationToken cancellationToken = default);
+    Task<WorkOrderDto?> SetWorkOrderCategoryAsync(int workOrderId, int categoryId, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<DocumentFileRecordActionType>> GetDocumentRecordActionTypesAsync(PythagorasQuery<DocumentFileRecordActionType>? query = null, CancellationToken ct = default);
+    Task<IReadOnlyList<DocumentFileRecordActionTypeStatus>> GetDocumentRecordActionTypeStatusesAsync(int actionTypeId, CancellationToken ct = default);
+    Task<IReadOnlyList<FileDocumentDirectory>> GetWorkOrderDocumentFoldersAsync(int workOrderId, PythagorasQuery<FileDocumentDirectory>? query = null, CancellationToken ct = default);
 }
