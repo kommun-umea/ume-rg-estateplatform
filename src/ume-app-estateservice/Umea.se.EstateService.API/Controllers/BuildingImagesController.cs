@@ -6,7 +6,6 @@ using Umea.se.EstateService.API.Extensions;
 using Umea.se.EstateService.API.Responses;
 using Umea.se.EstateService.Logic.Handlers.Images;
 using Umea.se.EstateService.Logic.Models;
-using Umea.se.EstateService.Shared.Exceptions;
 using Umea.se.Toolkit.Images;
 
 namespace Umea.se.EstateService.API.Controllers;
@@ -51,7 +50,12 @@ public class BuildingImagesController(IBuildingImageService buildingImageService
         [Range(1, int.MaxValue, ErrorMessage = "Building id must be positive.")] int buildingId,
         CancellationToken cancellationToken)
     {
-        BuildingImageMetadata? metadata = await buildingImageService.GetImageMetadataAsync(buildingId, cancellationToken) ?? throw new EntityNotFoundException("No images found for this building.");
+        BuildingImageMetadata? metadata = await buildingImageService.GetImageMetadataAsync(buildingId, cancellationToken);
+
+        if (metadata is null)
+        {
+            return NotFound(new ProblemDetails { Status = 404, Title = "Not found", Detail = "No images found for this building." });
+        }
 
         return Ok(new BuildingImagesResponse
         {
@@ -102,7 +106,13 @@ public class BuildingImagesController(IBuildingImageService buildingImageService
         w = SnapToAllowedSize(w);
         h = SnapToAllowedSize(h);
 
-        ImageResult? result = await buildingImageService.GetImageResultAsync(buildingId, imageId, w, h, cancellationToken) ?? throw new EntityNotFoundException(imageId.HasValue ? "Image not found." : "No images found for this building.");
+        ImageResult? result = await buildingImageService.GetImageResultAsync(buildingId, imageId, w, h, cancellationToken);
+
+        if (result is null)
+        {
+            return NotFound(new ProblemDetails { Status = 404, Title = "Not found", Detail = imageId.HasValue ? "Image not found." : "No images found for this building." });
+        }
+
         Response.SetPublicCacheHeaders(result.IsGzipped);
 
         return File(result.Data, result.ContentType);
