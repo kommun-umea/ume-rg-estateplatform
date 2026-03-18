@@ -126,7 +126,7 @@ module appServicePlan 'br/ume:microsoft.web.serverfarms:v2.3' = {
     purpose: purpose
     dateNowUtc: dateNowUtc
 
-    skuName: environment == 'prod' ? 'P1V4' : 'P0V4'
+    skuName: environment == 'prod' ? 'P0V4' : 'P0V4' // TODO: Prod should use P1V4, it is currently unavailable - 2026-03-18
   }
 }
 
