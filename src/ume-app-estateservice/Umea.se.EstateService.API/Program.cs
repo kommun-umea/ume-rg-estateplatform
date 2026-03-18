@@ -59,7 +59,7 @@ builder.Services
     .AddApplicationConfig(config)
     .AddApiDependencies()
     .AddLogicDependencies()
-    .AddDataStorePersistence(builder.Configuration.GetConnectionString("EstateService"))
+    .AddDataStorePersistence(config.DatabaseConnectionString)
     .AddServiceAccessDependencies()
     .AddSharedDependencies()
 ;

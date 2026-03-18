@@ -1,12 +1,6 @@
 name: $(buildName)_$(Date:yyyy-MM-ddTHH.mm.ss)
 
-trigger:
-  branches:
-    include:
-      - main
-  paths:
-    include:
-      - iac
+trigger: none
 
 pool:
   vmImage: ubuntu-latest
@@ -47,30 +41,9 @@ variables:
     value: ume-rg-estateplatform-${{ parameters.environment }}
 
 stages:
-  - stage: CheckForChangesStage
-    displayName: Check for changes
-    jobs:
-      - template: pipelines/general/template-check-for-changes.yml@templates
-        parameters:
-          paths:
-            - iac
-
   - stage: DeployInfrastructureStage
     displayName: Deploy Infrastructure
-    dependsOn: CheckForChangesStage
-    variables:
-      changedPaths: $[ dependencies.CheckForChangesStage.outputs['Job.Task.changedPaths'] ]
-    condition: |
-      and(
-        not(or(failed(), canceled())),
-        or(
-          eq(${{ parameters.iacJobPicker }}, true),
-          and(
-            eq(variables['Build.Reason'], 'IndividualCI'),
-            eq(variables['changedPaths'], 'iac')
-          )
-        )
-      )
+    condition: eq(${{ parameters.iacJobPicker }}, true)
     jobs:
       - template: pipelines/azure/template-deploy-infrastructure.yml@templates
         parameters:
@@ -85,18 +58,10 @@ stages:
   - stage: UpdateKeyVaultStage
     displayName: Update Key Vault
     dependsOn: DeployInfrastructureStage
-    variables:
-      changedPaths: $[ dependencies.CheckForChangesStage.outputs['Job.Task.changedPaths'] ]
     condition: |
       and(
         not(or(failed(), canceled())),
-        or(
-          eq(${{ parameters.updateKeyVaultJobPicker }}, true),
-          and(
-            eq(variables['Build.Reason'], 'IndividualCI'),
-            eq(variables['changedPaths'], 'iac')
-          )
-        )
+        eq(${{ parameters.updateKeyVaultJobPicker }}, true)
       )
     jobs:
       - template: pipelines/azure/template-update-keyvault.yml@templates

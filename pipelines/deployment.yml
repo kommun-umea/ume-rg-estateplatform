@@ -22,6 +22,11 @@ parameters:
       - test
       - prod
 
+  - name: shouldAutoDeployJobPicker
+    displayName: Auto-deploy modified systems
+    type: boolean
+    default: true
+
   - name: updateEstateServiceDatabaseJobPicker
     displayName: Update ume-sqldb-estateservice
     type: boolean
@@ -30,15 +35,12 @@ parameters:
   - name: buildAndDeployEstateServiceJobPicker
     displayName: Deploy ume-app-estateservice
     type: boolean
-    default: true
+    default: false
 
 variables:
   - template: pipelines/general/template-default-pipeline-variables.yml@templates
     parameters:
       environment: ${{ parameters.environment }}
-
-  - name: isAutomatedDeployment
-    value: $[ eq(variables['Build.RequestedFor'], 'Project Collection Build Service (umeakommun)') ]
 
   - group: ume-rg-estateplatform-${{ parameters.environment }}
 
@@ -58,7 +60,11 @@ stages:
   - stage: CheckForChangesStage
     displayName: Check for changes
     dependsOn: ValidateRequestStage
-    condition: not(or(failed(), canceled()))
+    condition: >-
+      and(
+        not(or(failed(), canceled())),
+        eq('${{ parameters.shouldAutoDeployJobPicker }}', 'true')
+      )
     jobs:
       - template: pipelines/general/template-check-for-changes.yml@templates
         parameters:
@@ -72,18 +78,14 @@ stages:
     dependsOn: CheckForChangesStage
     variables:
       changedPaths: $[ dependencies.CheckForChangesStage.outputs['Job.Task.CHANGED_PATHS'] ]
-      ESTATE_DB_CONNECTION: $(estateservice-database-connection-string)
     condition: >-
       and(
         not(or(failed(), canceled())),
         or(
           eq(${{ parameters.updateEstateServiceDatabaseJobPicker }}, true),
           and(
-            contains(variables['changedPaths'], 'Umea.se.EstateService.DataStore/Migrations'),
-            or(
-              eq(variables['Build.Reason'], 'IndividualCI'),
-              eq(variables['isAutomatedDeployment'], true)
-            )
+            eq('${{ parameters.shouldAutoDeployJobPicker }}', 'true'),
+            contains(variables['changedPaths'], 'Umea.se.EstateService.DataStore/Migrations')
           )
         )
       )
@@ -95,7 +97,6 @@ stages:
           projectFolderName: ume-app-estateservice
           startupProjectName: Umea.se.EstateService.API
           databaseProjectName: Umea.se.EstateService.DataStore
-          dotnetVersion: 10.0.x
   # ------
 
   # EstateService
@@ -112,11 +113,8 @@ stages:
         or(
           eq(${{ parameters.buildAndDeployEstateServiceJobPicker }}, true),
           and(
-            contains(variables['changedPaths'], 'ume-app-estateservice'),
-            or(
-              eq(variables['Build.Reason'], 'IndividualCI'),
-              eq(variables['isAutomatedDeployment'], true)
-            )
+            eq('${{ parameters.shouldAutoDeployJobPicker }}', 'true'),
+            contains(variables['changedPaths'], 'ume-app-estateservice')
           )
         )
       )
@@ -125,7 +123,6 @@ stages:
         parameters:
           projectFolderName: ume-app-estateservice
           entrypointProjectName: Umea.se.EstateService.API
-          dotnetVersion: 10.0.x
 
   - stage: DeployEstateServiceStage
     displayName: Deploy EstateService

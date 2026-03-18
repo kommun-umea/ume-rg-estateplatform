@@ -22,9 +22,6 @@ param organization string
 @description('Azure Devops Project.')
 param project string
 
-@description('ObjectId of ServiceConnection used for deployment.')
-param serviceConnectionObjectId string
-
 @description('Personal Access Token for Azure DevOps.')
 param personalAccessToken string
 
@@ -39,31 +36,17 @@ var resourceGroupTags = {
 }
 var resourceGroupName = '${companyPrefix}-${resourceGroupType}-${purpose}-${environment}'
 
-var groupObjectIds = {
-  aItUtvecklare: '40522447-c5bf-4fa2-bbfc-6c5903a3f81a'
-  azureDevOpsUtvecklare: '6ad27c94-eb4e-49d1-bc1a-eb24db26ad3d'
-}
-
-var keyVaultPermissions = {
-  readAll: {
-    secrets: ['List', 'Get']
-    certificates: ['List', 'Get']
-    keys: ['List', 'Get']
-  }
-  serviceConnectionPermissions: {
-    secrets: ['Get', 'List', 'Set', 'Delete']
-  }
-}
-
 var databasePurposes = {
   estateservice: 'estateservice'
 }
+var roleDefinitionIds = {
+  CognitiveServicesOpenAIUser: '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
+}
 
 // ------------ Functions ------------
-func getKeyVaultAccessPolicy(objectId string, permissions object) object => {
-  tenantId: subscription().tenantId
-  objectId: objectId
-  permissions: permissions
+func getKeyVaultAssignee(principalType string, principalId string) object => {
+  principalId: principalId
+  principalType: principalType
 }
 
 // ------------ Dependencies ------------
@@ -83,31 +66,58 @@ resource resourceGroup 'Microsoft.Resources/resourceGroups@2025-04-01' = {
   tags: resourceGroupTags
 }
 
+// Default Role Assignments
+module defaultRoleAssignments 'br/ume:umea.roleassignments.turkos.defaults:v2.0' = {
+  scope: resourceGroup
+  name: 'defaultRoleAssignments'
+  params: {
+    environment: environment
+  }
+}
+
+// Role Assignment - Cognitive Services OpenAI User
+module openaiRoleAssignments 'br/ume:microsoft.authorization.roleassignments:v2.2' = {
+  scope: resourceGroup
+  name: 'openaiRoleAssignments'
+  params: {
+    roleDefinitionId: roleDefinitionIds.CognitiveServicesOpenAIUser
+    assignees: [
+      {
+        principalId: app_estateservice.outputs.principalId
+        principalType: 'ServicePrincipal'
+      }
+      {
+        principalId: app_estateservice.outputs.?stageDeploymentSlot.principalId!
+        principalType: 'ServicePrincipal'
+      }
+    ]
+  }
+}
+
 // Key Vault
-module keyVault 'br/ume:microsoft.keyvault.vaults:v2.0' = {
+module keyVault 'br/ume:microsoft.keyvault.vaults:v2.1' = {
   scope: resourceGroup
   name: 'keyVault'
   params: {
     environment: environment
     companyPrefix: companyPrefix
     purpose: purpose
-    accessPolicies: [
-      getKeyVaultAccessPolicy(serviceConnectionObjectId, keyVaultPermissions.serviceConnectionPermissions)
-      getKeyVaultAccessPolicy(app_estateservice.outputs.principalId, keyVaultPermissions.readAll)
-      getKeyVaultAccessPolicy(app_estateservice.outputs.?stageDeploymentSlot.principalId!, keyVaultPermissions.readAll)
+    dateNowUtc: dateNowUtc
 
-      ...environment == 'dev'
-        ? [
-            getKeyVaultAccessPolicy(groupObjectIds.aItUtvecklare, keyVaultPermissions.readAll)
-            getKeyVaultAccessPolicy(groupObjectIds.azureDevOpsUtvecklare, keyVaultPermissions.readAll)
-          ]
-        : []
+    permissions: [
+      {
+        role: 'Key Vault User'
+        assignees: [
+          getKeyVaultAssignee('ServicePrincipal', app_estateservice.outputs.principalId)
+          getKeyVaultAssignee('ServicePrincipal', app_estateservice.outputs.?stageDeploymentSlot.principalId!)
+        ]
+      }
     ]
   }
 }
 
 // App Service Plan
-module appServicePlan 'br/ume:microsoft.web.serverfarms:v2.0' = {
+module appServicePlan 'br/ume:microsoft.web.serverfarms:v2.3' = {
   scope: resourceGroup
   name: 'appServicePlan'
   params: {
@@ -116,7 +126,7 @@ module appServicePlan 'br/ume:microsoft.web.serverfarms:v2.0' = {
     purpose: purpose
     dateNowUtc: dateNowUtc
 
-    skuName: environment == 'prod' ? 'P2V3' : 'P0V3'
+    skuName: environment == 'prod' ? 'P1V4' : 'P0V4'
   }
 }
 
@@ -186,34 +196,6 @@ module openai 'br/ume:microsoft.cognitiveservices.openai:v2.0' = {
         }
       }
     ]
-  }
-}
-
-// Role Assignment - Cognitive Services OpenAI User
-module openaiRoleAssignments 'br/ume:microsoft.authorization.roleassignments:v2.2' = {
-  scope: resourceGroup
-  name: 'openaiRoleAssignments'
-  params: {
-    roleDefinitionId: '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd' // Cognitive Services OpenAI User
-    assignees: [
-      {
-        principalId: app_estateservice.outputs.principalId
-        principalType: 'ServicePrincipal'
-      }
-      {
-        principalId: app_estateservice.outputs.?stageDeploymentSlot.principalId!
-        principalType: 'ServicePrincipal'
-      }
-    ]
-  }
-}
-
-// Default Role Assignments
-module defaultRoleAssignments 'br/ume:umea.roleassignments.turkos.defaults:v2.0' = {
-  scope: resourceGroup
-  name: 'defaultRoleAssignments'
-  params: {
-    environment: environment
   }
 }
 

@@ -7,6 +7,8 @@ namespace Umea.se.EstateService.Shared.Infrastructure;
 
 public class ApplicationConfig(IConfiguration configuration, Assembly? entryAssembly = null) : ApplicationConfigCloudBase(configuration, entryAssembly)
 {
+    public string DatabaseConnectionString => GetValue("ConnectionStrings:EstateService");
+
     public string PythagorasApiKey => GetValue("Pythagoras:ApiKey");
     public string PythagorasBaseUrl => GetValue("Pythagoras:BaseUrl");
 

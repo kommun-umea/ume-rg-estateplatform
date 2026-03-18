@@ -47,7 +47,6 @@ $outputs = $deployment.properties.outputs
 
 if ($null -ne $deployment) {
   Write-Host "Deployment succeeded!"
-  Write-Host ""
 } else {
   throw "Deployment failed!"
 }
