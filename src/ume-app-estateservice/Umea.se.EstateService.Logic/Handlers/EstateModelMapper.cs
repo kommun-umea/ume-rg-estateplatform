@@ -110,12 +110,18 @@ internal static class EstateModelMapper
         BuildingNoticeBoardModel? noticeBoardModel = null;
         if (building.NoticeBoard != null)
         {
-            noticeBoardModel = new BuildingNoticeBoardModel
+            bool isActive = (building.NoticeBoard.StartDate is null || building.NoticeBoard.StartDate.Value.Date <= DateTime.Today)
+                         && (building.NoticeBoard.EndDate is null || building.NoticeBoard.EndDate.Value.Date >= DateTime.Today);
+
+            if (isActive)
             {
-                Text = building.NoticeBoard.Text,
-                StartDate = building.NoticeBoard.StartDate,
-                EndDate = building.NoticeBoard.EndDate
-            };
+                noticeBoardModel = new BuildingNoticeBoardModel
+                {
+                    Text = building.NoticeBoard.Text,
+                    StartDate = building.NoticeBoard.StartDate,
+                    EndDate = building.NoticeBoard.EndDate
+                };
+            }
         }
 
         BuildingExtendedPropertiesModel extendedProperties = new()
