@@ -60,7 +60,7 @@ public static class DependencyInjectionDataStore
                 sqlOptions.EnableRetryOnFailure(
                     maxRetryCount: 3,
                     maxRetryDelay: TimeSpan.FromSeconds(10),
-                    errorNumbersToAdd: null);
+                    errorNumbersToAdd: [-2]); // -2 = SQL timeout (CommandTimeout expired)
 
                 sqlOptions.CommandTimeout(120); // 2 minute timeout for bulk operations
 
