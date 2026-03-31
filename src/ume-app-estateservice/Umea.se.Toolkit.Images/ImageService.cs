@@ -123,8 +123,8 @@ public sealed class ImageService(IFusionCache cache, ImageServiceOptions options
         IsFailSafeEnabled = true,
         FailSafeMaxDuration = TimeSpan.FromDays(365),  // Keep fail-safe data for up to 1 year
         FailSafeThrottleDuration = TimeSpan.FromSeconds(30),
-        FactorySoftTimeout = TimeSpan.FromSeconds(10),  // Allow time for image fetch + processing
-        FactoryHardTimeout = TimeSpan.FromSeconds(30),  // Hard limit for slow networks
+        FactorySoftTimeout = TimeSpan.FromSeconds(15),  // Allow time for image fetch + processing
+        FactoryHardTimeout = TimeSpan.FromSeconds(45),  // Hard limit for slow networks
         EagerRefreshThreshold = 0.9f,
     };
 
@@ -137,8 +137,8 @@ public sealed class ImageService(IFusionCache cache, ImageServiceOptions options
         IsFailSafeEnabled = true,
         FailSafeMaxDuration = TimeSpan.FromDays(365),
         FailSafeThrottleDuration = TimeSpan.FromSeconds(30),
-        FactorySoftTimeout = TimeSpan.FromSeconds(30),   // SVG rendering is slower than image fetches
-        FactoryHardTimeout = TimeSpan.FromSeconds(90),   // Pythagoras can be slow for complex blueprints
+        FactorySoftTimeout = TimeSpan.FromSeconds(45),   // SVG rendering is slower than image fetches
+        FactoryHardTimeout = TimeSpan.FromSeconds(120),  // Pythagoras can be slow for complex blueprints
         AllowTimedOutFactoryBackgroundCompletion = true,  // Let factory finish in background so next request hits cache
         EagerRefreshThreshold = 0.9f,
     };

@@ -38,33 +38,35 @@ public sealed class BuildingImageService(IPythagorasClient pythagorasClient, Bui
             $"images:{resolvedImageId}",
             maxWidth,
             maxHeight,
-            fetchOriginal: async ct =>
-            {
-                HttpResponseMessage response;
-                try
-                {
-                    response = await pythagorasClient.GetGalleryImageDataAsync(resolvedImageId, GalleryImageVariant.Original, ct);
-                }
-                catch (HttpRequestException ex)
-                {
-                    throw ex.StatusCode == HttpStatusCode.NotFound
-                        ? new ImageNotFoundException($"Image {resolvedImageId} not found in Pythagoras.")
-                        : new ExternalServiceUnavailableException($"Pythagoras returned {ex.StatusCode} for image {resolvedImageId}.", ex);
-                }
-
-                if (response.StatusCode == HttpStatusCode.NotFound)
-                {
-                    response.Dispose();
-                    throw new ImageNotFoundException($"Image {resolvedImageId} not found in Pythagoras.");
-                }
-
-                using (response)
-                {
-                    response.EnsureSuccessStatusCode();
-                    return await response.Content.ReadAsByteArrayAsync(ct);
-                }
-            },
+            fetchOriginal: ct => FetchImageAsync(resolvedImageId, ct),
             cancellationToken);
+    }
+
+    private async Task<byte[]> FetchImageAsync(int imageId, CancellationToken ct)
+    {
+        HttpResponseMessage response;
+        try
+        {
+            response = await pythagorasClient.GetGalleryImageDataAsync(imageId, GalleryImageVariant.Original, ct);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw ex.StatusCode == HttpStatusCode.NotFound
+                ? new ImageNotFoundException($"Image {imageId} not found in Pythagoras.")
+                : new ExternalServiceUnavailableException($"Pythagoras returned {ex.StatusCode} for image {imageId}.", ex);
+        }
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            response.Dispose();
+            throw new ImageNotFoundException($"Image {imageId} not found in Pythagoras.");
+        }
+
+        using (response)
+        {
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadAsByteArrayAsync(ct);
+        }
     }
 
     public async Task<BuildingImageMetadata?> GetImageMetadataAsync(int buildingId, CancellationToken cancellationToken = default)

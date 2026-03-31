@@ -116,12 +116,12 @@ builder.Services.AddHttpClient(HttpClientNames.Pythagoras, client =>
 })
 .AddStandardResilienceHandler(options =>
 {
-    options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(30);
-    options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(60);
+    options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(45);
+    options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(120);
     options.Retry.MaxRetryAttempts = 2;
     options.Retry.BackoffType = DelayBackoffType.Exponential;
     options.Retry.UseJitter = true;
-    options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(60);
+    options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(90);
 });
 
 builder.Services
