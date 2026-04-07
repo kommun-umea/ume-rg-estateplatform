@@ -45,7 +45,7 @@ public class WorkOrderHandlerTests : IDisposable
 
         DataStoreSeeder.Seed(
             _dataStore,
-            buildings: [new BuildingEntity { Id = 1, Name = "Building One", PopularName = "B1" }],
+            buildings: [new BuildingEntity { Id = 1, Name = "Building One", PopularName = "B1", WorkOrderTypes = [WorkOrderType.ErrorReport, WorkOrderType.BuildingService] }],
             rooms: [new RoomEntity { Id = 10, Name = "Room Ten", PopularName = "R10", BuildingId = 1 }]);
 
         ApplicationConfig config = CreateTestConfig();
@@ -60,7 +60,7 @@ public class WorkOrderHandlerTests : IDisposable
         CreateWorkOrderRequest request = new()
         {
             BuildingId = 1,
-            WorkOrderType = "error_report",
+            WorkOrderType = WorkOrderType.ErrorReport,
             Location = "Indoor",
             RoomId = 10,
             Description = "Test workOrder"
@@ -84,7 +84,7 @@ public class WorkOrderHandlerTests : IDisposable
         CreateWorkOrderRequest request = new()
         {
             BuildingId = 1,
-            WorkOrderType = "error_report",
+            WorkOrderType = WorkOrderType.ErrorReport,
             Location = "Outdoor",
             Description = "Outdoor issue"
         };
@@ -102,7 +102,7 @@ public class WorkOrderHandlerTests : IDisposable
         CreateWorkOrderRequest request = new()
         {
             BuildingId = 1,
-            WorkOrderType = "error_report",
+            WorkOrderType = WorkOrderType.ErrorReport,
             Location = "InvalidType",
             Description = "Test"
         };
@@ -117,7 +117,7 @@ public class WorkOrderHandlerTests : IDisposable
         CreateWorkOrderRequest request = new()
         {
             BuildingId = 1,
-            WorkOrderType = "invalid_type",
+            WorkOrderType = (WorkOrderType)999,
             Location = "Indoor",
             Description = "Test"
         };
@@ -132,7 +132,7 @@ public class WorkOrderHandlerTests : IDisposable
         CreateWorkOrderRequest request = new()
         {
             BuildingId = 9999,
-            WorkOrderType = "error_report",
+            WorkOrderType = WorkOrderType.ErrorReport,
             Location = "Indoor",
             Description = "Test"
         };
@@ -147,7 +147,7 @@ public class WorkOrderHandlerTests : IDisposable
         CreateWorkOrderRequest request = new()
         {
             BuildingId = 1,
-            WorkOrderType = "error_report",
+            WorkOrderType = WorkOrderType.ErrorReport,
             Location = "Outdoor",
             RoomId = 10,
             Description = "Test"
@@ -162,13 +162,13 @@ public class WorkOrderHandlerTests : IDisposable
     {
         DataStoreSeeder.Seed(
             _dataStore,
-            buildings: [new BuildingEntity { Id = 1, Name = "Building One", PopularName = "B1" }],
+            buildings: [new BuildingEntity { Id = 1, Name = "Building One", PopularName = "B1", WorkOrderTypes = [WorkOrderType.ErrorReport, WorkOrderType.BuildingService] }],
             rooms: [new RoomEntity { Id = 10, Name = "Room Ten", PopularName = "R10", BuildingId = 2 }]);
 
         CreateWorkOrderRequest request = new()
         {
             BuildingId = 1,
-            WorkOrderType = "error_report",
+            WorkOrderType = WorkOrderType.ErrorReport,
             Location = "Indoor",
             RoomId = 10,
             Description = "Test"
@@ -184,7 +184,7 @@ public class WorkOrderHandlerTests : IDisposable
         CreateWorkOrderRequest request = new()
         {
             BuildingId = 1,
-            WorkOrderType = "building_service",
+            WorkOrderType = WorkOrderType.BuildingService,
             Location = "Indoor",
             Description = "Service request"
         };
@@ -198,11 +198,11 @@ public class WorkOrderHandlerTests : IDisposable
     public async Task GetWorkOrders_ReturnsOnlyUserWorkOrders()
     {
         await _handler.SubmitWorkOrderAsync(
-            new CreateWorkOrderRequest { BuildingId = 1, WorkOrderType = "error_report", Location = "Indoor", Description = "User A workOrder" },
+            new CreateWorkOrderRequest { BuildingId = 1, WorkOrderType = WorkOrderType.ErrorReport, Location = "Indoor", Description = "User A workOrder" },
             "usera@example.com");
 
         await _handler.SubmitWorkOrderAsync(
-            new CreateWorkOrderRequest { BuildingId = 1, WorkOrderType = "error_report", Location = "Indoor", Description = "User B workOrder" },
+            new CreateWorkOrderRequest { BuildingId = 1, WorkOrderType = WorkOrderType.ErrorReport, Location = "Indoor", Description = "User B workOrder" },
             "userb@example.com");
 
         IReadOnlyList<WorkOrderListItemModel> result = await _handler.GetWorkOrdersAsync("usera@example.com");
@@ -215,7 +215,7 @@ public class WorkOrderHandlerTests : IDisposable
     public async Task GetWorkOrder_ByUid_ReturnsCorrectWorkOrder()
     {
         WorkOrderSubmissionModel created = await _handler.SubmitWorkOrderAsync(
-            new CreateWorkOrderRequest { BuildingId = 1, WorkOrderType = "error_report", Location = "Indoor", Description = "Find me" },
+            new CreateWorkOrderRequest { BuildingId = 1, WorkOrderType = WorkOrderType.ErrorReport, Location = "Indoor", Description = "Find me" },
             "test@example.com");
 
         WorkOrderDetailModel result = await _handler.GetWorkOrderAsync(created.Id, "test@example.com");
@@ -228,7 +228,7 @@ public class WorkOrderHandlerTests : IDisposable
     public async Task GetWorkOrder_WrongUser_ThrowsNotFound()
     {
         WorkOrderSubmissionModel created = await _handler.SubmitWorkOrderAsync(
-            new CreateWorkOrderRequest { BuildingId = 1, WorkOrderType = "error_report", Location = "Indoor", Description = "Not yours" },
+            new CreateWorkOrderRequest { BuildingId = 1, WorkOrderType = WorkOrderType.ErrorReport, Location = "Indoor", Description = "Not yours" },
             "usera@example.com");
 
         await Should.ThrowAsync<EntityNotFoundException>(
@@ -239,7 +239,7 @@ public class WorkOrderHandlerTests : IDisposable
     public async Task SyncWorkOrder_ReturnsWorkOrder()
     {
         WorkOrderSubmissionModel created = await _handler.SubmitWorkOrderAsync(
-            new CreateWorkOrderRequest { BuildingId = 1, WorkOrderType = "error_report", Location = "Indoor", Description = "Sync me" },
+            new CreateWorkOrderRequest { BuildingId = 1, WorkOrderType = WorkOrderType.ErrorReport, Location = "Indoor", Description = "Sync me" },
             "test@example.com");
 
         WorkOrderDetailModel result = await _handler.SyncWorkOrderAsync(created.Id, "test@example.com");
@@ -252,7 +252,7 @@ public class WorkOrderHandlerTests : IDisposable
     public async Task SyncWorkOrder_WrongUser_ThrowsNotFound()
     {
         WorkOrderSubmissionModel created = await _handler.SubmitWorkOrderAsync(
-            new CreateWorkOrderRequest { BuildingId = 1, WorkOrderType = "error_report", Location = "Indoor", Description = "Not yours" },
+            new CreateWorkOrderRequest { BuildingId = 1, WorkOrderType = WorkOrderType.ErrorReport, Location = "Indoor", Description = "Not yours" },
             "usera@example.com");
 
         await Should.ThrowAsync<EntityNotFoundException>(
@@ -272,7 +272,7 @@ public class WorkOrderHandlerTests : IDisposable
         DateTimeOffset before = DateTimeOffset.UtcNow;
 
         WorkOrderSubmissionModel result = await _handler.SubmitWorkOrderAsync(
-            new CreateWorkOrderRequest { BuildingId = 1, WorkOrderType = "error_report", Location = "Indoor", Description = "Test" },
+            new CreateWorkOrderRequest { BuildingId = 1, WorkOrderType = WorkOrderType.ErrorReport, Location = "Indoor", Description = "Test" },
             "test@example.com");
 
         result.Id.ShouldNotBe(Guid.Empty);

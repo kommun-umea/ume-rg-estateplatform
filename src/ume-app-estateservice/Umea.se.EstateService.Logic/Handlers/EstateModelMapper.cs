@@ -148,6 +148,7 @@ internal static class EstateModelMapper
             Region = regionAscendant,
             Organization = organizationAscendant,
             ExtendedProperties = extendedProperties,
+            WorkOrderTypes = building.WorkOrderTypes,
             NumFloors = building.NumFloors,
             NumRooms = building.NumRooms,
             NumDocuments = building.NumDocuments,

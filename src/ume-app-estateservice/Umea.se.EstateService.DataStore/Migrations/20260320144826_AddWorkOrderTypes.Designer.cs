@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Umea.se.EstateService.DataStore;
 
@@ -10,9 +11,11 @@ using Umea.se.EstateService.DataStore;
 namespace Umea.se.EstateService.DataStore.Migrations
 {
     [DbContext(typeof(EstateDbContext))]
-    partial class EstateDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260320144826_AddWorkOrderTypes")]
+    partial class AddWorkOrderTypes
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.5");

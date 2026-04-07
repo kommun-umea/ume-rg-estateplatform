@@ -27,6 +27,7 @@ public sealed class BuildingInfoModel : ISearchable, IFavoriteable
     public BuildingAscendantModel? Region { get; set; }
     public BuildingAscendantModel? Organization { get; set; }
     public BuildingExtendedPropertiesModel? ExtendedProperties { get; init; }
+    public IReadOnlyList<WorkOrderType> WorkOrderTypes { get; init; } = [];
     public string? ImageUrl { get; set; }
     public bool? IsFavorite { get; set; }
     public DateTimeOffset UpdatedAt => DateTime.Now;

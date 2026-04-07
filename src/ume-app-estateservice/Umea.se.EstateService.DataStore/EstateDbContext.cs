@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Umea.se.EstateService.DataStore.Entities;
 using Umea.se.EstateService.Shared.Data.Entities;
+using Umea.se.EstateService.Shared.Models;
 
 namespace Umea.se.EstateService.DataStore;
 
@@ -225,6 +226,26 @@ public class EstateDbContext(DbContextOptions<EstateDbContext> options) : DbCont
             entity.Property(e => e.ImageIds)
                 .HasColumnName("ImageIds")
                 .HasMaxLength(4000);
+
+            // Configure WorkOrderTypes as JSON column (enum stored as strings via [JsonConverter] on WorkOrderType)
+            ValueConverter<IReadOnlyList<WorkOrderType>, string> workOrderTypesConverter = new(
+                v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                v => string.IsNullOrEmpty(v)
+                    ? new List<WorkOrderType>()
+                    : JsonSerializer.Deserialize<List<WorkOrderType>>(v, (JsonSerializerOptions?)null) ?? new List<WorkOrderType>());
+
+            ValueComparer<IReadOnlyList<WorkOrderType>> workOrderTypesComparer = new(
+                (c1, c2) => (c1 == null && c2 == null) || (c1 != null && c2 != null && c1.SequenceEqual(c2)),
+                c => c == null ? 0 : c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                c => c == null ? new List<WorkOrderType>() : (IReadOnlyList<WorkOrderType>)c.ToList());
+
+            entity.Property(e => e.WorkOrderTypes)
+                .HasConversion(workOrderTypesConverter)
+                .Metadata.SetValueComparer(workOrderTypesComparer);
+
+            entity.Property(e => e.WorkOrderTypes)
+                .HasColumnName("WorkOrderTypes")
+                .HasMaxLength(500);
 
             entity.Property(e => e.NumDocuments)
                 .HasColumnName("NumDocuments");

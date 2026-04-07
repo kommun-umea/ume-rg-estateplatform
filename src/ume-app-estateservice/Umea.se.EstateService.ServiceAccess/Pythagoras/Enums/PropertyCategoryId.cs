@@ -4,6 +4,7 @@ public enum PropertyCategoryId
 {
     BlueprintAvailable = 13,
     PropertyDesignation = 56,
+    FacilityServiceOrder = 79,
     MunicipalityArea = 209,
     OperationalArea = 208,
     EstateExternalStatus = 210,
@@ -22,4 +23,5 @@ public enum PropertyCategoryId
     OperationsManager = 283,
     OperationCoordinator = 284,
     RentalAdministrator = 285,
+    TownHallServiceOrder = 289,
 }

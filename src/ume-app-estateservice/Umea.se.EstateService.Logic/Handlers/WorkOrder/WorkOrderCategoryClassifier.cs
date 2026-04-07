@@ -21,7 +21,8 @@ public class WorkOrderCategoryClassifier(
 
     public IReadOnlyList<WorkOrderCategoryNode> GetCategoriesForType(int workOrderTypeId)
     {
-        return [.. dataStore.WorkOrderCategories.Where(c => c.WorkOrderTypeIds.Contains(workOrderTypeId))];
+        return [.. dataStore.WorkOrderCategories.Where(c =>
+            c.WorkOrderTypeIds.Count == 0 || c.WorkOrderTypeIds.Contains(workOrderTypeId))];
     }
 
     public async Task<IReadOnlyList<WorkOrderCategorySuggestion>> ClassifyAsync(

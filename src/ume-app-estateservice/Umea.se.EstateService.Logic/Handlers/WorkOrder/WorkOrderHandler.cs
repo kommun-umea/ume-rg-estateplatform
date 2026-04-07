@@ -18,17 +18,19 @@ public class WorkOrderHandler(
     IWorkOrderFileValidator fileValidator,
     ILogger<WorkOrderHandler> logger) : IWorkOrderHandler
 {
-    private static readonly Dictionary<string, PythagorasWorkOrderType> _allowedWorkOrderTypes = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly Dictionary<WorkOrderType, PythagorasWorkOrderType> _workOrderTypeMap = new()
     {
-        ["error_report"] = PythagorasWorkOrderType.ErrorReport,
-        ["building_service"] = PythagorasWorkOrderType.BuildingService
+        [WorkOrderType.ErrorReport] = PythagorasWorkOrderType.ErrorReport,
+        [WorkOrderType.BuildingService] = PythagorasWorkOrderType.BuildingService,
+        [WorkOrderType.FacilityService] = PythagorasWorkOrderType.FacilityService,
+        [WorkOrderType.TownHallService] = PythagorasWorkOrderType.TownHallService,
     };
 
     public async Task<WorkOrderSubmissionModel> SubmitWorkOrderAsync(CreateWorkOrderRequest request, string email, CancellationToken cancellationToken = default)
     {
-        if (!_allowedWorkOrderTypes.TryGetValue(request.WorkOrderType, out PythagorasWorkOrderType workOrderType))
+        if (!_workOrderTypeMap.TryGetValue(request.WorkOrderType, out PythagorasWorkOrderType workOrderType))
         {
-            throw new BusinessValidationException($"Invalid work order type: {request.WorkOrderType}. Must be 'error_report' or 'building_service'.");
+            throw new BusinessValidationException($"Invalid work order type: {request.WorkOrderType}.");
         }
 
         if (!Enum.TryParse<WorkOrderLocation>(request.Location, ignoreCase: true, out WorkOrderLocation location))
@@ -39,6 +41,11 @@ public class WorkOrderHandler(
         if (!dataStore.BuildingsById.TryGetValue(request.BuildingId, out BuildingEntity? building))
         {
             throw new EntityNotFoundException($"Building with id {request.BuildingId} not found.");
+        }
+
+        if (!building.WorkOrderTypes.Contains(request.WorkOrderType))
+        {
+            throw new BusinessValidationException($"Building {request.BuildingId} does not support work order type '{request.WorkOrderType}'.");
         }
 
         string? roomName = null;

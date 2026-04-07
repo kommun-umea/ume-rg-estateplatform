@@ -36,7 +36,22 @@ public sealed class PythagorasDataRefreshService(
         (int)PropertyCategoryId.PropertyManager,
         (int)PropertyCategoryId.OperationsManager,
         (int)PropertyCategoryId.OperationCoordinator,
-        (int)PropertyCategoryId.RentalAdministrator
+        (int)PropertyCategoryId.RentalAdministrator,
+        (int)PropertyCategoryId.TownHallServiceOrder,
+        (int)PropertyCategoryId.FacilityServiceOrder
+    ]);
+
+    // Properties in the "Driftgrupper" category (8) are not cached by Pythagoras,
+    // so uilistdata never returns them. We backfill these via the calculatedvalue endpoint.
+    // Can be removed if Pythagoras starts caching these properties.
+    private static readonly IReadOnlyCollection<int> _uncachedPropertyIds = Array.AsReadOnly(
+    [
+        (int)PropertyCategoryId.FacilityServiceOrder,
+        (int)PropertyCategoryId.PropertyManager,
+        (int)PropertyCategoryId.OperationsManager,
+        (int)PropertyCategoryId.OperationCoordinator,
+        (int)PropertyCategoryId.RentalAdministrator,
+        (int)PropertyCategoryId.TownHallServiceOrder
     ]);
 
     private static readonly IReadOnlyCollection<int> _estateExtendedPropertyIds = Array.AsReadOnly(
@@ -412,6 +427,14 @@ public sealed class PythagorasDataRefreshService(
             .PostBuildingUiListDataAsync(buildingRequest, cancellationToken)
             .ConfigureAwait(false);
 
+        // Pythagoras uilistdata only returns properties that have cached values.
+        // Some properties (e.g. "Driftgrupper" category: contact persons, service order flags)
+        // may not have cached values despite having valid calculated values.
+        // Until Pythagoras rebuilds its property cache, we fall back to the per-building
+        // calculated property value endpoint for any properties missing from uilistdata.
+        await BackfillMissingPropertyValuesAsync(buildingResponse.Data, _uncachedPropertyIds, cancellationToken)
+            .ConfigureAwait(false);
+
         IReadOnlyList<Workspace> workspaces = await pythagorasClient
             .GetWorkspacesAsync(query: null, cancellationToken)
             .ConfigureAwait(false);
@@ -433,6 +456,71 @@ public sealed class PythagorasDataRefreshService(
             Workspaces = workspaces,
             WorkOrderCategories = workOrderCategories
         };
+    }
+
+    /// <summary>
+    /// For properties that uilistdata did not return (no cached value in Pythagoras),
+    /// falls back to the calculated property value endpoint per building.
+    /// </summary>
+    private async Task BackfillMissingPropertyValuesAsync(
+        IReadOnlyList<BuildingInfo> buildings,
+        IReadOnlyCollection<int> requestedPropertyIds,
+        CancellationToken cancellationToken)
+    {
+        List<(BuildingInfo Building, int[] MissingIds)> buildingsWithMissing = [];
+
+        foreach (BuildingInfo building in buildings)
+        {
+            int[] missing = requestedPropertyIds
+                .Where(pid => !building.PropertyValues.ContainsKey(pid))
+                .ToArray();
+
+            if (missing.Length > 0)
+            {
+                buildingsWithMissing.Add((building, missing));
+            }
+        }
+
+        if (buildingsWithMissing.Count == 0)
+        {
+            return;
+        }
+
+        logger.LogInformation(
+            "Backfilling calculated property values for {Count} buildings with missing cached properties",
+            buildingsWithMissing.Count);
+
+        foreach ((BuildingInfo building, int[] missingIds) in buildingsWithMissing)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            try
+            {
+                CalculatedPropertyValueRequest request = new()
+                {
+                    PropertyIds = missingIds,
+                    NavigationId = NavigationType.UmeaKommun
+                };
+
+                IReadOnlyDictionary<int, CalculatedPropertyValueDto> calculated = await pythagorasClient
+                    .GetBuildingCalculatedPropertyValuesAsync(building.Id, request, cancellationToken)
+                    .ConfigureAwait(false);
+
+                foreach (KeyValuePair<int, CalculatedPropertyValueDto> kvp in calculated)
+                {
+                    if (kvp.Value.OutputValue is not null)
+                    {
+                        building.PropertyValues[kvp.Key] = new PropertyValueDto { Value = kvp.Value.OutputValue };
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex,
+                    "Failed to backfill calculated properties for building {BuildingId}, skipping",
+                    building.Id);
+            }
+        }
     }
 
     private async Task<IReadOnlyList<Floor>> FetchFloorsViaWorkspaceBatchesAsync(

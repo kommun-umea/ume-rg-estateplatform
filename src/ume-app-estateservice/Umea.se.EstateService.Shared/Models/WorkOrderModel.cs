@@ -3,6 +3,7 @@ namespace Umea.se.EstateService.Shared.Models;
 public class WorkOrderDetailModel
 {
     public Guid Id { get; init; }
+    public WorkOrderType? WorkOrderType { get; init; }
     public string BuildingName { get; init; } = null!;
     public string? RoomName { get; init; }
     public string Location { get; init; } = null!;
@@ -20,6 +21,7 @@ public class WorkOrderDetailModel
 public class WorkOrderListItemModel
 {
     public Guid Id { get; init; }
+    public WorkOrderType? WorkOrderType { get; init; }
     public string BuildingName { get; init; } = null!;
     public string? RoomName { get; init; }
     public string Location { get; init; } = null!;

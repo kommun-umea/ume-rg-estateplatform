@@ -41,6 +41,7 @@ public static class BuildingEntityMapper
             NoticeBoard = CreateNoticeBoard(dto.PropertyValues),
             BlueprintAvailable = ParseBlueprintAvailable(dto.PropertyValues),
             ContactPersons = CreateContactPersons(dto.PropertyValues),
+            WorkOrderTypes = BuildWorkOrderTypes(dto.PropertyValues),
             BusinessType = dto.BusinessTypeId is int btId && !string.IsNullOrWhiteSpace(dto.BusinessTypeName)
                 ? new BusinessTypeModel { Id = btId, Name = dto.BusinessTypeName }
                 : null,
@@ -54,8 +55,7 @@ public static class BuildingEntityMapper
     /// <summary>
     /// Converts a collection of BuildingInfo DTOs to BuildingEntity objects.
     /// </summary>
-    public static List<BuildingEntity> ToEntities(IReadOnlyList<BuildingInfo> dtos)
-        => MapperUtilities.ToEntities(dtos, dto => ToEntity(dto));
+    public static List<BuildingEntity> ToEntities(IReadOnlyList<BuildingInfo> dtos) => MapperUtilities.ToEntities(dtos, dto => ToEntity(dto));
 
     /// <summary>
     /// Creates an AddressModel from BuildingInfo address fields.
@@ -170,6 +170,30 @@ public static class BuildingEntityMapper
             OperationCoordinator = operationCoordinator,
             RentalAdministrator = rentalAdministrator
         };
+    }
+
+    private static List<WorkOrderType> BuildWorkOrderTypes(Dictionary<int, PropertyValueDto>? propertyValues)
+    {
+        string? externalStatus = TryGetPropertyValue(propertyValues, PropertyCategoryId.BuildingExternalStatus);
+
+        if (!string.IsNullOrEmpty(externalStatus) && externalStatus != "Egen")
+        {
+            return [];
+        }
+
+        List<WorkOrderType> types = [WorkOrderType.ErrorReport, WorkOrderType.BuildingService];
+
+        if (TryGetPropertyValue(propertyValues, PropertyCategoryId.TownHallServiceOrder) == "Ja")
+        {
+            types.Add(WorkOrderType.TownHallService);
+        }
+
+        if (TryGetPropertyValue(propertyValues, PropertyCategoryId.FacilityServiceOrder) == "Ja")
+        {
+            types.Add(WorkOrderType.FacilityService);
+        }
+
+        return types;
     }
 
 }

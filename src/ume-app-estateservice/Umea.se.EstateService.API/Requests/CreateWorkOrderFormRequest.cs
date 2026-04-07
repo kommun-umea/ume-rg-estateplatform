@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using Swashbuckle.AspNetCore.Annotations;
+using Umea.se.EstateService.Shared.Models;
 
 namespace Umea.se.EstateService.API.Requests;
 
@@ -13,9 +14,8 @@ public class CreateWorkOrderFormRequest
 
     [Required]
     [JsonPropertyName("workOrderType")]
-    [SwaggerSchema("Type of work order.", Description = "error_report | building_service")]
-    [RegularExpression("^(error_report|building_service)$", ErrorMessage = "WorkOrderType must be 'error_report' or 'building_service'.")]
-    public string WorkOrderType { get; init; } = "error_report";
+    [SwaggerSchema("Type of work order.")]
+    public WorkOrderType WorkOrderType { get; init; }
 
     [Required]
     [JsonPropertyName("location")]

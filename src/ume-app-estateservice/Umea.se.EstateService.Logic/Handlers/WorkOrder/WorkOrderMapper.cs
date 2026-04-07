@@ -1,3 +1,4 @@
+using Umea.se.EstateService.ServiceAccess.Pythagoras.Enums;
 using Umea.se.EstateService.Shared.Data.Entities;
 using Umea.se.EstateService.Shared.Models;
 
@@ -5,6 +6,17 @@ namespace Umea.se.EstateService.Logic.Handlers.WorkOrder;
 
 internal static class WorkOrderMapper
 {
+    private static readonly Dictionary<PythagorasWorkOrderType, WorkOrderType> _reverseTypeMap = new()
+    {
+        [PythagorasWorkOrderType.ErrorReport] = WorkOrderType.ErrorReport,
+        [PythagorasWorkOrderType.BuildingService] = WorkOrderType.BuildingService,
+        [PythagorasWorkOrderType.FacilityService] = WorkOrderType.FacilityService,
+        [PythagorasWorkOrderType.TownHallService] = WorkOrderType.TownHallService,
+    };
+
+    private static WorkOrderType? MapWorkOrderType(int workOrderTypeId) =>
+        _reverseTypeMap.GetValueOrDefault((PythagorasWorkOrderType)workOrderTypeId);
+
     public static WorkOrderSubmissionModel MapToSubmission(WorkOrderEntity entity) => new()
     {
         Id = entity.Uid,
@@ -15,6 +27,7 @@ internal static class WorkOrderMapper
     public static WorkOrderDetailModel MapToDetail(WorkOrderEntity entity) => new()
     {
         Id = entity.Uid,
+        WorkOrderType = MapWorkOrderType(entity.WorkOrderTypeId),
         BuildingName = entity.BuildingName,
         RoomName = entity.RoomName,
         Location = entity.Location.ToString(),
@@ -39,6 +52,7 @@ internal static class WorkOrderMapper
         .. entities.Select(e => new WorkOrderListItemModel
         {
             Id = e.Uid,
+            WorkOrderType = MapWorkOrderType(e.WorkOrderTypeId),
             BuildingName = e.BuildingName,
             RoomName = e.RoomName,
             Location = e.Location.ToString(),

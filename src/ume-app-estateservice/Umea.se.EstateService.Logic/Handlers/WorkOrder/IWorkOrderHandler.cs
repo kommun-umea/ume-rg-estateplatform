@@ -14,7 +14,7 @@ public interface IWorkOrderHandler
 public class CreateWorkOrderRequest
 {
     public int BuildingId { get; init; }
-    public string WorkOrderType { get; init; } = null!;
+    public WorkOrderType WorkOrderType { get; init; }
     public string Location { get; init; } = null!;
     public int? RoomId { get; init; }
     public string Description { get; init; } = null!;

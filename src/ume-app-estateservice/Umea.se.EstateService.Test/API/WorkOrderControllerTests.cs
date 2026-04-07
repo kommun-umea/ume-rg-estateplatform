@@ -39,7 +39,7 @@ public class WorkOrderControllerTests : ControllerTestCloud<TestApiFactory, Prog
             WebAppFactory.GetDataStore(),
             buildings:
             [
-                new BuildingEntity { Id = 100, Name = "Test Building", PopularName = "TestB" }
+                new BuildingEntity { Id = 100, Name = "Test Building", PopularName = "TestB", WorkOrderTypes = [WorkOrderType.ErrorReport, WorkOrderType.BuildingService] }
             ],
             rooms:
             [
@@ -64,7 +64,7 @@ public class WorkOrderControllerTests : ControllerTestCloud<TestApiFactory, Prog
     {
         using MultipartFormDataContent content = new();
         content.Add(new StringContent("100"), "BuildingId");
-        content.Add(new StringContent("error_report"), "WorkOrderType");
+        content.Add(new StringContent("ErrorReport"), "WorkOrderType");
         content.Add(new StringContent("indoor"), "Location");
         content.Add(new StringContent("200"), "RoomId");
         content.Add(new StringContent("Broken window"), "Description");
@@ -112,7 +112,7 @@ public class WorkOrderControllerTests : ControllerTestCloud<TestApiFactory, Prog
     {
         using MultipartFormDataContent content = new();
         content.Add(new StringContent("100"), "BuildingId");
-        content.Add(new StringContent("error_report"), "WorkOrderType");
+        content.Add(new StringContent("ErrorReport"), "WorkOrderType");
         content.Add(new StringContent("indoor"), "Location");
         content.Add(new StringContent("Sync test"), "Description");
 
@@ -142,7 +142,7 @@ public class WorkOrderControllerTests : ControllerTestCloud<TestApiFactory, Prog
     {
         using MultipartFormDataContent content = new();
         content.Add(new StringContent("100"), "BuildingId");
-        content.Add(new StringContent("error_report"), "WorkOrderType");
+        content.Add(new StringContent("ErrorReport"), "WorkOrderType");
         content.Add(new StringContent("indoor"), "Location");
         content.Add(new StringContent("Photo attached"), "Description");
 

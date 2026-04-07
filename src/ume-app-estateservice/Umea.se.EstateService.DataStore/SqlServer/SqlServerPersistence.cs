@@ -1,4 +1,5 @@
 using System.Data;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -14,6 +15,7 @@ namespace Umea.se.EstateService.DataStore.SqlServer;
 /// SQL Server persistence implementation for the data store.
 /// Uses SqlBulkCopy for high-performance bulk inserts.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed class SqlServerPersistence(
     IDbContextFactory<EstateDbContext> dbContextFactory,
     ILogger<SqlServerPersistence> logger) : EfCorePersistenceBase(dbContextFactory, logger)
@@ -188,6 +190,7 @@ public sealed class SqlServerPersistence(
         table.Columns.Add("OperationsManager", typeof(string));
         table.Columns.Add("OperationCoordinator", typeof(string));
         table.Columns.Add("RentalAdministrator", typeof(string));
+        table.Columns.Add("WorkOrderTypes", typeof(string));
         table.Columns.Add("ImageIds", typeof(string));
         table.Columns.Add("NumDocuments", typeof(int));
         table.Columns.Add("BackgroundCacheFetchedAtUtc", typeof(DateTimeOffset));
@@ -228,6 +231,7 @@ public sealed class SqlServerPersistence(
                 (object?)b.ContactPersons?.OperationsManager ?? DBNull.Value,
                 (object?)b.ContactPersons?.OperationCoordinator ?? DBNull.Value,
                 (object?)b.ContactPersons?.RentalAdministrator ?? DBNull.Value,
+                JsonSerializer.Serialize(b.WorkOrderTypes, (JsonSerializerOptions?)null),
                 b.ImageIds is not null
                     ? JsonSerializer.Serialize(b.ImageIds, (JsonSerializerOptions?)null)
                     : DBNull.Value,

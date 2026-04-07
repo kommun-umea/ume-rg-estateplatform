@@ -47,6 +47,8 @@ public class BuildingEntity : NamedEntity
     /// </summary>
     public DateTimeOffset? BackgroundCacheFetchedAtUtc { get; set; }
 
+    public IReadOnlyList<WorkOrderType> WorkOrderTypes { get; set; } = [];
+
     public int EstateId { get; set; }
 
     public List<FloorEntity> Floors { get; set; } = [];
