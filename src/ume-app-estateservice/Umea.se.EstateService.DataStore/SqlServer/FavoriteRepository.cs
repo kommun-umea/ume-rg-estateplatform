@@ -35,6 +35,7 @@ public class FavoriteRepository(EstateDbContext dbContext) : IFavoriteRepository
     public async Task<IReadOnlyList<FavoriteEntity>> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
         return await dbContext.Favorites
+            .AsNoTracking()
             .Where(f => f.UserEmail == email)
             .OrderByDescending(f => f.CreatedAt)
             .ToListAsync(cancellationToken);
@@ -43,6 +44,7 @@ public class FavoriteRepository(EstateDbContext dbContext) : IFavoriteRepository
     public async Task<HashSet<(NodeType Type, int Id)>> GetFavoriteIdsAsync(string email, CancellationToken cancellationToken = default)
     {
         var pairs = await dbContext.Favorites
+            .AsNoTracking()
             .Where(f => f.UserEmail == email)
             .Select(f => new { f.NodeType, f.NodeId })
             .ToListAsync(cancellationToken);

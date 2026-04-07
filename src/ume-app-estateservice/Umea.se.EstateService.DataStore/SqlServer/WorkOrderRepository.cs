@@ -16,6 +16,7 @@ public class WorkOrderRepository(EstateDbContext dbContext) : IWorkOrderReposito
     public async Task<IReadOnlyList<WorkOrderEntity>> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
         return await dbContext.WorkOrders
+            .AsNoTracking()
             .Include(e => e.Files)
             .Where(e => e.CreatedByEmail == email || e.NotifierEmail == email)
             .OrderByDescending(e => e.CreatedAt)

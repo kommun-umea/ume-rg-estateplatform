@@ -42,7 +42,7 @@ public abstract class EfCorePersistenceBase(
             }
 
             // Check if database has data
-            if (!await context.Estates.AnyAsync(ct))
+            if (!await context.Estates.AsNoTracking().AnyAsync(ct))
             {
                 Logger.LogInformation("Database is empty, no data to load");
                 return (null, null);
