@@ -52,8 +52,7 @@ public sealed class TestApiFactory : WebAppFactoryBase<Program, HttpClientNames>
                 ["Pythagoras-Api-Key"] = "pythagoras-test-key",
                 // Enable all features for integration tests
                 ["Features"] = "EstateService,ContactPersons,Documents,ErrorReport",
-                // Disable automatic data store refresh during tests to avoid interference
-                ["DataSync:RefreshIntervalHours"] = "0",
+                // Disable scheduled refresh during tests (no CronSchedule = manual only)
                 // Work order submission config for tests
                 ["WorkOrder:FileStorage"] = "./test-workorder-files",
                 ["WorkOrder:ProcessingIntervalSeconds"] = "9999",

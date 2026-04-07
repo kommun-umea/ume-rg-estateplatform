@@ -74,7 +74,7 @@ public class AdminController(DataSyncService dataSyncService, SearchHandler sear
             DocumentCount = searchHandler.GetDocumentCount(),
             LastRefreshTime = dataInfo.LastRefreshTime?.UtcDateTime,
             NextRefreshTime = dataInfo.NextRefreshTime?.UtcDateTime,
-            RefreshIntervalHours = dataInfo.RefreshIntervalHours,
+            RefreshSchedule = dataInfo.RefreshSchedule,
             IsRefreshing = dataInfo.IsRefreshing
         };
 

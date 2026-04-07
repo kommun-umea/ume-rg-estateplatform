@@ -10,6 +10,6 @@ public sealed class DataStoreInfo
     public DateTimeOffset? LastRefreshTime { get; init; }
     public DateTimeOffset? LastAttemptTime { get; init; }
     public DateTimeOffset? NextRefreshTime { get; init; }
-    public double RefreshIntervalHours { get; init; }
+    public string? RefreshSchedule { get; init; }
     public bool IsRefreshing { get; init; }
 }

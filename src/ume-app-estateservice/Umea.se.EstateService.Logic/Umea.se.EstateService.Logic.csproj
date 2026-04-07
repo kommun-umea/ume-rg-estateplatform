@@ -10,6 +10,7 @@
     <InternalsVisibleTo Include="Umea.se.EstateService.Test" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Cronos" />
     <PackageReference Include="Microsoft.Extensions.AI" />
     <PackageReference Include="SymSpell" />
   </ItemGroup>

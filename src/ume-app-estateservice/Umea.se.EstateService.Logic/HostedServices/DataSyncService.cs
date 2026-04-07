@@ -1,4 +1,6 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Channels;
+using Cronos;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Umea.se.EstateService.Logic.Data;
@@ -11,8 +13,8 @@ using Umea.se.EstateService.Shared.Infrastructure.ConfigurationModels;
 namespace Umea.se.EstateService.Logic.HostedServices;
 
 /// <summary>
-/// Background service that refreshes the data store and search index on a periodic schedule.
-/// Periodic and manual triggers are funneled through a single queue and executed sequentially by one worker.
+/// Background service that refreshes the data store and search index on a cron schedule.
+/// Scheduled and manual triggers are funneled through a single queue and executed sequentially by one worker.
 /// </summary>
 public sealed class DataSyncService(
     IDataRefreshService dataRefreshService,
@@ -37,19 +39,20 @@ public sealed class DataSyncService(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        TimeSpan interval = _options.RefreshInterval;
         bool loadedFromCache = false;
+        DateTimeOffset? lastRefresh = null;
 
-        (DataSnapshot? snapshot, DateTimeOffset? lastRefresh) = await persistence.TryLoadAsync(stoppingToken).ConfigureAwait(false);
+        (DataSnapshot? snapshot, DateTimeOffset? persisted) = await persistence.TryLoadAsync(stoppingToken).ConfigureAwait(false);
         if (snapshot is not null)
         {
             loadedFromCache = true;
+            lastRefresh = persisted;
             backgroundCache.SeedFrom(snapshot.Buildings);
             dataStore.SetSnapshot(snapshot);
 
-            if (lastRefresh.HasValue)
+            if (persisted.HasValue)
             {
-                dataStore.RecordRefreshAttempt(lastRefresh.Value);
+                dataStore.RecordRefreshAttempt(persisted.Value);
             }
 
             try
@@ -62,22 +65,34 @@ public sealed class DataSyncService(
             }
         }
 
-        if (!loadedFromCache || _options.AlwaysRefreshOnStartup)
+        bool hasCron = TryParseCron(out CronExpression? cron, out TimeZoneInfo? tz);
+
+        if (!hasCron && !string.IsNullOrWhiteSpace(_options.Schedule))
         {
+            logger.LogError("Invalid cron expression '{Schedule}'. Scheduled refresh disabled.", _options.Schedule);
+        }
+
+        if (!loadedFromCache)
+        {
+            await RunStartupRefreshWithRetriesAsync(stoppingToken).ConfigureAwait(false);
+        }
+        else if (hasCron && IsOverdue(lastRefresh, cron!, tz!))
+        {
+            logger.LogInformation("Last refresh was {Ago} ago — running catch-up refresh.",
+                DateTimeOffset.UtcNow - lastRefresh);
             await RunStartupRefreshWithRetriesAsync(stoppingToken).ConfigureAwait(false);
         }
 
         // Start background cache consumer (refreshes stale document counts + image IDs)
         _ = backgroundCache.RunConsumerAsync(stoppingToken);
 
-        if (interval > TimeSpan.Zero)
+        if (hasCron)
         {
-            _nextRefreshTime = DateTimeOffset.UtcNow.Add(interval);
-            _ = RunPeriodicTriggerProducerAsync(interval, stoppingToken);
+            _ = RunScheduledRefreshAsync(cron!, tz!, stoppingToken);
         }
-        else
+        else if (string.IsNullOrWhiteSpace(_options.Schedule))
         {
-            logger.LogInformation("Periodic refresh disabled (interval <= 0). Manual triggers are still allowed.");
+            logger.LogInformation("Scheduled refresh disabled (no Schedule configured). Manual triggers are still allowed.");
         }
 
         try
@@ -129,7 +144,7 @@ public sealed class DataSyncService(
             LastRefreshTime = dataStore.LastRefreshUtc,
             LastAttemptTime = dataStore.LastAttemptUtc,
             NextRefreshTime = _nextRefreshTime,
-            RefreshIntervalHours = _options.RefreshIntervalHours,
+            RefreshSchedule = _options.Schedule,
             IsRefreshing = IsBusy()
         };
     }
@@ -158,25 +173,75 @@ public sealed class DataSyncService(
         logger.LogCritical("Startup refresh failed after {Attempts} attempts.", maxAttempts);
     }
 
-    private async Task RunPeriodicTriggerProducerAsync(TimeSpan interval, CancellationToken cancellationToken)
+    /// <summary>
+    /// Sleeps until the next cron occurrence, then triggers a refresh. Repeats until cancelled.
+    /// </summary>
+    private async Task RunScheduledRefreshAsync(CronExpression cron, TimeZoneInfo tz, CancellationToken cancellationToken)
     {
-        using PeriodicTimer timer = new(interval);
-
         try
         {
-            while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
+            while (!cancellationToken.IsCancellationRequested)
             {
-                if (!TryQueueTrigger(RefreshTriggerSource.Periodic))
+                DateTimeOffset utcNow = DateTimeOffset.UtcNow;
+                DateTimeOffset? nextUtc = cron.GetNextOccurrence(utcNow, tz);
+
+                if (nextUtc is null)
                 {
-                    logger.LogInformation("Skipping periodic trigger because a refresh is active or queued.");
+                    logger.LogWarning("Cron expression has no future occurrences. Scheduled refresh stopped.");
+                    return;
                 }
 
-                _nextRefreshTime = DateTimeOffset.UtcNow.Add(interval);
+                _nextRefreshTime = nextUtc;
+                TimeSpan delay = nextUtc.Value - utcNow;
+
+                logger.LogInformation("Next scheduled refresh at {NextRefresh:u} (in {Delay}).", nextUtc.Value, delay);
+
+                await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+
+                if (!TryQueueTrigger(RefreshTriggerSource.Scheduled))
+                {
+                    logger.LogInformation("Skipping scheduled trigger because a refresh is active or queued.");
+                }
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             // normal shutdown path
+        }
+    }
+
+    private static bool IsOverdue(DateTimeOffset? lastRefresh, CronExpression cron, TimeZoneInfo tz)
+    {
+        if (!lastRefresh.HasValue)
+        {
+            return false;
+        }
+
+        // If the next occurrence after the last refresh is in the past, we missed a scheduled run.
+        DateTimeOffset? nextAfterLast = cron.GetNextOccurrence(lastRefresh.Value, tz);
+        return nextAfterLast.HasValue && nextAfterLast.Value <= DateTimeOffset.UtcNow;
+    }
+
+    private bool TryParseCron([NotNullWhen(true)] out CronExpression? expression, [NotNullWhen(true)] out TimeZoneInfo? timeZone)
+    {
+        if (string.IsNullOrWhiteSpace(_options.Schedule))
+        {
+            expression = null;
+            timeZone = null;
+            return false;
+        }
+
+        try
+        {
+            expression = CronExpression.Parse(_options.Schedule);
+            timeZone = TimeZoneInfo.FindSystemTimeZoneById(_options.TimeZone);
+            return true;
+        }
+        catch (Exception ex) when (ex is CronFormatException or TimeZoneNotFoundException)
+        {
+            expression = null;
+            timeZone = null;
+            return false;
         }
     }
 
@@ -252,7 +317,7 @@ public sealed class DataSyncService(
     private enum RefreshTriggerSource
     {
         Startup,
-        Periodic,
+        Scheduled,
         Manual
     }
 

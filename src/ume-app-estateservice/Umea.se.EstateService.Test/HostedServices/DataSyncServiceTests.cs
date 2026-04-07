@@ -22,7 +22,6 @@ public sealed class DataSyncServiceTests
 
         ApplicationConfig appConfig = BuildAppConfig(new Dictionary<string, string?>
         {
-            ["DataSync:RefreshIntervalHours"] = "1",
             ["DataSync:MaxRetries"] = "0",
             ["DataSync:RetryBaseDelaySeconds"] = "1"
         });
