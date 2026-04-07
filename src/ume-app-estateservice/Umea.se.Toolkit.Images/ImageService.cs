@@ -125,6 +125,7 @@ public sealed class ImageService(IFusionCache cache, ImageServiceOptions options
         FailSafeThrottleDuration = TimeSpan.FromSeconds(30),
         FactorySoftTimeout = TimeSpan.FromSeconds(15),  // Allow time for image fetch + processing
         FactoryHardTimeout = TimeSpan.FromSeconds(45),  // Hard limit for slow networks
+        AllowBackgroundDistributedCacheOperations = true,  // Don't block caller while writing to L2 blob cache
         EagerRefreshThreshold = 0.9f,
     };
 
