@@ -76,8 +76,7 @@ public class DataStoreDocumentProvider(IDataStore dataStore) : IPythagorasDocume
             GeoLocation = building.GeoLocation,
             GrossArea = building.GrossArea,
             BusinessType = building.BusinessType,
-            // ImageUrl is not set here — it's patched at response time from live entity data
-            // (kept fresh by write-through from BuildingBackgroundCache).
+            // ImageUrl is not set here — it's patched at response time from live entity data.
             RankScore = 2,
             UpdatedAt = building.UpdatedAt,
             Ancestors = [],

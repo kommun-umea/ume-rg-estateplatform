@@ -78,6 +78,7 @@ public abstract class EfCorePersistenceBase(
 
             // Deserialize work order categories from JSON
             ImmutableArray<WorkOrderCategoryNode> workOrderCategories = DeserializeCategories(metadata.WorkOrderCategoriesJson);
+            ImmutableHashSet<int> portalPublishStatusIds = DeserializeStatusIds(metadata.PortalPublishStatusIdsJson);
 
             // Create snapshot
             DataSnapshot snapshot = new(
@@ -87,7 +88,8 @@ public abstract class EfCorePersistenceBase(
                 rooms: [.. rooms],
                 buildingAscendants: buildingAscendants,
                 refreshUtc: metadata.LastRefreshUtc,
-                workOrderCategories: workOrderCategories
+                workOrderCategories: workOrderCategories,
+                portalPublishStatusIds: portalPublishStatusIds
             );
 
             Logger.LogInformation(
@@ -264,6 +266,31 @@ public abstract class EfCorePersistenceBase(
 
         List<WorkOrderCategoryNode>? list = JsonSerializer.Deserialize<List<WorkOrderCategoryNode>>(json, _categoryJsonOptions);
         return list is { Count: > 0 } ? [.. list] : [];
+    }
+
+    #endregion
+
+    #region Portal Publish Status IDs JSON
+
+    protected static string SerializeStatusIds(ImmutableHashSet<int> statusIds)
+    {
+        if (statusIds.IsEmpty)
+        {
+            return "[]";
+        }
+
+        return JsonSerializer.Serialize(statusIds.OrderBy(id => id));
+    }
+
+    private static ImmutableHashSet<int> DeserializeStatusIds(string? json)
+    {
+        if (string.IsNullOrEmpty(json))
+        {
+            return ImmutableHashSet<int>.Empty;
+        }
+
+        List<int>? list = JsonSerializer.Deserialize<List<int>>(json);
+        return list is { Count: > 0 } ? [.. list] : ImmutableHashSet<int>.Empty;
     }
 
     #endregion

@@ -1,7 +1,7 @@
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Models;
 
-namespace Umea.se.EstateService.Logic.Data.Pythagoras.Mappers;
+namespace Umea.se.EstateService.Logic.Sync.Pythagoras.Mappers;
 
 public static class PythagorasFileDocumentMapper
 {
@@ -13,17 +13,17 @@ public static class PythagorasFileDocumentMapper
             Name = dto.Name,
             DirectoryId = directoryId,
             SizeInBytes = dto.DataSize,
-            ActionTypeId = dto.ActionTypeId,
-            ActionTypeName = dto.ActionTypeName,
+            CategoryId = dto.ActionTypeId,
+            CategoryName = dto.ActionTypeName,
         };
     }
 
-    public static IReadOnlyList<DocumentInfoModel> ToModelWithDirectoryId(IReadOnlyList<FileDocument> documentDtos, int? directoryId)
+    public static List<DocumentInfoModel> ToModelWithDirectoryId(IReadOnlyList<FileDocument> documentDtos, int? directoryId)
     {
         ArgumentNullException.ThrowIfNull(documentDtos);
 
         return documentDtos.Count == 0
             ? []
-            : documentDtos.Select(d => ToModel(d, directoryId)).ToArray();
+            : documentDtos.Select(d => ToModel(d, directoryId)).ToList();
     }
 }

@@ -19,8 +19,7 @@ public class EstateDataQueryHandler(IDataStore dataStore) : IEstateDataQueryHand
     // Ascendants are always included from the cache when available.
 
     /// <summary>
-    /// Stamps ImageUrl on building documents from live entity data
-    /// (kept fresh by write-through from BuildingBackgroundCache).
+    /// Stamps ImageUrl on building documents from live entity data.
     /// </summary>
     public void StampBuildingImageUrls(IEnumerable<PythagorasDocument> documents)
     {

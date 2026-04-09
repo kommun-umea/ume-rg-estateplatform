@@ -2,7 +2,7 @@ using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enums;
 using Umea.se.EstateService.Shared.ValueObjects;
 
-namespace Umea.se.EstateService.Logic.Data.Pythagoras.Mappers;
+namespace Umea.se.EstateService.Logic.Sync.Pythagoras.Mappers;
 
 /// <summary>
 /// Shared helper methods used across Pythagoras entity mappers.

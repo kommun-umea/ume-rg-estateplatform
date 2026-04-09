@@ -1,14 +1,15 @@
 using System.Net;
 using Umea.se.EstateService.Logic.Models;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
-using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enums;
+using Umea.se.EstateService.Shared.Data;
+using Umea.se.EstateService.Shared.Data.Entities;
 using Umea.se.EstateService.Shared.Exceptions;
 using Umea.se.Toolkit.Images;
 
 namespace Umea.se.EstateService.Logic.Handlers.Images;
 
-public sealed class BuildingImageService(IPythagorasClient pythagorasClient, BuildingBackgroundCache backgroundCache, ImageService imageService) : IBuildingImageService
+public sealed class BuildingImageService(IPythagorasClient pythagorasClient, IDataStore dataStore, ImageService imageService) : IBuildingImageService
 {
     public async Task<ImageResult?> GetImageResultAsync(int buildingId, int? imageId, int? maxWidth, int? maxHeight, CancellationToken cancellationToken = default)
     {
@@ -18,8 +19,7 @@ public sealed class BuildingImageService(IPythagorasClient pythagorasClient, Bui
             ArgumentOutOfRangeException.ThrowIfNegativeOrZero(imageId.Value);
         }
 
-        // Ensure image IDs are cached — falls back to inline Pythagoras fetch on miss
-        IReadOnlyList<int>? imageIds = await backgroundCache.GetOrFetchImageIdsAsync(buildingId, cancellationToken);
+        IReadOnlyList<int>? imageIds = GetImageIds(dataStore, buildingId);
 
         if (imageIds is null or { Count: 0 })
         {
@@ -73,7 +73,7 @@ public sealed class BuildingImageService(IPythagorasClient pythagorasClient, Bui
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(buildingId);
 
-        IReadOnlyList<int>? imageIds = await backgroundCache.GetOrFetchImageIdsAsync(buildingId, cancellationToken);
+        IReadOnlyList<int>? imageIds = GetImageIds(dataStore, buildingId);
 
         if (imageIds is null or { Count: 0 })
         {
@@ -85,10 +85,13 @@ public sealed class BuildingImageService(IPythagorasClient pythagorasClient, Bui
 
     public Task InvalidateCacheAsync(int buildingId, CancellationToken cancellationToken = default)
     {
-        // Cache handles its own staleness — no-op
         return Task.CompletedTask;
     }
 
-    public static GalleryImageFile SelectPrimaryImage(IReadOnlyList<GalleryImageFile> images)
-        => images.OrderByDescending(static i => i.Updated).ThenBy(static i => i.Id).First();
+    private static IReadOnlyList<int>? GetImageIds(IDataStore dataStore, int buildingId)
+    {
+        return dataStore.BuildingsById.TryGetValue(buildingId, out BuildingEntity? building)
+            ? building.ImageIds
+            : null;
+    }
 }

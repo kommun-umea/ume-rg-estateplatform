@@ -1,7 +1,6 @@
 ﻿using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
-using Umea.se.EstateService.Logic.Data.Pythagoras.Mappers;
-using Umea.se.EstateService.Logic.Handlers;
+using Umea.se.EstateService.Logic.Sync.Pythagoras.Mappers;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enums;
@@ -10,7 +9,7 @@ using Umea.se.EstateService.Shared.Data.Entities;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.EstateService.Shared.ValueObjects;
 
-namespace Umea.se.EstateService.Logic.Data.Pythagoras;
+namespace Umea.se.EstateService.Logic.Sync.Pythagoras;
 
 /// <summary>
 /// Service responsible for fetching data from Pythagoras API and updating the in-memory data store.
@@ -18,7 +17,6 @@ namespace Umea.se.EstateService.Logic.Data.Pythagoras;
 public sealed class PythagorasDataRefreshService(
     IPythagorasClient pythagorasClient,
     IDataStore dataStore,
-    BuildingBackgroundCache backgroundCache,
     ILogger<PythagorasDataRefreshService> logger) : IDataRefreshService
 {
     private static readonly IReadOnlyCollection<int> _buildingExtendedPropertyIds = Array.AsReadOnly(
@@ -101,6 +99,7 @@ public sealed class PythagorasDataRefreshService(
         public required IReadOnlyList<Floor> Floors { get; init; }
         public required IReadOnlyList<Workspace> Workspaces { get; init; }
         public required IReadOnlyList<WorkOrderCategoryInfoDto> WorkOrderCategories { get; init; }
+        public required ImmutableHashSet<int> PortalPublishStatusIds { get; init; }
     }
 
     /// <inheritdoc />
@@ -144,8 +143,7 @@ public sealed class PythagorasDataRefreshService(
             BuildEntityRelationships(estates, buildings, floors, rooms);
             CalculateBuildingWorkspaceStats(buildings);
 
-            // Write cached image IDs + document counts onto the new building entities before snapshot creation
-            backgroundCache.ApplyTo(buildings);
+            await FetchImageIdsForBuildingsAsync(buildings, cancellationToken);
 
             // Build ascendant lookup using NavigationInfo from buildings
             Dictionary<int, BuildingAscendantTriplet> buildingAscendants = BuildAscendantLookupByName(
@@ -168,7 +166,8 @@ public sealed class PythagorasDataRefreshService(
                 rooms: [.. rooms],
                 buildingAscendants: buildingAscendants,
                 refreshUtc: refreshTime,
-                workOrderCategories: workOrderCategories
+                workOrderCategories: workOrderCategories,
+                portalPublishStatusIds: data.PortalPublishStatusIds
             );
 
             dataStore.SetSnapshot(snapshot);
@@ -178,9 +177,11 @@ public sealed class PythagorasDataRefreshService(
             logger.LogInformation(
                 "Data refresh completed successfully in {Duration}ms. " +
                 "Estates: {EstateCount}, Buildings: {BuildingCount}, Floors: {FloorCount}, " +
-                "Rooms: {RoomCount}, Ascendants: {AscendantCount}, WorkOrderCategories: {CategoryCount}",
+                "Rooms: {RoomCount}, Ascendants: {AscendantCount}, WorkOrderCategories: {CategoryCount}, " +
+                "PortalPublishStatusIds: {StatusIds}",
                 duration, estates.Count, buildings.Count, floors.Count, rooms.Count,
-                buildingAscendants.Count, workOrderCategories.Length);
+                buildingAscendants.Count, workOrderCategories.Length,
+                string.Join(", ", data.PortalPublishStatusIds.OrderBy(id => id)));
         }
         catch (Exception ex)
         {
@@ -215,11 +216,7 @@ public sealed class PythagorasDataRefreshService(
         IReadOnlyList<BuildingInfo> buildings,
         IReadOnlyList<NavigationFolder> estates)
     {
-        // Build name -> estate ID lookup (names should be unique within type; take first on collision)
-        Dictionary<string, int> estateIdByName = estates
-            .Where(e => e.NavigationId == NavigationType.UmeaKommun)
-            .GroupBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.First().Id, StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, int> estateIdByName = BuildNameLookup(estates, f => f.Id);
 
         Dictionary<int, int> buildingToEstate = [];
 
@@ -239,7 +236,7 @@ public sealed class PythagorasDataRefreshService(
     /// <summary>
     /// Builds hierarchical relationships between entities.
     /// </summary>
-    private void BuildEntityRelationships(List<EstateEntity> estates, List<BuildingEntity> buildings, List<FloorEntity> floors, List<RoomEntity> rooms)
+    private static void BuildEntityRelationships(List<EstateEntity> estates, List<BuildingEntity> buildings, List<FloorEntity> floors, List<RoomEntity> rooms)
     {
         // Create lookup dictionaries
         Dictionary<int, EstateEntity> estatesById = estates.ToDictionary(e => e.Id);
@@ -294,6 +291,46 @@ public sealed class PythagorasDataRefreshService(
         }
     }
 
+    private async Task FetchImageIdsForBuildingsAsync(List<BuildingEntity> buildings, CancellationToken ct)
+    {
+        using SemaphoreSlim semaphore = new(10);
+
+        Task[] tasks = buildings.Select(async building =>
+        {
+            await semaphore.WaitAsync(ct);
+            try
+            {
+                IReadOnlyList<GalleryImageFile> images =
+                    await pythagorasClient.GetBuildingGalleryImagesAsync(building.Id, ct);
+
+                building.ImageIds = [.. images
+                    .OrderByDescending(i => i.Updated)
+                    .ThenBy(i => i.Id)
+                    .Select(i => i.Id)];
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to fetch image IDs for building {BuildingId}", building.Id);
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        }).ToArray();
+
+        await Task.WhenAll(tasks);
+    }
+
+    private static Dictionary<string, TValue> BuildNameLookup<TValue>(
+        IReadOnlyList<NavigationFolder> folders,
+        Func<NavigationFolder, TValue> valueSelector)
+    {
+        return folders
+            .Where(f => f.NavigationId == NavigationType.UmeaKommun)
+            .GroupBy(f => f.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => valueSelector(g.First()), StringComparer.OrdinalIgnoreCase);
+    }
+
     /// <summary>
     /// Creates a query for fetching folders of a specific type.
     /// Used to get folder entities for name-based lookup from building NavigationInfo.
@@ -329,27 +366,15 @@ public sealed class PythagorasDataRefreshService(
     /// Uses NavigationInfo from buildings to match folder names to folder entities.
     /// NavigationInfo keys: "5" = estate, "9" = district, "14" = organization.
     /// </summary>
-    private Dictionary<int, BuildingAscendantTriplet> BuildAscendantLookupByName(
+    private static Dictionary<int, BuildingAscendantTriplet> BuildAscendantLookupByName(
         IReadOnlyList<BuildingInfo> buildings,
         IReadOnlyList<NavigationFolder> estates,
         IReadOnlyList<NavigationFolder> districts,
         IReadOnlyList<NavigationFolder> organizations)
     {
-        // Build name -> folder lookups (names should be unique within each type; take first on collision)
-        Dictionary<string, NavigationFolder> estatesByName = estates
-            .Where(f => f.NavigationId == NavigationType.UmeaKommun)
-            .GroupBy(f => f.Name, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
-
-        Dictionary<string, NavigationFolder> districtsByName = districts
-            .Where(f => f.NavigationId == NavigationType.UmeaKommun)
-            .GroupBy(f => f.Name, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
-
-        Dictionary<string, NavigationFolder> organizationsByName = organizations
-            .Where(f => f.NavigationId == NavigationType.UmeaKommun)
-            .GroupBy(f => f.Name, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, NavigationFolder> estatesByName = BuildNameLookup(estates, f => f);
+        Dictionary<string, NavigationFolder> districtsByName = BuildNameLookup(districts, f => f);
+        Dictionary<string, NavigationFolder> organizationsByName = BuildNameLookup(organizations, f => f);
 
         Dictionary<int, BuildingAscendantTriplet> result = [];
 
@@ -446,6 +471,9 @@ public sealed class PythagorasDataRefreshService(
             .GetWorkOrderCategoriesAsync(1, cancellationToken)
             .ConfigureAwait(false);
 
+        ImmutableHashSet<int> portalPublishStatusIds = await FetchPortalPublishStatusIdsAsync(cancellationToken)
+            .ConfigureAwait(false);
+
         return new PythagorasData
         {
             Estates = estateResponse.Data,
@@ -454,7 +482,8 @@ public sealed class PythagorasDataRefreshService(
             Buildings = buildingResponse.Data,
             Floors = floors,
             Workspaces = workspaces,
-            WorkOrderCategories = workOrderCategories
+            WorkOrderCategories = workOrderCategories,
+            PortalPublishStatusIds = portalPublishStatusIds
         };
     }
 
@@ -521,6 +550,39 @@ public sealed class PythagorasDataRefreshService(
                     building.Id);
             }
         }
+    }
+
+    /// <summary>
+    /// Fetches all document action types and their statuses from Pythagoras,
+    /// returning the IDs of statuses named "Publiceras i Fastighetsportal" (case-insensitive).
+    /// </summary>
+    public async Task<ImmutableHashSet<int>> FetchPortalPublishStatusIdsAsync(CancellationToken cancellationToken)
+    {
+        IReadOnlyList<DocumentFileRecordActionType> actionTypes = await pythagorasClient
+            .GetDocumentRecordActionTypesAsync(cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        ImmutableHashSet<int>.Builder builder = ImmutableHashSet.CreateBuilder<int>();
+
+        foreach (DocumentFileRecordActionType actionType in actionTypes)
+        {
+            IReadOnlyList<DocumentFileRecordActionTypeStatus> statuses = await pythagorasClient
+                .GetDocumentRecordActionTypeStatusesAsync(actionType.Id, cancellationToken)
+                .ConfigureAwait(false);
+
+            foreach (DocumentFileRecordActionTypeStatus status in statuses)
+            {
+                if (status.Name.Contains("Publiceras i Fastighetsportal", StringComparison.OrdinalIgnoreCase))
+                {
+                    builder.Add(status.Id);
+                }
+            }
+        }
+
+        logger.LogInformation("Resolved {Count} portal publish status IDs: [{Ids}]",
+            builder.Count, string.Join(", ", builder.OrderBy(id => id)));
+
+        return builder.ToImmutable();
     }
 
     private async Task<IReadOnlyList<Floor>> FetchFloorsViaWorkspaceBatchesAsync(

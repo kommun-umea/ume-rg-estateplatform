@@ -24,6 +24,7 @@ public class EstateDbContext(DbContextOptions<EstateDbContext> options) : DbCont
     public DbSet<WorkOrderEntity> WorkOrders => Set<WorkOrderEntity>();
     public DbSet<WorkOrderFileEntity> WorkOrderFiles => Set<WorkOrderFileEntity>();
     public DbSet<FavoriteEntity> Favorites => Set<FavoriteEntity>();
+    public DbSet<BuildingDocumentEntity> BuildingDocuments => Set<BuildingDocumentEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -38,6 +39,7 @@ public class EstateDbContext(DbContextOptions<EstateDbContext> options) : DbCont
         ConfigureWorkOrder(modelBuilder);
         ConfigureWorkOrderFile(modelBuilder);
         ConfigureFavorite(modelBuilder);
+        ConfigureBuildingDocument(modelBuilder);
 
         if (Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite")
         {
@@ -249,9 +251,6 @@ public class EstateDbContext(DbContextOptions<EstateDbContext> options) : DbCont
 
             entity.Property(e => e.NumDocuments)
                 .HasColumnName("NumDocuments");
-
-            entity.Property(e => e.BackgroundCacheFetchedAtUtc)
-                .HasColumnName("BackgroundCacheFetchedAtUtc");
 
             // Ignore navigation properties for EF mapping
             entity.Ignore(e => e.Floors);
@@ -467,6 +466,31 @@ public class EstateDbContext(DbContextOptions<EstateDbContext> options) : DbCont
 
             entity.HasIndex(e => new { e.UserEmail, e.NodeType, e.NodeId })
                 .IsUnique();
+        });
+    }
+
+    private static void ConfigureBuildingDocument(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<BuildingDocumentEntity>(entity =>
+        {
+            entity.ToTable("BuildingDocuments");
+
+            entity.HasKey(e => new { e.BuildingId, e.DocumentId });
+
+            entity.Property(e => e.BuildingId)
+                .ValueGeneratedNever();
+
+            entity.Property(e => e.DocumentId)
+                .ValueGeneratedNever();
+
+            entity.Property(e => e.Name)
+                .HasMaxLength(500)
+                .IsRequired();
+
+            entity.Property(e => e.CategoryName)
+                .HasMaxLength(200);
+
+            entity.HasIndex(e => e.BuildingId);
         });
     }
 }

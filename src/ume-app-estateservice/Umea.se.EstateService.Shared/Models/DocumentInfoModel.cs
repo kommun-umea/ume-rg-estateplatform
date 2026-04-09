@@ -6,6 +6,6 @@ public sealed class DocumentInfoModel
     public required string Name { get; init; }
     public int? DirectoryId { get; init; }
     public long? SizeInBytes { get; init; }
-    public int? ActionTypeId { get; init; }
-    public string? ActionTypeName { get; init; }
+    public int? CategoryId { get; init; }
+    public string? CategoryName { get; init; }
 }

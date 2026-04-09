@@ -193,8 +193,6 @@ public sealed class SqlServerPersistence(
         table.Columns.Add("WorkOrderTypes", typeof(string));
         table.Columns.Add("ImageIds", typeof(string));
         table.Columns.Add("NumDocuments", typeof(int));
-        table.Columns.Add("BackgroundCacheFetchedAtUtc", typeof(DateTimeOffset));
-
         foreach (BuildingEntity b in buildings)
         {
             table.Rows.Add(
@@ -235,8 +233,7 @@ public sealed class SqlServerPersistence(
                 b.ImageIds is not null
                     ? JsonSerializer.Serialize(b.ImageIds, (JsonSerializerOptions?)null)
                     : DBNull.Value,
-                (object?)b.NumDocuments ?? DBNull.Value,
-                (object?)b.BackgroundCacheFetchedAtUtc ?? DBNull.Value
+                (object?)b.NumDocuments ?? DBNull.Value
             );
         }
 
@@ -362,10 +359,12 @@ public sealed class SqlServerPersistence(
         table.Columns.Add("FloorCount", typeof(int));
         table.Columns.Add("RoomCount", typeof(int));
         table.Columns.Add("WorkOrderCategoriesJson", typeof(string));
+        table.Columns.Add("PortalPublishStatusIdsJson", typeof(string));
 
         table.Rows.Add(1, refreshTime, snapshot.Estates.Length, snapshot.Buildings.Length,
             snapshot.Floors.Length, snapshot.Rooms.Length,
-            SerializeCategories(snapshot.WorkOrderCategories));
+            SerializeCategories(snapshot.WorkOrderCategories),
+            SerializeStatusIds(snapshot.PortalPublishStatusIds));
 
         return table;
     }

@@ -49,7 +49,8 @@ public sealed class SqlitePersistence(
             BuildingCount = snapshot.Buildings.Length,
             FloorCount = snapshot.Floors.Length,
             RoomCount = snapshot.Rooms.Length,
-            WorkOrderCategoriesJson = SerializeCategories(snapshot.WorkOrderCategories)
+            WorkOrderCategoriesJson = SerializeCategories(snapshot.WorkOrderCategories),
+            PortalPublishStatusIdsJson = SerializeStatusIds(snapshot.PortalPublishStatusIds)
         });
 
         await context.SaveChangesAsync(ct);

@@ -70,7 +70,6 @@ public sealed class TestApiFactory : WebAppFactoryBase<Program, HttpClientNames>
             services.RemoveAll<IEstateDataQueryHandler>();
             services.RemoveAll<IBuildingImageService>();
             services.RemoveAll<IDataStore>();
-            services.RemoveAll<BuildingBackgroundCache>();
             services.RemoveAll<IDataStorePersistence>();
             services.RemoveAll<InMemoryDataStore>();
 
@@ -82,7 +81,6 @@ public sealed class TestApiFactory : WebAppFactoryBase<Program, HttpClientNames>
             services.AddSingleton<InMemoryDataStore>();
             services.AddSingleton<IDataStore>(sp => sp.GetRequiredService<InMemoryDataStore>());
             services.AddSingleton<IEstateDataQueryHandler>(sp => new EstateDataQueryHandler(sp.GetRequiredService<IDataStore>()));
-            services.AddSingleton<BuildingBackgroundCache>();
 
             // Add no-op persistence for tests
             services.AddSingleton<IDataStorePersistence, NullDataStorePersistence>();

@@ -24,6 +24,7 @@ public sealed class DataSnapshot
     public ImmutableDictionary<int, FloorEntity> FloorsById { get; }
     public ImmutableDictionary<int, RoomEntity> RoomsById { get; }
     public ImmutableDictionary<int, WorkOrderCategoryNode> WorkOrderCategoriesById { get; }
+    public ImmutableHashSet<int> PortalPublishStatusIds { get; }
     public DateTimeOffset? LastRefreshUtc { get; }
     public bool IsReady { get; }
 
@@ -43,6 +44,7 @@ public sealed class DataSnapshot
         FloorsById = [];
         RoomsById = [];
         WorkOrderCategoriesById = ImmutableDictionary<int, WorkOrderCategoryNode>.Empty;
+        PortalPublishStatusIds = ImmutableHashSet<int>.Empty;
         IsReady = false;
         LastRefreshUtc = null;
     }
@@ -59,13 +61,15 @@ public sealed class DataSnapshot
         ImmutableArray<RoomEntity> rooms,
         IReadOnlyDictionary<int, BuildingAscendantTriplet> buildingAscendants,
         DateTimeOffset refreshUtc,
-        ImmutableArray<WorkOrderCategoryNode> workOrderCategories = default)
+        ImmutableArray<WorkOrderCategoryNode> workOrderCategories = default,
+        ImmutableHashSet<int>? portalPublishStatusIds = null)
     {
         Estates = estates;
         Buildings = buildings;
         Floors = floors;
         Rooms = rooms;
         WorkOrderCategories = workOrderCategories.IsDefault ? [] : workOrderCategories;
+        PortalPublishStatusIds = portalPublishStatusIds ?? ImmutableHashSet<int>.Empty;
         BuildingAscendants = buildingAscendants;
         LastRefreshUtc = refreshUtc;
         IsReady = true;
@@ -81,6 +85,14 @@ public sealed class DataSnapshot
         // Wire up navigation properties so handlers can traverse the hierarchy.
         // Skip if already populated (e.g. by PythagorasDataRefreshService before snapshot creation).
         WireUpNavigationProperties();
+    }
+
+    public DataSnapshot WithPortalPublishStatusIds(ImmutableHashSet<int> statusIds)
+    {
+        return new DataSnapshot(
+            Estates, Buildings, Floors, Rooms, BuildingAscendants,
+            LastRefreshUtc ?? DateTimeOffset.MinValue,
+            WorkOrderCategories, statusIds);
     }
 
     private void WireUpNavigationProperties()

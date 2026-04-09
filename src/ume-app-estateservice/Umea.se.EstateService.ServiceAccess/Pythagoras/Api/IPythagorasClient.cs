@@ -15,6 +15,7 @@ public interface IPythagorasClient
     Task<IReadOnlyList<FileDocument>> GetDirectoryDocuments(int directoryId, PythagorasQuery<FileDocument>? query = null, CancellationToken cancellationToken = default);
     Task<(byte[] data, string contentType)> GetDocument(int documentId, CancellationToken cancellationToken = default);
     Task<UiListDataResponse<FileDocument>> GetBuildingDocumentListAsync(int buildingId, int? maxResults = null, CancellationToken cancellationToken = default);
+    Task<UiListDataResponse<FileDocument>> GetDocumentListAsync(int? maxResults = null, string? orderBy = null, bool orderAsc = true, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Workspace>> GetWorkspacesAsync(PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<NavigationFolder>> GetNavigationFoldersAsync(PythagorasQuery<NavigationFolder>? query = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Floor>> GetFloorsAsync(PythagorasQuery<Floor>? query = null, CancellationToken cancellationToken = default);
@@ -35,7 +36,8 @@ public interface IPythagorasClient
     Task<IReadOnlyList<WorkOrderCategoryInfoDto>> GetWorkOrderCategoriesAsync(int moduleId, CancellationToken cancellationToken = default);
     Task<WorkOrderDto?> SetWorkOrderCategoryAsync(int workOrderId, int categoryId, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<DocumentFileRecordActionType>> GetDocumentRecordActionTypesAsync(PythagorasQuery<DocumentFileRecordActionType>? query = null, CancellationToken ct = default);
+    Task<IReadOnlyList<DocumentFileRecordActionType>> GetDocumentRecordActionTypesAsync(PythagorasQuery<DocumentFileRecordActionType>? query = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<DocumentFileRecordActionTypeStatus>> GetDocumentRecordActionTypeStatusesAsync(int actionTypeId, CancellationToken ct = default);
     Task<IReadOnlyList<FileDocumentDirectory>> GetWorkOrderDocumentFoldersAsync(int workOrderId, PythagorasQuery<FileDocumentDirectory>? query = null, CancellationToken ct = default);
+    Task<FileDocumentInfo?> GetDocumentInfoAsync(int documentId, CancellationToken cancellationToken = default);
 }

@@ -1,7 +1,7 @@
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.Shared.Data.Entities;
 
-namespace Umea.se.EstateService.Logic.Data.Pythagoras.Mappers;
+namespace Umea.se.EstateService.Logic.Sync.Pythagoras.Mappers;
 
 /// <summary>
 /// Maps Floor DTOs from Pythagoras API to FloorEntity objects.

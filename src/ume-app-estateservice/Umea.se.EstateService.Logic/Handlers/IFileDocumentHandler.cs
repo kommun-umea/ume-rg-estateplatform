@@ -8,4 +8,6 @@ public interface IFileDocumentHandler
     Task<BuildingDocumentTreeModel> GetBuildingDocumentTree(int buildingId, CancellationToken cancellationToken = default);
     Task<BuildingDocumentTreeNestedModel> GetBuildingDocumentTreeNested(int buildingId, CancellationToken cancellationToken = default);
     Task<int> GetBuildingDocumentCountAsync(int buildingId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<DocumentInfoModel>> GetBuildingDocumentsForPortalAsync(int buildingId, CancellationToken cancellationToken = default);
+    Task<DocumentFileModel?> GetBuildingDocumentForPortalAsync(int buildingId, int documentId, CancellationToken cancellationToken = default);
 }

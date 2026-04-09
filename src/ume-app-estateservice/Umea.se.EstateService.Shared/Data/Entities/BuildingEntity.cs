@@ -25,27 +25,14 @@ public class BuildingEntity : NamedEntity
 
     /// <summary>
     /// Gallery image IDs for this building. First image is the primary image.
-    /// <para>
-    /// Kept fresh at runtime by write-through from <see cref="Handlers.BuildingBackgroundCache"/>.
-    /// <c>IReadOnlyList</c> ensures reference-swap atomicity on 64-bit CLR and
-    /// prevents mutation while another thread reads.
-    /// </para>
+    /// Populated during core refresh from Pythagoras API.
     /// </summary>
     public IReadOnlyList<int>? ImageIds { get; set; }
 
     /// <summary>
-    /// Cached document count from Pythagoras. Null means not yet fetched.
-    /// <para>
-    /// Kept fresh at runtime by write-through from <see cref="Handlers.BuildingBackgroundCache"/>.
-    /// </para>
+    /// Document count for this building. Populated by DocumentSyncHandler from the BuildingDocuments table.
     /// </summary>
     public int? NumDocuments { get; set; }
-
-    /// <summary>
-    /// When the background cache (document count + image IDs) was last fetched from Pythagoras (UTC).
-    /// Shared timestamp — both properties are refreshed together.
-    /// </summary>
-    public DateTimeOffset? BackgroundCacheFetchedAtUtc { get; set; }
 
     public IReadOnlyList<WorkOrderType> WorkOrderTypes { get; set; } = [];
 

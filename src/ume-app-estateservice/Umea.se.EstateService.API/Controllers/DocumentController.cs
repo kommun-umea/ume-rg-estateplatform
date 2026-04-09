@@ -9,26 +9,41 @@ namespace Umea.se.EstateService.API.Controllers;
 
 [ApiController]
 [Produces("application/json")]
-[Route(ApiRoutes.Documents)]
+[Route(ApiRoutes.Buildings)]
 [Authorize]
 [FeatureGate("Documents")]
 public class DocumentController(IFileDocumentHandler fileDocumentHandler) : ControllerBase
 {
     /// <summary>
-    /// Downloads a building document
+    /// Gets documents for a building filtered by allowed document categories
     /// </summary>
-    /// <param name="buildingId">Id of building </param>
-    /// <param name="directoryId">Id of directory </param>
-    /// <param name="documentId">Id of document </param>
-    /// <returns>Returns a file</returns>
-    [HttpGet("building/{buildingId:int}/directory/{directoryId:int}/download/{documentId:int}")]
+    /// <param name="buildingId">Id of building</param>
+    /// <returns>Returns a flat list of documents</returns>
+    [HttpGet("{buildingId:int}/documents")]
+    [SwaggerOperation(
+        Summary = "Get building documents",
+        Description = "Gets all documents for a building filtered by allowed document categories"
+    )]
+    public async Task<ActionResult<IReadOnlyList<DocumentInfoModel>>> GetBuildingDocuments(int buildingId, CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<DocumentInfoModel> documents = await fileDocumentHandler.GetBuildingDocumentsForPortalAsync(buildingId, cancellationToken);
+        return Ok(documents);
+    }
+
+    /// <summary>
+    /// Downloads a building document if it belongs to an allowed category
+    /// </summary>
+    /// <param name="buildingId">Id of building</param>
+    /// <param name="documentId">Id of document</param>
+    /// <returns>Returns the document file</returns>
+    [HttpGet("{buildingId:int}/documents/{documentId:int}/download")]
     [SwaggerOperation(
         Summary = "Download building document",
-        Description = "Download a document from a building directory"
+        Description = "Downloads a document if it belongs to the specified building and an allowed document category"
     )]
-    public async Task<ActionResult> GetBuildingDocument(int buildingId, int directoryId, int documentId, CancellationToken cancellationToken = default)
+    public async Task<ActionResult> GetBuildingDocument(int buildingId, int documentId, CancellationToken cancellationToken = default)
     {
-        DocumentFileModel? document = await fileDocumentHandler.GetBuildingDocument(buildingId, directoryId, documentId, cancellationToken);
+        DocumentFileModel? document = await fileDocumentHandler.GetBuildingDocumentForPortalAsync(buildingId, documentId, cancellationToken);
 
         if (document is null)
         {
@@ -36,37 +51,5 @@ public class DocumentController(IFileDocumentHandler fileDocumentHandler) : Cont
         }
 
         return File(document.Content, document.ContentType, document.Name);
-    }
-
-    /// <summary>
-    /// Gets all documents and directories for a building as a flat list
-    /// </summary>
-    /// <param name="buildingId">Id of building</param>
-    /// <returns>Returns all documents and directories with parent references</returns>
-    [HttpGet("building/{buildingId:int}/all")]
-    [SwaggerOperation(
-        Summary = "Get all building documents",
-        Description = "Gets all documents and directories for a building as a flat list with parent references for building a tree structure"
-    )]
-    public async Task<ActionResult<BuildingDocumentTreeModel>> GetBuildingDocumentTree(int buildingId, CancellationToken cancellationToken = default)
-    {
-        BuildingDocumentTreeModel tree = await fileDocumentHandler.GetBuildingDocumentTree(buildingId, cancellationToken);
-        return Ok(tree);
-    }
-
-    /// <summary>
-    /// Gets all documents and directories for a building as a nested tree structure
-    /// </summary>
-    /// <param name="buildingId">Id of building</param>
-    /// <returns>Returns a nested tree structure of documents and directories</returns>
-    [HttpGet("building/{buildingId:int}/tree")]
-    [SwaggerOperation(
-        Summary = "Get building document tree",
-        Description = "Gets all documents and directories for a building as a nested tree structure ready for rendering"
-    )]
-    public async Task<ActionResult<BuildingDocumentTreeNestedModel>> GetBuildingDocumentTreeNested(int buildingId, CancellationToken cancellationToken = default)
-    {
-        BuildingDocumentTreeNestedModel tree = await fileDocumentHandler.GetBuildingDocumentTreeNested(buildingId, cancellationToken);
-        return Ok(tree);
     }
 }

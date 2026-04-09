@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 using Umea.se.EstateService.API.Responses;
 using Umea.se.EstateService.Logic.Handlers;
-using Umea.se.EstateService.Logic.HostedServices;
+using Umea.se.EstateService.Logic.Sync;
 using Umea.se.EstateService.Logic.Models;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
@@ -50,6 +50,50 @@ public class AdminController(DataSyncService dataSyncService, SearchHandler sear
     }
 
     /// <summary>
+    /// Triggers a manual document sync from the external API.
+    /// </summary>
+    /// <remarks>
+    /// Starts a background document sync. If a document sync is already running, the request is accepted but no new sync is started.
+    /// </remarks>
+    /// <response code="202">Document sync started or already running</response>
+    [HttpPost("trigger-sync/documents")]
+    [SwaggerOperation(
+        Summary = "Trigger manual document sync",
+        Description = "Starts a background document sync from the external API. If a document sync is already running, the request is accepted but no new sync is started."
+    )]
+    [ProducesResponseType(typeof(object), StatusCodes.Status202Accepted)]
+    public IActionResult TriggerDocumentSync()
+    {
+        RefreshStatus status = dataSyncService.TriggerDocumentSync();
+
+        return Accepted(new { message = status == RefreshStatus.Started
+            ? "Document sync started"
+            : "Document sync already running" });
+    }
+
+    /// <summary>
+    /// Triggers a manual image cache pre-warm.
+    /// </summary>
+    /// <remarks>
+    /// Pre-warms the image cache for all building primary images. If a pre-warm is already running, the request is accepted but no new one is started.
+    /// </remarks>
+    /// <response code="202">Image pre-warm started or already running</response>
+    [HttpPost("trigger-sync/images")]
+    [SwaggerOperation(
+        Summary = "Trigger manual image pre-warm",
+        Description = "Pre-warms the image cache for all building primary images. If a pre-warm is already running, the request is accepted but no new one is started."
+    )]
+    [ProducesResponseType(typeof(object), StatusCodes.Status202Accepted)]
+    public IActionResult TriggerImagePreWarm()
+    {
+        RefreshStatus status = dataSyncService.TriggerImagePreWarm();
+
+        return Accepted(new { message = status == RefreshStatus.Started
+            ? "Image pre-warm started"
+            : "Image pre-warm already running" });
+    }
+
+    /// <summary>
     /// Gets information about the current data sync status.
     /// </summary>
     /// <remarks>
@@ -75,6 +119,8 @@ public class AdminController(DataSyncService dataSyncService, SearchHandler sear
             LastRefreshTime = dataInfo.LastRefreshTime?.UtcDateTime,
             NextRefreshTime = dataInfo.NextRefreshTime?.UtcDateTime,
             RefreshSchedule = dataInfo.RefreshSchedule,
+            DocumentSyncSchedule = dataInfo.DocumentSyncSchedule,
+            ImagePreWarmSchedule = dataInfo.ImagePreWarmSchedule,
             IsRefreshing = dataInfo.IsRefreshing
         };
 
@@ -86,7 +132,7 @@ public class AdminController(DataSyncService dataSyncService, SearchHandler sear
     [ProducesResponseType(typeof(DocumentRecordTypesResponse), StatusCodes.Status200OK)]
     public async Task<ActionResult<DocumentRecordTypesResponse>> GetDocumentRecordTypes(CancellationToken ct)
     {
-        IReadOnlyList<DocumentFileRecordActionType> actionTypes = await pythagorasClient.GetDocumentRecordActionTypesAsync(ct: ct);
+        IReadOnlyList<DocumentFileRecordActionType> actionTypes = await pythagorasClient.GetDocumentRecordActionTypesAsync(cancellationToken: ct);
         List<DocumentRecordTypeItem> result = [];
 
         foreach (DocumentFileRecordActionType type in actionTypes)

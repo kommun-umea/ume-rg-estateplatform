@@ -110,6 +110,22 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : Ext
         return result ?? new UiListDataResponse<FileDocument>();
     }
 
+    public async Task<UiListDataResponse<FileDocument>> GetDocumentListAsync(int? maxResults = null, string? orderBy = null, bool orderAsc = true, CancellationToken cancellationToken = default)
+    {
+        List<string> parts = [];
+        if (maxResults.HasValue) parts.Add($"maxResults={maxResults.Value}");
+        if (orderBy is not null) parts.Add($"orderBy={orderBy}");
+        if (!orderAsc) parts.Add("orderAsc=false");
+
+        string requestUri = BuildRequestUri(
+            NormalizeEndpoint("rest/v1/documentfile/uilistdata"),
+            string.Join("&", parts));
+
+        using HttpResponseMessage response = await HttpClient.GetAsync(requestUri, cancellationToken).ConfigureAwait(false);
+        UiListDataResponse<FileDocument>? result = await ProcessResponseAsync<UiListDataResponse<FileDocument>>(response, cancellationToken).ConfigureAwait(false);
+        return result ?? new UiListDataResponse<FileDocument>();
+    }
+
     public Task<IReadOnlyList<Workspace>> GetWorkspacesAsync(PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
     {
         query ??= new PythagorasQuery<Workspace>();
@@ -759,5 +775,16 @@ where TValue : class
 
         query ??= new PythagorasQuery<FileDocumentDirectory>();
         return QueryAsync($"rest/v1/workorder/{workOrderId}/documentfolder/info/root", query, ct);
+    }
+
+    public Task<FileDocumentInfo?> GetDocumentInfoAsync(int documentId, CancellationToken cancellationToken = default)
+    {
+        if (documentId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(documentId), "Document id must be positive.");
+        }
+
+        string endpoint = $"rest/v1/documentfile/{documentId}/info";
+        return GetAsync<FileDocumentInfo>(endpoint, cancellationToken);
     }
 }

@@ -1,12 +1,21 @@
-using Umea.se.EstateService.Logic.Data.Pythagoras.Mappers;
+using Microsoft.EntityFrameworkCore;
+using Umea.se.EstateService.DataStore;
+using Umea.se.EstateService.DataStore.Entities;
+using Umea.se.EstateService.Logic.Sync.Pythagoras.Mappers;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
+using Umea.se.EstateService.Shared.Data;
 using Umea.se.EstateService.Shared.Models;
 
 namespace Umea.se.EstateService.Logic.Handlers;
 
-public class FileDocumentHandler(IPythagorasClient pythagorasClient) : IFileDocumentHandler
+public class FileDocumentHandler(
+    IPythagorasClient pythagorasClient,
+    IDataStore dataStore,
+    IDbContextFactory<EstateDbContext> dbContextFactory) : IFileDocumentHandler
 {
+    private const int MaxParallelInfoRequests = 10;
+
     public async Task<DocumentFileModel?> GetBuildingDocument(int buildingId, int directoryId, int documentId, CancellationToken cancellationToken = default)
     {
         if (!await DirectoryBelongsToBuilding(buildingId, directoryId, cancellationToken))
@@ -16,6 +25,12 @@ public class FileDocumentHandler(IPythagorasClient pythagorasClient) : IFileDocu
 
         FileDocument? documentDto = await GetDocumentInDirectory(directoryId, documentId, cancellationToken);
         if (documentDto is null)
+        {
+            return null;
+        }
+
+        FileDocumentInfo? info = await pythagorasClient.GetDocumentInfoAsync(documentId, cancellationToken);
+        if (info is null || !info.RecordStatusId.HasValue || !dataStore.PortalPublishStatusIds.Contains(info.RecordStatusId.Value))
         {
             return null;
         }
@@ -57,7 +72,9 @@ public class FileDocumentHandler(IPythagorasClient pythagorasClient) : IFileDocu
         IReadOnlyList<FileDocumentDirectory> rootDirectories = await pythagorasClient.GetBuildingRootDirectories(buildingId, null, cancellationToken);
 
         // Add root documents (no directory ID since they're at root level)
-        allDocuments.AddRange(PythagorasFileDocumentMapper.ToModelWithDirectoryId(rootDocuments, null));
+        List<DocumentInfoModel> rootDocModels = PythagorasFileDocumentMapper.ToModelWithDirectoryId(rootDocuments, null);
+        List<DocumentInfoModel> filteredRootDocs = await FilterByPortalStatusAsync(rootDocModels, cancellationToken);
+        allDocuments.AddRange(filteredRootDocs);
 
         // Process each root directory recursively
         foreach (FileDocumentDirectory rootDir in rootDirectories)
@@ -94,7 +111,9 @@ public class FileDocumentHandler(IPythagorasClient pythagorasClient) : IFileDocu
         PythagorasQuery<FileDocument> docQuery = new PythagorasQuery<FileDocument>()
             .WithQueryParameter("includeActionType", "true");
         IReadOnlyList<FileDocument> documents = await pythagorasClient.GetDirectoryDocuments(directory.Id, docQuery, cancellationToken);
-        allDocuments.AddRange(PythagorasFileDocumentMapper.ToModelWithDirectoryId(documents, directory.Id));
+        List<DocumentInfoModel> docModels = PythagorasFileDocumentMapper.ToModelWithDirectoryId(documents, directory.Id);
+        List<DocumentInfoModel> filteredDocs = await FilterByPortalStatusAsync(docModels, cancellationToken);
+        allDocuments.AddRange(filteredDocs);
 
         // Get and process child directories
         IReadOnlyList<FileDocumentDirectory> childDirectories = await pythagorasClient.GetChildDirectories(directory.Id, null, cancellationToken);
@@ -113,7 +132,9 @@ public class FileDocumentHandler(IPythagorasClient pythagorasClient) : IFileDocu
         IReadOnlyList<FileDocument> rootDocuments = await pythagorasClient.GetBuildingRootDocuments(buildingId, null, cancellationToken);
         IReadOnlyList<FileDocumentDirectory> rootDirectories = await pythagorasClient.GetBuildingRootDirectories(buildingId, null, cancellationToken);
 
-        totalDocuments += rootDocuments.Count;
+        List<DocumentInfoModel> rootDocModels = PythagorasFileDocumentMapper.ToModelWithDirectoryId(rootDocuments, null);
+        List<DocumentInfoModel> filteredRootDocs = await FilterByPortalStatusAsync(rootDocModels, cancellationToken);
+        totalDocuments += filteredRootDocs.Count;
 
         // Build nested tree for each root directory
         List<DocumentTreeNodeModel> nestedDirectories = [];
@@ -129,7 +150,7 @@ public class FileDocumentHandler(IPythagorasClient pythagorasClient) : IFileDocu
             TotalDocumentCount = totalDocuments,
             TotalDirectoryCount = totalDirectories,
             Directories = nestedDirectories,
-            RootDocuments = PythagorasFileDocumentMapper.ToModelWithDirectoryId(rootDocuments, null)
+            RootDocuments = filteredRootDocs
         };
     }
 
@@ -141,6 +162,8 @@ public class FileDocumentHandler(IPythagorasClient pythagorasClient) : IFileDocu
         PythagorasQuery<FileDocument> docQuery = new PythagorasQuery<FileDocument>()
             .WithQueryParameter("includeActionType", "true");
         IReadOnlyList<FileDocument> documents = await pythagorasClient.GetDirectoryDocuments(directory.Id, docQuery, cancellationToken);
+        List<DocumentInfoModel> docModels = PythagorasFileDocumentMapper.ToModelWithDirectoryId(documents, directory.Id);
+        List<DocumentInfoModel> filteredDocs = await FilterByPortalStatusAsync(docModels, cancellationToken);
 
         // Get and process child directories
         IReadOnlyList<FileDocumentDirectory> childDirectories = await pythagorasClient.GetChildDirectories(directory.Id, null, cancellationToken);
@@ -156,7 +179,7 @@ public class FileDocumentHandler(IPythagorasClient pythagorasClient) : IFileDocu
             Id = directory.Id,
             Name = directory.Name,
             Subdirectories = childNodes,
-            Documents = PythagorasFileDocumentMapper.ToModelWithDirectoryId(documents, directory.Id)
+            Documents = filteredDocs
         };
     }
 
@@ -173,8 +196,100 @@ public class FileDocumentHandler(IPythagorasClient pythagorasClient) : IFileDocu
 
     public async Task<int> GetBuildingDocumentCountAsync(int buildingId, CancellationToken cancellationToken = default)
     {
-        // Use uilistdata endpoint with maxResults=0 to just get the count
-        UiListDataResponse<FileDocument> response = await pythagorasClient.GetBuildingDocumentListAsync(buildingId, maxResults: 0, cancellationToken);
-        return response.TotalSize;
+        await using EstateDbContext context = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await context.BuildingDocuments
+            .Where(r => r.BuildingId == buildingId)
+            .CountAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<DocumentInfoModel>> GetBuildingDocumentsForPortalAsync(int buildingId, CancellationToken cancellationToken = default)
+    {
+        await using EstateDbContext context = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        List<BuildingDocumentEntity> rows = await context.BuildingDocuments
+            .AsNoTracking()
+            .Where(r => r.BuildingId == buildingId)
+            .ToListAsync(cancellationToken);
+
+        return rows.Select(r => new DocumentInfoModel
+        {
+            Id = r.DocumentId,
+            Name = r.Name,
+            SizeInBytes = r.SizeInBytes,
+            CategoryId = r.CategoryId,
+            CategoryName = r.CategoryName,
+        }).ToList();
+    }
+
+    public async Task<DocumentFileModel?> GetBuildingDocumentForPortalAsync(int buildingId, int documentId, CancellationToken cancellationToken = default)
+    {
+        FileDocumentInfo? info = await pythagorasClient.GetDocumentInfoAsync(documentId, cancellationToken);
+
+        if (info is null
+            || !string.Equals(info.EntityType, "building", StringComparison.OrdinalIgnoreCase)
+            || info.EntityId != buildingId
+            || !info.RecordStatusId.HasValue
+            || !dataStore.PortalPublishStatusIds.Contains(info.RecordStatusId.Value))
+        {
+            return null;
+        }
+
+        (byte[] data, string contentType) = await pythagorasClient.GetDocument(documentId, cancellationToken);
+
+        return new DocumentFileModel
+        {
+            Name = info.Name,
+            ContentType = contentType,
+            Content = data
+        };
+    }
+
+    private async Task<List<DocumentInfoModel>> FilterByPortalStatusAsync(List<DocumentInfoModel> documents, CancellationToken cancellationToken)
+    {
+        if (documents.Count == 0)
+        {
+            return [];
+        }
+
+        Dictionary<int, FileDocumentInfo> infoLookup = await GetDocumentInfoLookupAsync(documents, cancellationToken);
+
+        return documents
+            .Where(doc => infoLookup.TryGetValue(doc.Id, out FileDocumentInfo? info) && info.RecordStatusId.HasValue && dataStore.PortalPublishStatusIds.Contains(info.RecordStatusId.Value) && info.VersionRank == 1)
+            .ToList();
+    }
+
+    private async Task<Dictionary<int, FileDocumentInfo>> GetDocumentInfoLookupAsync(List<DocumentInfoModel> documents, CancellationToken cancellationToken)
+    {
+        if (documents.Count == 0)
+        {
+            return [];
+        }
+
+        using SemaphoreSlim semaphore = new(MaxParallelInfoRequests);
+        Task<FileDocumentInfo?>[] tasks = documents.Select(async doc =>
+        {
+            await semaphore.WaitAsync(cancellationToken);
+            try
+            {
+                return await pythagorasClient.GetDocumentInfoAsync(doc.Id, cancellationToken);
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        }).ToArray();
+
+        FileDocumentInfo?[] results = await Task.WhenAll(tasks);
+
+        Dictionary<int, FileDocumentInfo> lookup = [];
+        foreach (FileDocumentInfo? info in results)
+        {
+            if (info is not null)
+            {
+                lookup[info.Id] = info;
+            }
+        }
+        return lookup;
     }
 }

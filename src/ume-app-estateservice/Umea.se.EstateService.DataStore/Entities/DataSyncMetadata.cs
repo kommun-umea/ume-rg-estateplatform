@@ -9,4 +9,7 @@ public class DataSyncMetadata
     public int FloorCount { get; set; }
     public int RoomCount { get; set; }
     public string? WorkOrderCategoriesJson { get; set; }
+    public string? PortalPublishStatusIdsJson { get; set; }
+    public int? DocumentTotalCount { get; set; }
+    public long? DocumentLatestUpdatedEpoch { get; set; }
 }

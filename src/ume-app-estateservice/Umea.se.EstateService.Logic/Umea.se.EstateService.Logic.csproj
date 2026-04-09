@@ -15,6 +15,8 @@
     <PackageReference Include="SymSpell" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Umea.se.EstateService.DataStore\Umea.se.EstateService.DataStore.csproj" />
+    <ProjectReference Include="..\Umea.se.EstateService.DataStore\Umea.se.EstateService.DataStore.csproj" />
     <ProjectReference Include="..\Umea.se.EstateService.ServiceAccess\Umea.se.EstateService.ServiceAccess.csproj" />
     <ProjectReference Include="..\Umea.se.EstateService.Shared\Umea.se.EstateService.Shared.csproj" />
     <ProjectReference Include="..\Umea.se.Toolkit.Images\Umea.se.Toolkit.Images.csproj" />

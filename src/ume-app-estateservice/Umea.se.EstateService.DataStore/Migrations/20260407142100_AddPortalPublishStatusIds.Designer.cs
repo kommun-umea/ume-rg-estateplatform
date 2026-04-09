@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Umea.se.EstateService.DataStore;
 
@@ -11,9 +12,11 @@ using Umea.se.EstateService.DataStore;
 namespace Umea.se.EstateService.DataStore.Migrations
 {
     [DbContext(typeof(EstateDbContext))]
-    partial class EstateDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260407142100_AddPortalPublishStatusIds")]
+    partial class AddPortalPublishStatusIds
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -83,51 +86,12 @@ namespace Umea.se.EstateService.DataStore.Migrations
                     b.ToTable("BuildingAscendants", (string)null);
                 });
 
-            modelBuilder.Entity("Umea.se.EstateService.DataStore.Entities.BuildingDocumentEntity", b =>
-                {
-                    b.Property<int>("BuildingId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("DocumentId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("CategoryId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("CategoryName")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<DateTimeOffset>("FetchedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<long?>("SizeInBytes")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("BuildingId", "DocumentId");
-
-                    b.HasIndex("BuildingId");
-
-                    b.ToTable("BuildingDocuments", (string)null);
-                });
-
             modelBuilder.Entity("Umea.se.EstateService.DataStore.Entities.DataSyncMetadata", b =>
                 {
                     b.Property<int>("Id")
                         .HasColumnType("int");
 
                     b.Property<int>("BuildingCount")
-                        .HasColumnType("int");
-
-                    b.Property<long?>("DocumentLatestUpdatedEpoch")
-                        .HasColumnType("bigint");
-
-                    b.Property<int?>("DocumentTotalCount")
                         .HasColumnType("int");
 
                     b.Property<int>("EstateCount")
@@ -157,6 +121,10 @@ namespace Umea.se.EstateService.DataStore.Migrations
                 {
                     b.Property<int>("Id")
                         .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("BackgroundCacheFetchedAtUtc")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("BackgroundCacheFetchedAtUtc");
 
                     b.Property<bool?>("BlueprintAvailable")
                         .HasColumnType("bit");

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Umea.se.EstateService.Shared.Data;
 using Umea.se.EstateService.Shared.Data.Entities;
 
@@ -28,6 +29,7 @@ public sealed class InMemoryDataStore : IDataStore
     public IReadOnlyDictionary<int, EstateEntity> EstatesById => _snapshot.EstatesById;
     public IReadOnlyDictionary<int, RoomEntity> RoomsById => _snapshot.RoomsById;
     public IReadOnlyDictionary<int, WorkOrderCategoryNode> WorkOrderCategoriesById => _snapshot.WorkOrderCategoriesById;
+    public ImmutableHashSet<int> PortalPublishStatusIds => _snapshot.PortalPublishStatusIds;
 
     public bool IsReady => _snapshot.IsReady;
     public DateTimeOffset? LastRefreshUtc => _snapshot.LastRefreshUtc;

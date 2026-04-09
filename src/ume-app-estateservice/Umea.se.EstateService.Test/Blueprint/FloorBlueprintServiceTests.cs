@@ -5,7 +5,6 @@ using System.Net.Http.Headers;
 using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
 using Umea.se.EstateService.Logic.Data;
-using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Logic.Handlers.Blueprint;
 using Umea.se.EstateService.Logic.Models;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enums;
@@ -27,7 +26,7 @@ public class FloorBlueprintServiceTests
         return new ImageService(cache, options, NullLogger<ImageService>.Instance);
     }
 
-    private static EstateDataQueryHandler CreateHandler(params RoomEntity[] rooms)
+    private static InMemoryDataStore CreateDataStore(params RoomEntity[] rooms)
     {
         InMemoryDataStore dataStore = new();
         if (rooms.Length > 0)
@@ -41,7 +40,7 @@ public class FloorBlueprintServiceTests
                 refreshUtc: DateTimeOffset.UtcNow));
         }
 
-        return new EstateDataQueryHandler(dataStore);
+        return dataStore;
     }
 
     private static async Task<string> ReadContentAsync(FloorBlueprint blueprint)
@@ -80,8 +79,8 @@ public class FloorBlueprintServiceTests
             }
         };
 
-        EstateDataQueryHandler handler = CreateHandler();
-        FloorBlueprintHandler fbHandler = new(client, handler, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
+        InMemoryDataStore dataStore = CreateDataStore();
+        FloorBlueprintHandler fbHandler = new(client, dataStore, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
 
         FloorBlueprint result = await fbHandler.GetBlueprintAsync(42, BlueprintFormat.Pdf, includeWorkspaceTexts: false);
 
@@ -101,8 +100,8 @@ public class FloorBlueprintServiceTests
             OnGetFloorBlueprintAsync = (_, _, _, _) => throw new HttpRequestException("fail")
         };
 
-        EstateDataQueryHandler handler = CreateHandler();
-        FloorBlueprintHandler fbHandler = new(client, handler, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
+        InMemoryDataStore dataStore = CreateDataStore();
+        FloorBlueprintHandler fbHandler = new(client, dataStore, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
 
         await Should.ThrowAsync<ExternalServiceUnavailableException>(() =>
             fbHandler.GetBlueprintAsync(5, BlueprintFormat.Svg, includeWorkspaceTexts: false));
@@ -126,8 +125,8 @@ public class FloorBlueprintServiceTests
             }
         };
 
-        EstateDataQueryHandler handler = CreateHandler();
-        FloorBlueprintHandler fbHandler = new(client, handler, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
+        InMemoryDataStore dataStore = CreateDataStore();
+        FloorBlueprintHandler fbHandler = new(client, dataStore, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
 
         FloorBlueprint result = await fbHandler.GetBlueprintAsync(11, BlueprintFormat.Svg, includeWorkspaceTexts: false);
 
@@ -157,8 +156,8 @@ public class FloorBlueprintServiceTests
             }
         };
 
-        EstateDataQueryHandler handler = CreateHandler();
-        FloorBlueprintHandler fbHandler = new(client, handler, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
+        InMemoryDataStore dataStore = CreateDataStore();
+        FloorBlueprintHandler fbHandler = new(client, dataStore, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
 
         FloorBlueprint result = await fbHandler.GetBlueprintAsync(11, BlueprintFormat.Pdf, includeWorkspaceTexts: false);
 
@@ -171,8 +170,8 @@ public class FloorBlueprintServiceTests
     public async Task GetBlueprintAsync_WithInvalidFloorId_ThrowsValidationException()
     {
         FakePythagorasClient client = new();
-        EstateDataQueryHandler handler = CreateHandler();
-        FloorBlueprintHandler fbHandler = new(client, handler, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
+        InMemoryDataStore dataStore = CreateDataStore();
+        FloorBlueprintHandler fbHandler = new(client, dataStore, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
 
         await Should.ThrowAsync<BusinessValidationException>(() =>
             fbHandler.GetBlueprintAsync(0, BlueprintFormat.Pdf, includeWorkspaceTexts: false));
@@ -199,11 +198,11 @@ public class FloorBlueprintServiceTests
             }
         };
 
-        EstateDataQueryHandler handler = CreateHandler(
+        InMemoryDataStore dataStore = CreateDataStore(
             new RoomEntity { Id = 5, Name = "Alpha", PopularName = "Popular Alpha", BuildingId = 1, FloorId = 99 },
             new RoomEntity { Id = 6, Name = "Beta", BuildingId = 1, FloorId = 99 });
 
-        FloorBlueprintHandler fbHandler = new(client, handler, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
+        FloorBlueprintHandler fbHandler = new(client, dataStore, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
 
         FloorBlueprint result = await fbHandler.GetBlueprintAsync(99, BlueprintFormat.Pdf, includeWorkspaceTexts: true);
         result.ShouldNotBeNull();
@@ -250,8 +249,8 @@ public class FloorBlueprintServiceTests
             }
         };
 
-        EstateDataQueryHandler handler = CreateHandler();
-        FloorBlueprintHandler fbHandler = new(client, handler, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
+        InMemoryDataStore dataStore = CreateDataStore();
+        FloorBlueprintHandler fbHandler = new(client, dataStore, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
 
         FloorBlueprint result = await fbHandler.GetBlueprintAsync(5, BlueprintFormat.Svg, includeWorkspaceTexts: false);
 
@@ -294,8 +293,8 @@ public class FloorBlueprintServiceTests
             }
         };
 
-        EstateDataQueryHandler handler = CreateHandler();
-        FloorBlueprintHandler fbHandler = new(client, handler, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
+        InMemoryDataStore dataStore = CreateDataStore();
+        FloorBlueprintHandler fbHandler = new(client, dataStore, CreateImageService(), NullLogger<FloorBlueprintHandler>.Instance);
 
         FloorBlueprint result = await fbHandler.GetBlueprintAsync(7, BlueprintFormat.Svg, includeWorkspaceTexts: false);
 

@@ -2,9 +2,9 @@ using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enums;
 using Umea.se.EstateService.Shared.Data.Entities;
 using Umea.se.EstateService.Shared.ValueObjects;
-using static Umea.se.EstateService.Logic.Data.Pythagoras.Mappers.MapperUtilities;
+using static Umea.se.EstateService.Logic.Sync.Pythagoras.Mappers.MapperUtilities;
 
-namespace Umea.se.EstateService.Logic.Data.Pythagoras.Mappers;
+namespace Umea.se.EstateService.Logic.Sync.Pythagoras.Mappers;
 
 /// <summary>
 /// Maps NavigationFolder DTOs from Pythagoras API to EstateEntity objects.

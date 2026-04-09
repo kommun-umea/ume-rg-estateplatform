@@ -5,14 +5,15 @@ using Microsoft.Extensions.Logging;
 using Umea.se.EstateService.Logic.Models;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enums;
+using Umea.se.EstateService.Shared.Data;
+using Umea.se.EstateService.Shared.Data.Entities;
 using Umea.se.EstateService.Shared.Exceptions;
-using Umea.se.EstateService.Shared.Models;
 using Umea.se.Toolkit.Images;
 using ZiggyCreatures.Caching.Fusion;
 
 namespace Umea.se.EstateService.Logic.Handlers.Blueprint;
 
-public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IEstateDataQueryHandler pythagorasHandler, ImageService imageService, ILogger<FloorBlueprintHandler> logger) : IFloorBlueprintService
+public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IDataStore dataStore, ImageService imageService, ILogger<FloorBlueprintHandler> logger) : IFloorBlueprintService
 {
     private static readonly string[] _nodesToRemove =
     [
@@ -22,7 +23,7 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IE
     ];
 
     private readonly IPythagorasClient _pythagorasClient = pythagorasClient;
-    private readonly IEstateDataQueryHandler _pythagorasHandler = pythagorasHandler;
+    private readonly IDataStore _dataStore = dataStore;
     private readonly ImageService _imageService = imageService;
     private readonly ILogger<FloorBlueprintHandler> _logger = logger;
 
@@ -33,7 +34,7 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IE
             throw new BusinessValidationException("Floor id must be positive.");
         }
 
-        IDictionary<int, IReadOnlyList<string>>? workspaceTexts = await GetWorkspaceTextsAsync(floorId, includeWorkspaceTexts, cancellationToken).ConfigureAwait(false);
+        IDictionary<int, IReadOnlyList<string>>? workspaceTexts = GetWorkspaceTexts(floorId, includeWorkspaceTexts);
 
         if (format == BlueprintFormat.Svg)
         {
@@ -43,26 +44,22 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IE
         return await FetchBlueprintFromPythagorasAsync(floorId, format, workspaceTexts, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<IDictionary<int, IReadOnlyList<string>>?> GetWorkspaceTextsAsync(int floorId, bool includeWorkspaceTexts, CancellationToken cancellationToken)
+    private IDictionary<int, IReadOnlyList<string>>? GetWorkspaceTexts(int floorId, bool includeWorkspaceTexts)
     {
         if (!includeWorkspaceTexts)
         {
             return null;
         }
 
-        _logger.LogInformation("Workspace text enrichment requested for floor {FloorId}. Fetching room data.", floorId);
-
-        IReadOnlyList<RoomModel> rooms = await _pythagorasHandler
-            .GetRoomsAsync(roomIds: null, buildingId: null, floorId: floorId, queryArgs: null, cancellationToken)
-            .ConfigureAwait(false);
+        List<RoomEntity> rooms = _dataStore.Rooms.Where(r => r.FloorId == floorId).ToList();
 
         if (rooms.Count == 0)
         {
-            _logger.LogInformation("Workspace text enrichment requested, but no rooms found for floor {FloorId}.", floorId);
+            _logger.LogDebug("No rooms found in cache for floor {FloorId}.", floorId);
             return null;
         }
 
-        _logger.LogInformation("Found {Count} rooms to include in blueprint for floor {FloorId}.", rooms.Count, floorId);
+        _logger.LogDebug("Found {Count} rooms in cache for floor {FloorId}.", rooms.Count, floorId);
 
         return rooms.ToDictionary(
             static room => room.Id,
@@ -217,7 +214,7 @@ public sealed class FloorBlueprintHandler(IPythagorasClient pythagorasClient, IE
         return $"{fileName}.{FormatToExtension(format)}";
     }
 
-    private static string ResolveWorkspaceText(RoomModel room)
+    private static string ResolveWorkspaceText(RoomEntity room)
     {
         if (!string.IsNullOrWhiteSpace(room.PopularName))
         {

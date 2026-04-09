@@ -202,6 +202,11 @@ public sealed class FakePythagorasClient : IPythagorasClient
         return Task.FromResult(_buildingDocumentListResult ?? new UiListDataResponse<FileDocument>());
     }
 
+    public Task<UiListDataResponse<FileDocument>> GetDocumentListAsync(int? maxResults = null, string? orderBy = null, bool orderAsc = true, CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(new UiListDataResponse<FileDocument>());
+    }
+
     public Task<IReadOnlyList<Workspace>> GetWorkspacesAsync(PythagorasQuery<Workspace>? query = null, CancellationToken cancellationToken = default)
         => CaptureAsync("rest/v1/workspace/info", query, cancellationToken);
 
@@ -337,6 +342,25 @@ public sealed class FakePythagorasClient : IPythagorasClient
         return CaptureAsync($"rest/v1/workorder/{workOrderId}/documentfolder/info/root", query, ct);
     }
 
+    private readonly Dictionary<int, FileDocumentInfo> _documentInfoResults = [];
+
+    public void SetDocumentInfoResult(int documentId, FileDocumentInfo info)
+    {
+        _documentInfoResults[documentId] = info;
+    }
+
+    public Task<FileDocumentInfo?> GetDocumentInfoAsync(int documentId, CancellationToken cancellationToken = default)
+    {
+        if (documentId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(documentId), "Document id must be positive.");
+        }
+
+        Requests.Add(new RequestCapture(typeof(FileDocumentInfo), $"rest/v1/documentfile/{documentId}/info", null, null, cancellationToken));
+        _documentInfoResults.TryGetValue(documentId, out FileDocumentInfo? result);
+        return Task.FromResult(result);
+    }
+
     public readonly record struct WorkOrderRequestCapture(string Method, int EntityId, string? Parameters);
 
     /// <summary>
@@ -360,6 +384,7 @@ public sealed class FakePythagorasClient : IPythagorasClient
         _getWorkOrderResult = null;
         _setWorkOrderCategoryResult = null;
         _workOrderInfoResults = [];
+        _documentInfoResults.Clear();
         WorkOrderRequests.Clear();
     }
 

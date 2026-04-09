@@ -1,8 +1,11 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Umea.se.EstateService.DataStore;
 using Umea.se.EstateService.Logic.Data;
 using Umea.se.EstateService.Logic.Handlers;
-using Umea.se.EstateService.Logic.HostedServices;
+using Umea.se.EstateService.Logic.Sync;
 using Umea.se.EstateService.Logic.Models;
 using Umea.se.EstateService.Logic.Search.Providers;
 using Umea.se.EstateService.Shared.Infrastructure;
@@ -27,13 +30,23 @@ public sealed class DataSyncServiceTests
         });
 
         SearchHandler searchHandler = CreateSearchHandler(appConfig);
+        FakePythagorasClient pythagorasClient = new();
+        DocumentSyncHandler documentSyncHandler = new(pythagorasClient, dataStore, new FakeDbContextFactory(), NullLogger<DocumentSyncHandler>.Instance);
+        ImagePreWarmHandler imagePreWarmHandler = new(new FakeServiceScopeFactory(), dataStore, NullLogger<ImagePreWarmHandler>.Instance);
 
-        DataSyncService sut = new(
+        RefreshPipelineRunner refreshPipeline = new(
             dataRefreshService,
             dataStore,
             persistence,
-            new BuildingBackgroundCache(new FakePythagorasClient(), dataStore, NullLogger<BuildingBackgroundCache>.Instance),
+            new FakeDbContextFactory(),
             searchHandler,
+            NullLogger<RefreshPipelineRunner>.Instance);
+
+        DataSyncService sut = new(
+            dataStore,
+            documentSyncHandler,
+            imagePreWarmHandler,
+            refreshPipeline,
             appConfig,
             NullLogger<DataSyncService>.Instance);
 
@@ -80,6 +93,9 @@ public sealed class DataSyncServiceTests
             await _releaseTcs.Task.WaitAsync(cancellationToken);
         }
 
+        public Task<System.Collections.Immutable.ImmutableHashSet<int>> FetchPortalPublishStatusIdsAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(System.Collections.Immutable.ImmutableHashSet<int>.Empty);
+
         public Task WaitUntilRefreshStartedAsync(TimeSpan timeout)
             => _startedTcs.Task.WaitAsync(timeout);
 
@@ -91,5 +107,17 @@ public sealed class DataSyncServiceTests
     {
         public Task<ICollection<PythagorasDocument>> GetDocumentsAsync()
             => Task.FromResult<ICollection<PythagorasDocument>>([]);
+    }
+
+    private sealed class FakeDbContextFactory : IDbContextFactory<EstateDbContext>
+    {
+        public EstateDbContext CreateDbContext()
+            => throw new NotSupportedException("Not used in this test.");
+    }
+
+    private sealed class FakeServiceScopeFactory : IServiceScopeFactory
+    {
+        public IServiceScope CreateScope()
+            => throw new NotSupportedException("Not used in this test.");
     }
 }

@@ -98,8 +98,6 @@ internal static class EstateModelMapper
 
     /// <summary>
     /// Maps a building entity to a BuildingInfoModel.
-    /// ImageIds, NumDocuments, and BackgroundCacheFetchedAtUtc are kept fresh on the entity
-    /// by write-through from BuildingBackgroundCache, so no cache overlay is needed.
     /// </summary>
     public static BuildingInfoModel MapBuildingInfo(
         BuildingEntity building,

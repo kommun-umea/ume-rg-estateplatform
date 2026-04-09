@@ -7,11 +7,11 @@ public sealed class DocumentFileRecordActionType : IPythagorasDto
     public string Name { get; init; } = string.Empty;
     public int? NumberOfRecordYears { get; init; }
     public int? NumberOfRecordMonths { get; init; }
-    public bool OverrideIsRecorded { get; init; }
-    public bool OverrideIsGDPR { get; init; }
-    public bool IsRecordedReadonly { get; init; }
-    public bool IsSecuredReadonly { get; init; }
-    public bool IsGDPRReadonly { get; init; }
+    public bool? OverrideIsRecorded { get; init; }
+    public bool? OverrideIsGDPR { get; init; }
+    public bool? IsRecordedReadonly { get; init; }
+    public bool? IsSecuredReadonly { get; init; }
+    public bool? IsGDPRReadonly { get; init; }
     public string? ForceRemovalProcess { get; init; }
 }
 

@@ -1,12 +1,13 @@
 using Microsoft.Extensions.DependencyInjection;
 using Umea.se.EstateService.Logic.Data;
-using Umea.se.EstateService.Logic.Data.Pythagoras;
+using Umea.se.EstateService.Logic.Sync.Pythagoras;
 using Umea.se.EstateService.Logic.Handlers;
 using Umea.se.EstateService.Logic.Handlers.Blueprint;
 using Umea.se.EstateService.Logic.Handlers.Favorite;
 using Umea.se.EstateService.Logic.Handlers.Images;
 using Umea.se.EstateService.Logic.Handlers.WorkOrder;
 using Umea.se.EstateService.Logic.HostedServices;
+using Umea.se.EstateService.Logic.Sync;
 using Umea.se.EstateService.Logic.Search.Providers;
 using Umea.se.EstateService.Shared.Data;
 
@@ -27,7 +28,8 @@ public static class DependencyInjectionLogic
 
         services.AddSingleton<IFloorBlueprintService, FloorBlueprintHandler>();
         services.AddScoped<IBuildingImageService, BuildingImageService>();
-        services.AddSingleton<BuildingBackgroundCache>();
+        services.AddSingleton<DocumentSyncHandler>();
+        services.AddSingleton<ImagePreWarmHandler>();
 
         services.AddTransient<IFileDocumentHandler, FileDocumentHandler>();
 
@@ -38,6 +40,7 @@ public static class DependencyInjectionLogic
         services.AddScoped<IWorkOrderHandler, WorkOrderHandler>();
         services.AddScoped<IFavoriteHandler, FavoriteHandler>();
 
+        services.AddSingleton<RefreshPipelineRunner>();
         services.AddSingleton<DataSyncService>();
         services.AddHostedService(sp => sp.GetRequiredService<DataSyncService>());
         services.AddHostedService<WorkOrderProcessingService>();

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Umea.se.EstateService.Shared.Data.Entities;
 
 namespace Umea.se.EstateService.Shared.Data;
@@ -45,6 +46,12 @@ public interface IDataStore
     IReadOnlyDictionary<int, RoomEntity> RoomsById { get; }
 
     IReadOnlyDictionary<int, WorkOrderCategoryNode> WorkOrderCategoriesById { get; }
+
+    /// <summary>
+    /// Record action type status IDs that represent "Publiceras i Fastighetsportal".
+    /// Fetched from Pythagoras during sync. Empty until first successful sync.
+    /// </summary>
+    ImmutableHashSet<int> PortalPublishStatusIds { get; }
 
     bool IsReady { get; }
     DateTimeOffset? LastRefreshUtc { get; }
