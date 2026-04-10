@@ -104,6 +104,7 @@ public sealed class DocumentSyncHandler(
         await using EstateDbContext context = await dbContextFactory.CreateDbContextAsync(ct);
 
         DataSyncMetadata? metadata = await context.Set<DataSyncMetadata>()
+            .OrderBy(m => m.Id)
             .FirstOrDefaultAsync(ct);
 
         if (metadata is null
@@ -122,6 +123,7 @@ public sealed class DocumentSyncHandler(
         await using EstateDbContext context = await dbContextFactory.CreateDbContextAsync(ct);
 
         DataSyncMetadata? metadata = await context.Set<DataSyncMetadata>()
+            .OrderBy(m => m.Id)
             .FirstOrDefaultAsync(ct);
 
         if (metadata is not null)
