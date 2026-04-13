@@ -10,6 +10,8 @@ namespace Umea.se.EstateService.ServiceAccess.Pythagoras.Api;
 
 public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : ExternalServiceBase(HttpClientNames.Pythagoras, httpClientFactory), IPythagorasClient
 {
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
+
     private const string PythagorasApplicationName = "se.pythagoras.pythagorasweb";
 
     private static readonly JsonSerializerOptions _serializerOptions = new(JsonSerializerDefaults.Web)
@@ -538,8 +540,14 @@ where TValue : class
         string queryString = FormQueryParameter("pyApp", PythagorasApplicationName);
         string requestUri = BuildRequestUri(NormalizeEndpoint(endpoint), queryString);
 
+        // Gallery image fetches use a dedicated HttpClient with tighter timeouts so they fit
+        // inside the raster FusionCache FactoryHardTimeout. See Program.cs for configuration.
+        // Default content buffering (not ResponseHeadersRead) so the body read is covered by
+        // Polly's timeout budget, not FusionCache's hard timeout. The caller already loads the
+        // full image into memory, so buffering here doesn't change the memory model.
+        HttpClient imageClient = _httpClientFactory.CreateClient(HttpClientNames.PythagorasImages);
         HttpRequestMessage request = new(HttpMethod.Get, requestUri);
-        return HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        return imageClient.SendAsync(request, cancellationToken);
     }
 
     public async Task<WorkOrderDto?> CreateWorkOrderAsync(PythagorasWorkOrderType workOrderType, PythagorasWorkOrderOrigin origin, CreatePythagorasWorkOrderRequest request, CancellationToken cancellationToken = default)

@@ -56,6 +56,7 @@ public sealed class ImagePreWarmHandler(
     private async Task RunSyncAsync(CancellationToken ct)
     {
         int warmed = 0, skipped = 0, failed = 0;
+        (int BuildingId, int ImageId, Exception Error)? firstFailure = null;
 
         logger.LogInformation("Image pre-warm starting for {Count} buildings.",
             dataStore.Buildings.Count());
@@ -78,7 +79,6 @@ public sealed class ImagePreWarmHandler(
 
             try
             {
-                // FusionCache GetOrSetAsync: L1/L2 hit = instant, miss = Pythagoras fetch + normalize + cache
                 await imageService.GetImageResultAsync(
                     building.Id,
                     primaryImageId,
@@ -86,7 +86,6 @@ public sealed class ImagePreWarmHandler(
                     maxHeight: null,
                     ct);
 
-                // Pre-warm the most common thumbnail size (list views)
                 await imageService.GetImageResultAsync(
                     building.Id,
                     primaryImageId,
@@ -98,13 +97,25 @@ public sealed class ImagePreWarmHandler(
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Image pre-warm failed for building {BuildingId}, image {ImageId}",
+                logger.LogDebug(ex, "Image pre-warm failed for building {BuildingId}, image {ImageId}",
                     building.Id, primaryImageId);
                 failed++;
+                firstFailure ??= (building.Id, primaryImageId, ex);
             }
         }
 
-        logger.LogInformation("Image pre-warm complete. Warmed={Warmed}, Skipped={Skipped}, Failed={Failed}",
-            warmed, skipped, failed);
+        if (firstFailure is null)
+        {
+            logger.LogInformation("Image pre-warm complete. Warmed={Warmed}, Skipped={Skipped}, Failed={Failed}",
+                warmed, skipped, failed);
+            return;
+        }
+
+        (int firstFailedBuildingId, int firstFailedImageId, Exception firstError) = firstFailure.Value;
+        logger.LogWarning(
+            "Image pre-warm complete with failures. Warmed={Warmed}, Skipped={Skipped}, Failed={Failed}. " +
+            "First failure: building {FirstFailedBuildingId} image {FirstFailedImageId} — {FirstFailureType}: {FirstFailureMessage}",
+            warmed, skipped, failed,
+            firstFailedBuildingId, firstFailedImageId, firstError.GetType().Name, firstError.Message);
     }
 }

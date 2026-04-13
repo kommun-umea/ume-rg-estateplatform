@@ -124,6 +124,26 @@ builder.Services.AddHttpClient(HttpClientNames.Pythagoras, client =>
     options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(90);
 });
 
+// Gallery image fetches have their own tighter budget so they fit inside the raster image
+// FusionCache FactoryHardTimeout (45s). This prevents slow image fetches from being torn down
+// mid-retry with TaskCanceled/Socket 995 noise. SVG blueprints continue to use the shared
+// Pythagoras client above, which matches their 45s/120s FusionCache budget.
+// See Umea.se.Toolkit.Images.ImageService CreateCacheOptions for the raster cache timings.
+builder.Services.AddHttpClient(HttpClientNames.PythagorasImages, client =>
+{
+    client.BaseAddress = new Uri(config.PythagorasBaseUrl);
+    client.DefaultRequestHeaders.Add("api_key", config.PythagorasApiKey);
+})
+.AddStandardResilienceHandler(options =>
+{
+    options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(10);
+    options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(40);
+    options.Retry.MaxRetryAttempts = 2;
+    options.Retry.BackoffType = DelayBackoffType.Exponential;
+    options.Retry.UseJitter = true;
+    options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(90);
+});
+
 builder.Services
     .AddAuthorization()
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
