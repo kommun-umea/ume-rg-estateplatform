@@ -436,7 +436,10 @@ public sealed class PythagorasClient(IHttpClientFactory httpClientFactory) : Ext
             Content = BuildBlueprintContent(payload)
         };
 
-        return HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        // Blueprint rendering is significantly slower than other Pythagoras endpoints.
+        // Uses a dedicated HttpClient with higher timeouts matching the SVG FusionCache budget.
+        HttpClient blueprintClient = _httpClientFactory.CreateClient(HttpClientNames.PythagorasBlueprints);
+        return blueprintClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
     }
 
     private static FormUrlEncodedContent BuildBlueprintContent(FloorBlueprintRequestPayload payload)

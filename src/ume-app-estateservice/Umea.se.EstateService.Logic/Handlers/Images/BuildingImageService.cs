@@ -11,6 +11,10 @@ namespace Umea.se.EstateService.Logic.Handlers.Images;
 
 public sealed class BuildingImageService(IPythagorasClient pythagorasClient, IDataStore dataStore, ImageService imageService) : IBuildingImageService
 {
+    private const int MaxConcurrentPythagorasImageFetches = 5;
+    private static readonly SemaphoreSlim _pythagorasImageFetchGate =
+        new(MaxConcurrentPythagorasImageFetches, MaxConcurrentPythagorasImageFetches);
+
     public async Task<ImageResult?> GetImageResultAsync(int buildingId, int? imageId, int? maxWidth, int? maxHeight, CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(buildingId);
@@ -43,6 +47,19 @@ public sealed class BuildingImageService(IPythagorasClient pythagorasClient, IDa
     }
 
     private async Task<byte[]> FetchImageAsync(int imageId, CancellationToken ct)
+    {
+        await _pythagorasImageFetchGate.WaitAsync(ct);
+        try
+        {
+            return await FetchImageFromPythagorasAsync(imageId, ct);
+        }
+        finally
+        {
+            _pythagorasImageFetchGate.Release();
+        }
+    }
+
+    private async Task<byte[]> FetchImageFromPythagorasAsync(int imageId, CancellationToken ct)
     {
         HttpResponseMessage response;
         try

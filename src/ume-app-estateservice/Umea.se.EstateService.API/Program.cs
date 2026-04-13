@@ -116,8 +116,8 @@ builder.Services.AddHttpClient(HttpClientNames.Pythagoras, client =>
 })
 .AddStandardResilienceHandler(options =>
 {
-    options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(45);
-    options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(120);
+    options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(10);
+    options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(30);
     options.Retry.MaxRetryAttempts = 2;
     options.Retry.BackoffType = DelayBackoffType.Exponential;
     options.Retry.UseJitter = true;
@@ -126,8 +126,7 @@ builder.Services.AddHttpClient(HttpClientNames.Pythagoras, client =>
 
 // Gallery image fetches have their own tighter budget so they fit inside the raster image
 // FusionCache FactoryHardTimeout (45s). This prevents slow image fetches from being torn down
-// mid-retry with TaskCanceled/Socket 995 noise. SVG blueprints continue to use the shared
-// Pythagoras client above, which matches their 45s/120s FusionCache budget.
+// mid-retry with TaskCanceled/Socket 995 noise.
 // See Umea.se.Toolkit.Images.ImageService CreateCacheOptions for the raster cache timings.
 builder.Services.AddHttpClient(HttpClientNames.PythagorasImages, client =>
 {
@@ -138,6 +137,23 @@ builder.Services.AddHttpClient(HttpClientNames.PythagorasImages, client =>
 {
     options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(10);
     options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(40);
+    options.Retry.MaxRetryAttempts = 2;
+    options.Retry.BackoffType = DelayBackoffType.Exponential;
+    options.Retry.UseJitter = true;
+    options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(90);
+});
+
+// Blueprint rendering in Pythagoras is significantly slower than other endpoints.
+// Dedicated client with higher timeouts to match the SVG FusionCache budget (45s/120s).
+builder.Services.AddHttpClient(HttpClientNames.PythagorasBlueprints, client =>
+{
+    client.BaseAddress = new Uri(config.PythagorasBaseUrl);
+    client.DefaultRequestHeaders.Add("api_key", config.PythagorasApiKey);
+})
+.AddStandardResilienceHandler(options =>
+{
+    options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(45);
+    options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(120);
     options.Retry.MaxRetryAttempts = 2;
     options.Retry.BackoffType = DelayBackoffType.Exponential;
     options.Retry.UseJitter = true;

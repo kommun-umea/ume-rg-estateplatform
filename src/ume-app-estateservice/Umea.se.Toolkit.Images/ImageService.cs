@@ -113,9 +113,11 @@ public sealed class ImageService(IFusionCache cache, ImageServiceOptions options
 
     private static FusionCacheEntryOptions CreateCacheOptions(ImageServiceOptions options) => new()
     {
-        // L1 (in-memory) cache lifetime - default 24 hours
-        Duration = options.MemoryCacheLifetime,
-        // L2 (blob storage) cache lifetime - default 6 months
+        // Duration = logical freshness: controls when FusionCache considers an L2 entry stale and
+        // re-runs the factory. Set to blob lifetime so L2 hits never trigger unnecessary re-fetches.
+        // MemoryCacheDuration = actual L1 memory TTL, kept shorter to limit memory usage.
+        Duration = options.BlobCacheLifetime,
+        MemoryCacheDuration = options.MemoryCacheLifetime,
         DistributedCacheDuration = options.BlobCacheLifetime,
         // Default size estimate for L2 cache hits (100KB). Overridden with actual size in factory via adaptive caching.
         Size = 100 * 1024,
@@ -123,16 +125,18 @@ public sealed class ImageService(IFusionCache cache, ImageServiceOptions options
         IsFailSafeEnabled = true,
         FailSafeMaxDuration = TimeSpan.FromDays(365),  // Keep fail-safe data for up to 1 year
         FailSafeThrottleDuration = TimeSpan.FromSeconds(30),
-        FactorySoftTimeout = TimeSpan.FromSeconds(15),  // Allow time for image fetch + processing
-        FactoryHardTimeout = TimeSpan.FromSeconds(45),  // Hard limit for slow networks
+        FactorySoftTimeout = TimeSpan.FromSeconds(5),   // Return fail-safe stale value if available, let factory finish in background
+        FactoryHardTimeout = TimeSpan.FromSeconds(15),  // Hard limit — covers degraded Pythagoras + one retry
         AllowBackgroundDistributedCacheOperations = true,  // Don't block caller while writing to L2 blob cache
-        EagerRefreshThreshold = 0.9f,
     };
 
     private static FusionCacheEntryOptions CreateSvgCacheOptions(ImageServiceOptions options) => new()
     {
-        Duration = options.MemoryCacheLifetime,
-        DistributedCacheDuration = options.BlobCacheLifetime,
+        // Shorter logical duration than raster images — blueprint cache keys don't include a
+        // data version, so floor plan or room label changes need to refresh within a reasonable window.
+        Duration = TimeSpan.FromDays(30),
+        MemoryCacheDuration = options.MemoryCacheLifetime,
+        DistributedCacheDuration = TimeSpan.FromDays(30),
         Size = 200 * 1024,
         Priority = CacheItemPriority.High,
         IsFailSafeEnabled = true,
@@ -141,7 +145,6 @@ public sealed class ImageService(IFusionCache cache, ImageServiceOptions options
         FactorySoftTimeout = TimeSpan.FromSeconds(45),   // SVG rendering is slower than image fetches
         FactoryHardTimeout = TimeSpan.FromSeconds(120),  // Pythagoras can be slow for complex blueprints
         AllowTimedOutFactoryBackgroundCompletion = true,  // Let factory finish in background so next request hits cache
-        EagerRefreshThreshold = 0.9f,
     };
 
     #region Image Processing
