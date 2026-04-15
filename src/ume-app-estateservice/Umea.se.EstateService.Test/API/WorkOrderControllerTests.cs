@@ -2,10 +2,12 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Umea.se.EstateService.API;
 using Umea.se.EstateService.DataStore;
 using Umea.se.EstateService.ServiceAccess;
+using Umea.se.EstateService.API.Responses;
 using Umea.se.EstateService.Shared.Data.Entities;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.EstateService.Test.TestHelpers;
@@ -162,5 +164,95 @@ public class WorkOrderControllerTests : ControllerTestCloud<TestApiFactory, Prog
         detail.FileCount.ShouldBe(1);
         detail.Files.Count.ShouldBe(1);
         detail.Files[0].FileName.ShouldBe("photo.jpg");
+    }
+
+    [Fact]
+    public async Task CreateWorkOrder_MissingDescription_ReturnsCamelCaseFieldError()
+    {
+        using MultipartFormDataContent content = new();
+        content.Add(new StringContent("100"), "BuildingId");
+        content.Add(new StringContent("ErrorReport"), "WorkOrderType");
+        content.Add(new StringContent("indoor"), "Location");
+        content.Add(new StringContent("200"), "RoomId");
+        // Description intentionally omitted
+
+        HttpResponseMessage response = await _client.PostAsync(ApiRoutes.WorkOrders, content);
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        ValidationProblemDetails? problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
+        problem.ShouldNotBeNull();
+        problem.Errors.ShouldContainKey("description");
+        problem.Errors["description"].ShouldContain("required");
+    }
+
+    [Fact]
+    public async Task CreateWorkOrder_InvalidEmailAndPhone_ReturnsMultipleFieldErrors()
+    {
+        using MultipartFormDataContent content = new();
+        content.Add(new StringContent("100"), "BuildingId");
+        content.Add(new StringContent("ErrorReport"), "WorkOrderType");
+        content.Add(new StringContent("indoor"), "Location");
+        content.Add(new StringContent("200"), "RoomId");
+        content.Add(new StringContent("Broken window"), "Description");
+        content.Add(new StringContent("not-an-email"), "NotifierEmail");
+        content.Add(new StringContent("!!!invalid!!!"), "NotifierPhone");
+
+        HttpResponseMessage response = await _client.PostAsync(ApiRoutes.WorkOrders, content);
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        ValidationProblemDetails? problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
+        problem.ShouldNotBeNull();
+        problem.Errors.ShouldContainKey("notifierEmail");
+        problem.Errors["notifierEmail"].ShouldContain("invalid_format");
+        problem.Errors.ShouldContainKey("notifierPhone");
+        problem.Errors["notifierPhone"].ShouldContain("invalid_format");
+    }
+
+    [Fact]
+    public async Task CreateWorkOrder_WithValidNotifierPhone_Succeeds()
+    {
+        using MultipartFormDataContent content = new();
+        content.Add(new StringContent("100"), "BuildingId");
+        content.Add(new StringContent("ErrorReport"), "WorkOrderType");
+        content.Add(new StringContent("indoor"), "Location");
+        content.Add(new StringContent("200"), "RoomId");
+        content.Add(new StringContent("Broken window"), "Description");
+        content.Add(new StringContent("+46 70 123 45 67"), "NotifierPhone");
+
+        HttpResponseMessage response = await _client.PostAsync(ApiRoutes.WorkOrders, content);
+        response.StatusCode.ShouldBe(HttpStatusCode.Created);
+    }
+
+    [Fact]
+    public async Task CreateWorkOrder_DescriptionTooLong_ReturnsMaxLengthError()
+    {
+        using MultipartFormDataContent content = new();
+        content.Add(new StringContent("100"), "BuildingId");
+        content.Add(new StringContent("ErrorReport"), "WorkOrderType");
+        content.Add(new StringContent("indoor"), "Location");
+        content.Add(new StringContent("200"), "RoomId");
+        content.Add(new StringContent(new string('x', 2001)), "Description");
+
+        HttpResponseMessage response = await _client.PostAsync(ApiRoutes.WorkOrders, content);
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        ValidationProblemDetails? problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
+        problem.ShouldNotBeNull();
+        problem.Errors.ShouldContainKey("description");
+        problem.Errors["description"].ShouldContain("max_length");
+    }
+
+    [Fact]
+    public async Task GetConfig_ReturnsFileUploadConfig()
+    {
+        HttpResponseMessage response = await _client.GetAsync($"{ApiRoutes.WorkOrders}/config");
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        WorkOrderConfigResponse? config = await response.Content.ReadFromJsonAsync<WorkOrderConfigResponse>();
+        config.ShouldNotBeNull();
+        config.MaxFileCount.ShouldBeGreaterThan(0);
+        config.MaxFileSizeBytes.ShouldBeGreaterThan(0);
+        config.AllowedContentTypes.ShouldNotBeEmpty();
+        config.AllowedContentTypes.ShouldContain("application/pdf");
     }
 }

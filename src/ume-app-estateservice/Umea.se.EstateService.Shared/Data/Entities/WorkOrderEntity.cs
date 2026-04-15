@@ -32,6 +32,7 @@ public class WorkOrderEntity : BaseEntity
     public string CreatedByEmail { get; set; } = string.Empty;
     public string? NotifierEmail { get; set; }
     public string? NotifierName { get; set; }
+    public string? NotifierPhone { get; set; }
 
     public List<WorkOrderFileEntity> Files { get; set; } = [];
 }

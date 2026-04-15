@@ -16,7 +16,7 @@ public sealed class EstateServiceExceptionFilter(ILogger<EstateServiceExceptionF
     {
         (int statusCode, string title) = context.Exception switch
         {
-            BusinessValidationException => (StatusCodes.Status400BadRequest, "Validation error"),
+            BusinessValidationException => (StatusCodes.Status400BadRequest, "One or more validation errors occurred."),
             EntityNotFoundException => (StatusCodes.Status404NotFound, "Not found"),
             StateConflictException => (StatusCodes.Status409Conflict, "Conflict"),
             ImageNotFoundException => (StatusCodes.Status404NotFound, "Not found"),
@@ -41,12 +41,21 @@ public sealed class EstateServiceExceptionFilter(ILogger<EstateServiceExceptionF
             logger.LogWarning(context.Exception, "{Title}: {Message}", title, context.Exception.Message);
         }
 
-        context.Result = new ObjectResult(new ProblemDetails
-        {
-            Status = statusCode,
-            Title = title,
-            Detail = context.Exception.Message
-        })
+        ProblemDetails problem = context.Exception is BusinessValidationException { Errors.Count: > 0 } validation
+            ? new ValidationProblemDetails(validation.Errors)
+            {
+                Status = statusCode,
+                Title = title,
+                Detail = context.Exception.Message
+            }
+            : new ProblemDetails
+            {
+                Status = statusCode,
+                Title = title,
+                Detail = context.Exception.Message
+            };
+
+        context.Result = new ObjectResult(problem)
         {
             StatusCode = statusCode,
             ContentTypes = { "application/problem+json" }

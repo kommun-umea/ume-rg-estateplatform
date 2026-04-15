@@ -79,6 +79,30 @@ public class WorkOrderHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task SubmitWorkOrder_WithNotifierPhone_PersistsPhoneOnEntity()
+    {
+        CreateWorkOrderRequest request = new()
+        {
+            BuildingId = 1,
+            WorkOrderType = WorkOrderType.ErrorReport,
+            Location = "Indoor",
+            RoomId = 10,
+            Description = "Test",
+            NotifierName = "Test User",
+            NotifierEmail = "notifier@example.com",
+            NotifierPhone = "+46 70 123 45 67"
+        };
+
+        WorkOrderSubmissionModel result = await _handler.SubmitWorkOrderAsync(request, "test@example.com");
+
+        WorkOrderEntity? entity = await _dbContext.WorkOrders.FirstOrDefaultAsync(w => w.Uid == result.Id);
+        entity.ShouldNotBeNull();
+        entity.NotifierPhone.ShouldBe("+46 70 123 45 67");
+        entity.NotifierName.ShouldBe("Test User");
+        entity.NotifierEmail.ShouldBe("notifier@example.com");
+    }
+
+    [Fact]
     public async Task SubmitWorkOrder_ValidOutdoor_CreatesEntityWithoutRoom()
     {
         CreateWorkOrderRequest request = new()
@@ -97,7 +121,7 @@ public class WorkOrderHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task SubmitWorkOrder_InvalidLocation_Throws()
+    public async Task SubmitWorkOrder_InvalidLocation_ThrowsWithFieldError()
     {
         CreateWorkOrderRequest request = new()
         {
@@ -107,12 +131,15 @@ public class WorkOrderHandlerTests : IDisposable
             Description = "Test"
         };
 
-        await Should.ThrowAsync<BusinessValidationException>(
+        BusinessValidationException exception = await Should.ThrowAsync<BusinessValidationException>(
             () => _handler.SubmitWorkOrderAsync(request, "test@example.com"));
+
+        exception.Errors.ShouldContainKey("location");
+        exception.Errors["location"].ShouldContain("invalid_value");
     }
 
     [Fact]
-    public async Task SubmitWorkOrder_InvalidWorkOrderType_Throws()
+    public async Task SubmitWorkOrder_InvalidWorkOrderType_ThrowsWithFieldError()
     {
         CreateWorkOrderRequest request = new()
         {
@@ -122,12 +149,15 @@ public class WorkOrderHandlerTests : IDisposable
             Description = "Test"
         };
 
-        await Should.ThrowAsync<BusinessValidationException>(
+        BusinessValidationException exception = await Should.ThrowAsync<BusinessValidationException>(
             () => _handler.SubmitWorkOrderAsync(request, "test@example.com"));
+
+        exception.Errors.ShouldContainKey("workOrderType");
+        exception.Errors["workOrderType"].ShouldContain("invalid_value");
     }
 
     [Fact]
-    public async Task SubmitWorkOrder_InvalidBuilding_Throws()
+    public async Task SubmitWorkOrder_InvalidBuilding_ThrowsWithFieldError()
     {
         CreateWorkOrderRequest request = new()
         {
@@ -137,12 +167,15 @@ public class WorkOrderHandlerTests : IDisposable
             Description = "Test"
         };
 
-        await Should.ThrowAsync<EntityNotFoundException>(
+        BusinessValidationException exception = await Should.ThrowAsync<BusinessValidationException>(
             () => _handler.SubmitWorkOrderAsync(request, "test@example.com"));
+
+        exception.Errors.ShouldContainKey("buildingId");
+        exception.Errors["buildingId"].ShouldContain("not_found");
     }
 
     [Fact]
-    public async Task SubmitWorkOrder_OutdoorWithRoom_Throws()
+    public async Task SubmitWorkOrder_OutdoorWithRoom_ThrowsWithFieldError()
     {
         CreateWorkOrderRequest request = new()
         {
@@ -153,12 +186,15 @@ public class WorkOrderHandlerTests : IDisposable
             Description = "Test"
         };
 
-        await Should.ThrowAsync<BusinessValidationException>(
+        BusinessValidationException exception = await Should.ThrowAsync<BusinessValidationException>(
             () => _handler.SubmitWorkOrderAsync(request, "test@example.com"));
+
+        exception.Errors.ShouldContainKey("roomId");
+        exception.Errors["roomId"].ShouldContain("conflict");
     }
 
     [Fact]
-    public async Task SubmitWorkOrder_RoomNotInBuilding_Throws()
+    public async Task SubmitWorkOrder_RoomNotInBuilding_ThrowsWithFieldError()
     {
         DataStoreSeeder.Seed(
             _dataStore,
@@ -174,8 +210,31 @@ public class WorkOrderHandlerTests : IDisposable
             Description = "Test"
         };
 
-        await Should.ThrowAsync<BusinessValidationException>(
+        BusinessValidationException exception = await Should.ThrowAsync<BusinessValidationException>(
             () => _handler.SubmitWorkOrderAsync(request, "test@example.com"));
+
+        exception.Errors.ShouldContainKey("roomId");
+        exception.Errors["roomId"].ShouldContain("invalid_value");
+    }
+
+    [Fact]
+    public async Task SubmitWorkOrder_MultipleInvalidFields_ReturnsAllErrors()
+    {
+        CreateWorkOrderRequest request = new()
+        {
+            BuildingId = 9999,
+            WorkOrderType = (WorkOrderType)999,
+            Location = "InvalidType",
+            Description = "Test"
+        };
+
+        BusinessValidationException exception = await Should.ThrowAsync<BusinessValidationException>(
+            () => _handler.SubmitWorkOrderAsync(request, "test@example.com"));
+
+        exception.Errors.Count.ShouldBeGreaterThanOrEqualTo(3);
+        exception.Errors.ShouldContainKey("workOrderType");
+        exception.Errors.ShouldContainKey("location");
+        exception.Errors.ShouldContainKey("buildingId");
     }
 
     [Fact]

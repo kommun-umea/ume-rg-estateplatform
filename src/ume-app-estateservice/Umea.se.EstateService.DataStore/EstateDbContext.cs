@@ -404,6 +404,9 @@ public class EstateDbContext(DbContextOptions<EstateDbContext> options) : DbCont
             entity.Property(e => e.NotifierName)
                 .HasMaxLength(200);
 
+            entity.Property(e => e.NotifierPhone)
+                .HasMaxLength(50);
+
             entity.Property(e => e.PythagorasStatusName)
                 .HasMaxLength(200);
 

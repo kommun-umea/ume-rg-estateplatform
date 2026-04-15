@@ -20,6 +20,7 @@ public class CreateWorkOrderRequest
     public string Description { get; init; } = null!;
     public string? NotifierEmail { get; init; }
     public string? NotifierName { get; init; }
+    public string? NotifierPhone { get; init; }
     public List<WorkOrderFileUpload>? Files { get; init; }
 }
 

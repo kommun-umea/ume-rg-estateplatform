@@ -4,7 +4,9 @@ using Microsoft.FeatureManagement.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 using Umea.se.EstateService.API.Extensions;
 using Umea.se.EstateService.API.Requests;
+using Umea.se.EstateService.API.Responses;
 using Umea.se.EstateService.Logic.Handlers.WorkOrder;
+using Umea.se.EstateService.Shared.Infrastructure;
 using Umea.se.EstateService.Shared.Models;
 using Umea.se.Toolkit.UserFromToken;
 
@@ -15,7 +17,7 @@ namespace Umea.se.EstateService.API.Controllers;
 [Route(ApiRoutes.WorkOrders)]
 [Authorize]
 [FeatureGate("ErrorReport")]
-public class WorkOrderController(IWorkOrderHandler workOrderHandler, UserToken userToken) : ControllerBase
+public class WorkOrderController(IWorkOrderHandler workOrderHandler, UserToken userToken, ApplicationConfig appConfig) : ControllerBase
 {
     [HttpPost]
     [SwaggerOperation(Summary = "Submit workOrder", Description = "Submit a new workOrder report for a building.")]
@@ -35,6 +37,7 @@ public class WorkOrderController(IWorkOrderHandler workOrderHandler, UserToken u
             Description = form.Description,
             NotifierEmail = form.NotifierEmail,
             NotifierName = form.NotifierName,
+            NotifierPhone = form.NotifierPhone,
             Files = form.Files?.Select(f => new WorkOrderFileUpload
             {
                 FileName = f.FileName,
@@ -93,5 +96,21 @@ public class WorkOrderController(IWorkOrderHandler workOrderHandler, UserToken u
         string email = userToken.GetRequiredEmail();
 
         return Ok(await workOrderHandler.GetWorkOrderAsync(id, email, cancellationToken));
+    }
+
+    [HttpGet("config")]
+    [AllowAnonymous]
+    [SwaggerOperation(Summary = "Get work order config", Description = "Returns file upload validation rules for the client.")]
+    [SwaggerResponse(StatusCodes.Status200OK, "File upload configuration.", typeof(WorkOrderConfigResponse))]
+    public ActionResult<WorkOrderConfigResponse> GetConfig()
+    {
+        Shared.Infrastructure.ConfigurationModels.WorkOrderFileValidationConfig fileValidation = appConfig.WorkOrderProcessing.FileValidation;
+
+        return Ok(new WorkOrderConfigResponse
+        {
+            MaxFileCount = fileValidation.MaxFileCount,
+            MaxFileSizeBytes = fileValidation.MaxFileSizeBytes,
+            AllowedContentTypes = fileValidation.AllowedContentTypes
+        });
     }
 }

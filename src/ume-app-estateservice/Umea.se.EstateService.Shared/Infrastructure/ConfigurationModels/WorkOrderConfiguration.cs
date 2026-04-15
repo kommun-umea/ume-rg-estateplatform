@@ -40,11 +40,7 @@ public class WorkOrderFileValidationConfig
     public int MaxFileCount { get; set; } = 10;
     public long MaxFileSizeBytes { get; set; } = 20 * 1024 * 1024; // 20 MB
 
-    public List<string> AllowedContentTypes { get; set; } =
-    [
-        "image/*",
-        "application/pdf",
-    ];
+    public List<string> AllowedContentTypes { get; set; } = [];
 }
 
 public enum FileStorageType

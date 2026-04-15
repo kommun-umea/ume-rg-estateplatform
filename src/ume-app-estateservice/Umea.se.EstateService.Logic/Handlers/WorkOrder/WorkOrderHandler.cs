@@ -28,24 +28,25 @@ public class WorkOrderHandler(
 
     public async Task<WorkOrderSubmissionModel> SubmitWorkOrderAsync(CreateWorkOrderRequest request, string email, CancellationToken cancellationToken = default)
     {
+        ValidationErrorBuilder errors = new();
+
         if (!_workOrderTypeMap.TryGetValue(request.WorkOrderType, out PythagorasWorkOrderType workOrderType))
         {
-            throw new BusinessValidationException($"Invalid work order type: {request.WorkOrderType}.");
+            errors.AddError("workOrderType", ValidationErrorCode.InvalidValue);
         }
 
         if (!Enum.TryParse<WorkOrderLocation>(request.Location, ignoreCase: true, out WorkOrderLocation location))
         {
-            throw new BusinessValidationException($"Invalid location: {request.Location}. Must be 'indoor' or 'outdoor'.");
+            errors.AddError("location", ValidationErrorCode.InvalidValue);
         }
 
         if (!dataStore.BuildingsById.TryGetValue(request.BuildingId, out BuildingEntity? building))
         {
-            throw new EntityNotFoundException($"Building with id {request.BuildingId} not found.");
+            errors.AddError("buildingId", ValidationErrorCode.NotFound);
         }
-
-        if (!building.WorkOrderTypes.Contains(request.WorkOrderType))
+        else if (!building.WorkOrderTypes.Contains(request.WorkOrderType))
         {
-            throw new BusinessValidationException($"Building {request.BuildingId} does not support work order type '{request.WorkOrderType}'.");
+            errors.AddError("workOrderType", ValidationErrorCode.NotSupported);
         }
 
         string? roomName = null;
@@ -53,27 +54,29 @@ public class WorkOrderHandler(
         {
             if (location == WorkOrderLocation.Outdoor)
             {
-                throw new BusinessValidationException("RoomId must not be provided for outdoor work orders.");
+                errors.AddError("roomId", ValidationErrorCode.Conflict);
             }
-
-            if (!dataStore.RoomsById.TryGetValue(request.RoomId.Value, out RoomEntity? room))
+            else if (!dataStore.RoomsById.TryGetValue(request.RoomId.Value, out RoomEntity? room))
             {
-                throw new EntityNotFoundException($"Room with id {request.RoomId.Value} not found.");
+                errors.AddError("roomId", ValidationErrorCode.NotFound);
             }
-
-            if (room.BuildingId != request.BuildingId)
+            else if (room.BuildingId != request.BuildingId)
             {
-                throw new BusinessValidationException($"Room {request.RoomId.Value} does not belong to building {request.BuildingId}.");
+                errors.AddError("roomId", ValidationErrorCode.InvalidValue);
             }
-
-            roomName = room.Name;
+            else
+            {
+                roomName = room.Name;
+            }
         }
+
+        errors.ThrowIfErrors();
 
         WorkOrderEntity workOrder = new()
         {
             Uid = Guid.NewGuid(),
             BuildingId = request.BuildingId,
-            BuildingName = building.Name,
+            BuildingName = building!.Name,
             RoomId = request.RoomId,
             RoomName = roomName,
             Location = location,
@@ -87,7 +90,8 @@ public class WorkOrderHandler(
             NotifierEmail = (!string.IsNullOrWhiteSpace(request.NotifierEmail)
                 ? request.NotifierEmail
                 : email).ToLowerInvariant(),
-            NotifierName = request.NotifierName
+            NotifierName = request.NotifierName,
+            NotifierPhone = request.NotifierPhone
         };
 
         if (request.Files is { Count: > 0 })

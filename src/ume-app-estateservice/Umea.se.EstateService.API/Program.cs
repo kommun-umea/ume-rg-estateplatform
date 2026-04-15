@@ -206,6 +206,8 @@ builder.Services.AddControllers(options =>
 .AddJsonOptions(options =>
 {
     options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+    // Ensure ValidationProblemDetails.Errors keys (e.g. "Description") are serialized as camelCase ("description").
+    options.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.CamelCase;
 });
 
 WebApplication app = builder.Build();

@@ -173,6 +173,7 @@ public class WorkOrderProcessor(
             BoundObjectIds = [workOrder.RoomId ?? workOrder.BuildingId],
             NotifierEmail = workOrder.NotifierEmail ?? workOrder.CreatedByEmail,
             NotifierName = workOrder.NotifierName,
+            NotifierTelephone = workOrder.NotifierPhone,
             NotifierUsername = workOrder.NotifierEmail ?? workOrder.CreatedByEmail,
             CategoryId = workOrder.CategoryId,
         };

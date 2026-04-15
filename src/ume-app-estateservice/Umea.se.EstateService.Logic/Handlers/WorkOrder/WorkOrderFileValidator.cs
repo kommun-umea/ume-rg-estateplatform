@@ -32,36 +32,42 @@ public class WorkOrderFileValidator(ApplicationConfig appConfig) : IWorkOrderFil
 
     public async Task ValidateAsync(IReadOnlyList<WorkOrderFileUpload> files, CancellationToken cancellationToken = default)
     {
+        ValidationErrorBuilder errors = new();
+
         if (files.Count > _config.MaxFileCount)
         {
-            throw new BusinessValidationException($"Too many files. Maximum is {_config.MaxFileCount}, got {files.Count}.");
+            errors.AddError("files", ValidationErrorCode.TooManyFiles);
         }
 
         for (int i = 0; i < files.Count; i++)
         {
             WorkOrderFileUpload file = files[i];
+            string key = $"files[{i}]";
 
             if (file.FileSize > _config.MaxFileSizeBytes)
             {
-                throw new BusinessValidationException(
-                    $"File '{file.FileName}' is too large ({file.FileSize} bytes). Maximum is {_config.MaxFileSizeBytes} bytes.");
+                errors.AddError(key, ValidationErrorCode.FileTooLarge);
             }
 
             if (!IsAllowedContentType(file.ContentType))
             {
-                throw new BusinessValidationException(
-                    $"File '{file.FileName}' has disallowed content type '{file.ContentType}'. Allowed types: {string.Join(", ", _config.AllowedContentTypes)}.");
+                errors.AddError(key, ValidationErrorCode.InvalidContentType);
+                continue; // Skip magic byte check when content type is already disallowed
             }
 
-            string? detectedType = await DetectContentTypeAsync(file.Stream, cancellationToken) ?? throw new BusinessValidationException(
-                    $"File '{file.FileName}' could not be identified. The file content does not match any known file format.");
+            string? detectedType = await DetectContentTypeAsync(file.Stream, cancellationToken);
 
-            if (!ContentTypeMatchesClaimed(detectedType, file.ContentType))
+            if (detectedType is null)
             {
-                throw new BusinessValidationException(
-                    $"File '{file.FileName}' content does not match its declared type '{file.ContentType}'. Detected: '{detectedType}'.");
+                errors.AddError(key, ValidationErrorCode.UnrecognizedFileContent);
+            }
+            else if (!ContentTypeMatchesClaimed(detectedType, file.ContentType))
+            {
+                errors.AddError(key, ValidationErrorCode.ContentTypeMismatch);
             }
         }
+
+        errors.ThrowIfErrors();
     }
 
     private static async Task<string?> DetectContentTypeAsync(Stream stream, CancellationToken ct)
