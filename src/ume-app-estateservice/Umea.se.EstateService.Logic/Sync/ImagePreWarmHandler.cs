@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Umea.se.EstateService.Logic.Handlers.Images;
 using Umea.se.EstateService.Shared.Data;
 using Umea.se.EstateService.Shared.Data.Entities;
+using Umea.se.Toolkit.Images;
 
 namespace Umea.se.EstateService.Logic.Sync;
 
@@ -13,6 +14,12 @@ public sealed class ImagePreWarmHandler(
 {
     private const int ThumbnailWidth = 300;
     private readonly SemaphoreSlim _syncGate = new(1, 1);
+
+    private static readonly IReadOnlyList<ImageVariantRequest> PreWarmVariants =
+    [
+        new ImageVariantRequest(MaxWidth: null, MaxHeight: null),
+        new ImageVariantRequest(MaxWidth: ThumbnailWidth, MaxHeight: null),
+    ];
 
     /// <summary>
     /// Attempt to start an image pre-warm in the background.
@@ -79,18 +86,10 @@ public sealed class ImagePreWarmHandler(
 
             try
             {
-                await imageService.GetImageResultAsync(
+                await imageService.PreWarmImageAsync(
                     building.Id,
                     primaryImageId,
-                    maxWidth: null,
-                    maxHeight: null,
-                    ct);
-
-                await imageService.GetImageResultAsync(
-                    building.Id,
-                    primaryImageId,
-                    maxWidth: ThumbnailWidth,
-                    maxHeight: null,
+                    PreWarmVariants,
                     ct);
 
                 warmed++;
@@ -102,6 +101,12 @@ public sealed class ImagePreWarmHandler(
                 failed++;
                 firstFailure ??= (building.Id, primaryImageId, ex);
             }
+
+            // Yield briefly between items as a backpressure point for
+            // ImageSharp allocations, background L2 writes, and normal app
+            // work. ~37 s total over 1461 buildings — negligible for a
+            // nightly batch.
+            await Task.Delay(TimeSpan.FromMilliseconds(25), ct);
         }
 
         if (firstFailure is null)

@@ -109,6 +109,65 @@ public sealed class ImageService(IFusionCache cache, ImageServiceOptions options
         return thumbEntry.ToImageResult();
     }
 
+    /// <summary>
+    /// Refresh cache entries for an image without going through the user-facing
+    /// GetOrSetAsync factory path. Intended for background pre-warm jobs: fetches
+    /// the original once, normalizes it, then writes the original and each
+    /// requested variant directly via <see cref="IFusionCache.SetAsync"/>.
+    /// </summary>
+    public async Task PreWarmImageAsync(
+        string imageId,
+        Func<CancellationToken, Task<byte[]>> fetchOriginal,
+        IReadOnlyList<ImageVariantRequest> variants,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(fetchOriginal);
+        ArgumentNullException.ThrowIfNull(variants);
+
+        if (variants.Count == 0)
+        {
+            return;
+        }
+
+        _logger.LogDebug("Pre-warm fetching and normalizing image: {ImageId}", imageId);
+        byte[] raw = await fetchOriginal(ct);
+        ValidateNotEmpty(raw, imageId);
+
+        byte[] normalized = Resize(raw, _options.MaxOriginalDimension, _options.MaxOriginalDimension, _options.OriginalWebPQuality);
+        ImageCacheEntry originalEntry = ImageCacheEntry.WebP(normalized);
+
+        string prefixedId = PrefixKey(imageId);
+        string originalKey = ImageCacheKeys.Original(prefixedId);
+
+        await WriteEntryAsync(originalKey, originalEntry, ct);
+        _logger.LogDebug("Pre-warmed normalized original {ImageId}: {Size}KB", imageId, normalized.Length / 1024);
+
+        foreach (ImageVariantRequest variant in variants)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (variant.MaxWidth is null && variant.MaxHeight is null)
+            {
+                // The normalized original already covers this variant.
+                continue;
+            }
+
+            byte[] thumb = Resize(normalized, variant.MaxWidth, variant.MaxHeight, _options.WebPQuality);
+            ImageCacheEntry thumbEntry = ImageCacheEntry.WebP(thumb);
+            string thumbKey = ImageCacheKeys.Thumbnail(prefixedId, variant.MaxWidth, variant.MaxHeight);
+
+            await WriteEntryAsync(thumbKey, thumbEntry, ct);
+            _logger.LogDebug("Pre-warmed thumbnail {Key}: {Size}KB", thumbKey, thumb.Length / 1024);
+        }
+    }
+
+    private async Task WriteEntryAsync(string key, ImageCacheEntry entry, CancellationToken ct)
+    {
+        FusionCacheEntryOptions entryOptions = _cacheOptions.Duplicate();
+        entryOptions.Size = entry.Data.Length;
+        await _cache.SetAsync(key, entry, entryOptions, tags: null, ct);
+    }
+
     private string PrefixKey(string imageId) => $"{_options.CacheKeyPrefix}:{imageId}";
 
     private static FusionCacheEntryOptions CreateCacheOptions(ImageServiceOptions options) => new()

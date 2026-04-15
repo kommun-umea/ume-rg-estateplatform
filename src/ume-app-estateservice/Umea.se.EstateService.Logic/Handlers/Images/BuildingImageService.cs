@@ -46,6 +46,41 @@ public sealed class BuildingImageService(IPythagorasClient pythagorasClient, IDa
             cancellationToken);
     }
 
+    public async Task PreWarmImageAsync(int buildingId, int? imageId, IReadOnlyList<ImageVariantRequest> variants, CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(buildingId);
+        ArgumentNullException.ThrowIfNull(variants);
+        if (imageId.HasValue)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(imageId.Value);
+        }
+
+        if (variants.Count == 0)
+        {
+            return;
+        }
+
+        IReadOnlyList<int>? imageIds = GetImageIds(dataStore, buildingId);
+
+        if (imageIds is null or { Count: 0 })
+        {
+            return;
+        }
+
+        int resolvedImageId = imageId ?? imageIds[0];
+
+        if (imageId.HasValue && !imageIds.Contains(imageId.Value))
+        {
+            return;
+        }
+
+        await imageService.PreWarmImageAsync(
+            $"images:{resolvedImageId}",
+            fetchOriginal: ct => FetchImageAsync(resolvedImageId, ct),
+            variants,
+            cancellationToken);
+    }
+
     private async Task<byte[]> FetchImageAsync(int imageId, CancellationToken ct)
     {
         await _pythagorasImageFetchGate.WaitAsync(ct);

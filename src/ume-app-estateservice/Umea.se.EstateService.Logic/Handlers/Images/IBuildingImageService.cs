@@ -21,6 +21,18 @@ public interface IBuildingImageService
     Task<ImageResult?> GetImageResultAsync(int buildingId, int? imageId, int? maxWidth, int? maxHeight, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Refresh cache entries for a building's image without using the user-facing
+    /// GetOrSetAsync factory path. Used by the nightly pre-warm job. Silently
+    /// returns when the building or image does not exist or the image does not
+    /// belong to the building.
+    /// </summary>
+    /// <param name="buildingId">The building ID</param>
+    /// <param name="imageId">Optional image ID. If null, pre-warms the primary image.</param>
+    /// <param name="variants">Variants to cache. A variant with both dimensions null refers to the normalized original.</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    Task PreWarmImageAsync(int buildingId, int? imageId, IReadOnlyList<ImageVariantRequest> variants, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Gets metadata about all images for a building.
     /// </summary>
     /// <param name="buildingId">The building ID</param>

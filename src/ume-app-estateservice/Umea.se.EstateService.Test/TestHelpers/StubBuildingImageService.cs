@@ -62,6 +62,16 @@ public sealed class StubBuildingImageService : IBuildingImageService
         return Task.CompletedTask;
     }
 
+    public Task PreWarmImageAsync(
+        int buildingId,
+        int? imageId,
+        IReadOnlyList<ImageVariantRequest> variants,
+        CancellationToken cancellationToken = default)
+    {
+        ImageRequestedForBuildingIds.Add(buildingId);
+        return Task.CompletedTask;
+    }
+
     /// <summary>
     /// Resets all configured results and captured requests.
     /// </summary>
