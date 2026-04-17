@@ -88,8 +88,8 @@ public sealed class DocumentSyncHandler(
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Document sync failed for building {BuildingId}",
-                    building.Id);
+                logger.LogInformation("Document sync failed for building {BuildingId}: {Error}",
+                    building.Id, ex.Message);
             }
         }
 
