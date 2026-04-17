@@ -57,11 +57,15 @@ Each `PythagorasDocument` contains:
 |-------------------|----------------------------------|-------------|----------|
 | Name              | Official name (e.g., "458-08")   | Yes         | Yes      |
 | PopularName       | Common name (e.g., "Stadshuset") | Yes         | Yes      |
+| Aliases           | Alternative names                | Yes         | Yes      |
 | Path              | Hierarchical path                | Yes         | No       |
 | AddressSearchText | Street address                   | Yes         | No       |
 | Ancestors         | Parent entities                  | Yes         | No       |
 | Type              | Estate/Building/Room             | Filter only | -        |
 | GeoLocation       | Lat/Lng coordinates              | Filter only | -        |
+| BusinessType      | Business classification          | Filter only | -        |
+| GrossArea         | Total area                       | Score boost | -        |
+| NumChildren       | Child entity count               | Score boost | -        |
 
 ---
 
@@ -73,11 +77,12 @@ Each `PythagorasDocument` contains:
 For each document:
   1. Index Name field (with n-grams)
   2. Index PopularName field (with n-grams)
-  3. Index Path field
-  4. Index Address field
-  5. Index all Ancestor names
-  6. Store document length (token count)
-  7. Update term frequencies
+  3. Index Aliases (with n-grams)
+  4. Index Path field
+  5. Index Address field
+  6. Index all Ancestor names
+  7. Store document length (token count)
+  8. Update term frequencies
 
 Post-processing:
   1. Build SymSpell dictionary from term frequencies
@@ -105,12 +110,17 @@ N-gram postings use position `-1` to distinguish them from regular term position
 ### Posting Structure
 
 ```csharp
-record Posting(int DocId, Field Field, List<int> Positions);
+internal sealed class Posting(int docId, Field field, int position)
+{
+    public int DocId;
+    public Field Field;
+    public List<int> Positions = [position]; // additional positions appended on subsequent hits
+}
 ```
 
 - **DocId**: Internal document index
 - **Field**: Which field the term appears in
-- **Positions**: Token positions (0-indexed), or -1 for n-gram matches
+- **Positions**: Token positions (0-indexed), or -1 for n-gram matches. The constructor seeds the list with the first position; later occurrences of the same (term, doc, field) append to the existing posting.
 
 ---
 
@@ -225,17 +235,21 @@ The final score for a document is:
 
 ```
 FinalScore = TypeBoost
+           + AreaBoost
+           + ChildrenBoost
            + BM25Score
            + ExactMatchBonus
            + StartsWithBonus
            + PopularStartsWithBonus
            + ExactTokenMatchBonus
            + SameFieldMultiTokenBonus
-           + NgramContribution
+           + NgramContribution      (capped by NgramMaxContribution)
            + ProximityBonus
            + TermMatchBonus
            + GeoBonus
 ```
+
+`AreaBoost` and `ChildrenBoost` are derived from `PythagorasDocument.GrossArea` and `PythagorasDocument.NumChildren` via `ComputeAreaBoost` / `ComputeChildrenBoost` in `InMemorySearchService`. They reward larger / more populated entities so that, for tied text relevance, a parent estate ranks above an empty placeholder.
 
 ### Field Weights
 
@@ -403,17 +417,18 @@ if (lat >= south && lat <= north && lng >= west && lng <= east)
 
 ### Scoring Constants
 
-| Constant                   | Value | Description                         |
-|----------------------------|-------|-------------------------------------|
-| `ExactMatchBonus`          | 60.0  | Full query matches Name/PopularName |
-| `StartsWithBonus`          | 50.0  | Term at position 0 in key fields    |
-| `SameFieldMultiTokenBonus` | 40.0  | Per extra token in same field       |
-| `ExactTokenMatchBonus`     | 25.0  | Query token = index term            |
-| `PopularStartsWithBonus`   | 12.0  | PopularName starts with term        |
-| `NgramScoreMultiplier`     | 0.5   | Reduce n-gram contribution          |
-| `NgramPositionWeight`      | 0.6   | Position weight for n-grams         |
-| `TermMatchIncrement`       | 0.2   | Per-token match bonus               |
-| `ProximityMultiplier`      | 0.05  | Base proximity factor               |
+| Constant                   | Value | Description                                       |
+|----------------------------|-------|---------------------------------------------------|
+| `ExactMatchBonus`          | 60.0  | Full query matches Name/PopularName               |
+| `StartsWithBonus`          | 50.0  | Term at position 0 in key fields                  |
+| `SameFieldMultiTokenBonus` | 40.0  | Per extra token in same field                     |
+| `NgramMaxContribution`     | 35.0  | Cap on total n-gram contribution per document     |
+| `ExactTokenMatchBonus`     | 25.0  | Query token = index term                          |
+| `PopularStartsWithBonus`   | 12.0  | PopularName starts with term                      |
+| `NgramScoreMultiplier`     | 0.5   | Reduce n-gram contribution                        |
+| `NgramPositionWeight`      | 0.6   | Position weight for n-grams                       |
+| `TermMatchIncrement`       | 0.2   | Per-token match bonus                             |
+| `ProximityMultiplier`      | 0.05  | Base proximity factor                             |
 
 ### BM25 Parameters
 
@@ -475,6 +490,8 @@ GET /search/debug?query=skolgatan+31
         "popularName": "Stadshuset",
         "type": "Building",
         "typeBoost": 0.0,
+        "areaBoost": 0.0,
+        "childrenBoost": 0.0,
         "bm25Score": 12.5,
         "exactMatchBonus": 0.0,
         "startsWithBonus": 50.0,
@@ -509,17 +526,17 @@ GET /search/debug?query=skolgatan+31
 
 ## Query Options
 
-| Option                  | Default | Description                               |
-|-------------------------|---------|-------------------------------------------|
-| `EnablePrefix`          | true    | Allow prefix matching                     |
-| `EnableFuzzy`           | true    | Allow fuzzy (typo) matching               |
-| `EnableContains`        | true    | Allow n-gram/substring matching           |
-| `FuzzyMaxEdits`         | 2       | Maximum edit distance for fuzzy           |
-| `MaxResults`            | 10      | Maximum results to return                 |
-| `PreferEstatesOnTie`    | false   | Prefer estates when scores are equal      |
-| `FilterByTypes`         | null    | Filter by NodeType (Estate/Building/Room) |
-| `FilterByBusinessTypes` | null    | Filter by business type IDs               |
-| `GeoFilter`             | null    | Radius or bounding box filter             |
+| Option                  | Default | Description                                                            |
+|-------------------------|---------|------------------------------------------------------------------------|
+| `EnablePrefix`          | true    | Allow prefix matching                                                  |
+| `EnableFuzzy`           | true    | Allow fuzzy (typo) matching                                            |
+| `EnableContains`        | true    | Allow n-gram/substring matching                                        |
+| `FuzzyMaxEdits`         | 1       | Maximum edit distance for fuzzy (capped at 2 by `_symSpellMaxEdits`)   |
+| `MaxResults`            | 50      | Maximum results to return                                              |
+| `PreferEstatesOnTie`    | true    | Prefer estates when scores are equal                                   |
+| `FilterByTypes`         | null    | Filter by NodeType (Estate/Building/Room)                              |
+| `FilterByBusinessTypes` | null    | Filter by business type IDs                                            |
+| `GeoFilter`             | null    | Radius or bounding box filter                                          |
 
 ---
 

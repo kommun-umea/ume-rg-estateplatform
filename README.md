@@ -8,9 +8,17 @@ This project provides a API layer that communicates with the Pythagoras system t
 
 ## Technology Stack
 
-- **.NET**
-- **ASP.NET**
+- **.NET 10 / ASP.NET Core**
+- **Entity Framework Core** - Persistence layer
 - **Pythagoras API** - External data source integration
+- **Azure Blob Storage** - Image and file storage
+- **Azure OpenAI** - AI-assisted features
+- **FusionCache** - Distributed L1/L2 caching
+- **Polly / Microsoft.Extensions.Http.Resilience** - Retry and circuit breaker policies
+- **JWT Bearer Authentication** - API authentication
+- **Swagger / Swashbuckle** - OpenAPI documentation
+- **Application Insights / OpenTelemetry** - Telemetry
+- **xUnit + Shouldly** - Testing
 - **Bicep** - Infrastructure as Code
 - **Azure DevOps** - CI/CD Pipelines
 
@@ -18,22 +26,26 @@ This project provides a API layer that communicates with the Pythagoras system t
 
 ```
 src/ume-app-estateservice/
-├── Umea.se.EstateService.API/          # Main API project
-├── Umea.se.EstateService.Logic/        # Business logic layer
-├── Umea.se.EstateService.ServiceAccess/# External service integration
-├── Umea.se.EstateService.Shared/       # Shared utilities and models
-└── Umea.se.EstateService.Test/         # Unit tests
-iac/                                    # Infrastructure as Code (Bicep)
-pipelines/                              # Azure DevOps pipeline definitions
+├── Umea.se.EstateService.API/           # Main API project (ASP.NET Core)
+├── Umea.se.EstateService.Logic/         # Business logic layer
+├── Umea.se.EstateService.ServiceAccess/ # External service integration (Pythagoras)
+├── Umea.se.EstateService.DataStore/     # EF Core persistence layer
+├── Umea.se.EstateService.Shared/        # Shared utilities and models
+├── Umea.se.EstateService.Test/          # Unit and integration tests
+├── Umea.se.Toolkit.Images/              # Shared image processing library
+└── docs/                                # Additional API documentation
+iac/                                     # Infrastructure as Code (Bicep)
+pipelines/                               # Azure DevOps pipeline definitions
 ```
 
 ## Getting Started
 
 ### Prerequisites
 
-- .NET SDK
+- .NET 10 SDK
 - IDE of choice (Visual Studio, JetBrains Rider, or Visual Studio Code)
 - Access to Pythagoras API credentials
+- Access to an Azure Key Vault with the required secrets (see Configuration)
 - Access to Umeå Kommun's Azure DevOps NuGet feeds might make things easier. As of writing this is not public (yet)
 
 ### Installation
@@ -65,15 +77,23 @@ dotnet run --project src/ume-app-estateservice/Umea.se.EstateService.API
 
 ## Configuration
 
-Before running the application, ensure you have configured:
+Most secrets are resolved from Azure Key Vault via the `@KeyVault(...)` placeholders in `appsettings.json`. Before running the application, ensure you have configured:
 
-- **Pythagoras API Settings**: Endpoint URLs, authentication credentials
-- **Environment Variables**: Any required environment-specific configurations
-- **Logging Configuration**: Appropriate logging levels and targets
+- **Key Vault**: `KeyVaultUrl` and credentials (DefaultAzureCredential) with access to the required secrets
+- **Database**: `ConnectionStrings:EstateService` for the EF Core data store
+- **Pythagoras API**: `Pythagoras:ApiKey` and `Pythagoras:BaseUrl`
+- **Authentication**: `Authentication:TokenServiceUrl` and `Authentication:Audience` for JWT bearer auth, plus `Api:Keys`
+- **Azure OpenAI**: `OpenAI:Endpoint`, `OpenAI:Model`, and `OpenAI:Enabled`
+- **Image cache**: `ImageCache:BlobServiceUrl` and `ImageCache:BlobContainerName`
+- **Work orders**: `WorkOrder:FileStorage`, `WorkOrder:FileStorageContainer`, and processing/validation settings
+- **Data sync**: `DataSync:Schedule` cron expressions
+- **Application Insights**: `ApplicationInsights:ConnectionString`
+- **CORS**: `Cors:AllowedOrigins` for your front-end origins
 - **NuGet Authentication**: Access to Umeå Kommun's private package feeds
-- **Keyvault
 
-> **Note**: The Infrastructure as Code (IaC) and CI/CD pipelines included in this repository are specifically configured for Umeå Kommun's deployment environment. If you plan to use this solution in a different environment, you will need to configure your own deployment setup and keyvault.
+> **Note**: The Infrastructure as Code (IaC) and CI/CD pipelines included in this repository are specifically configured for Umeå Kommun's deployment environment. If you plan to use this solution in a different environment, you will need to configure your own deployment setup and Key Vault.
+
+Additional API documentation lives in [`src/ume-app-estateservice/docs/`](src/ume-app-estateservice/docs/).
 
 ## Development Environment
 
@@ -117,7 +137,7 @@ This project follows strict code quality standards enforced through:
 - **Warnings = Errors**: We treat warnings as errors
 
 Key coding standards:
-- No `var` usage - explicit type declarations required
+- Explicit type declarations preferred over `var` (enforced as a warning, which fails the build under warnings-as-errors)
 - Mandatory curly braces for all code blocks
 - File-scoped namespace declarations
 - Comprehensive CA rules for performance and maintainability
