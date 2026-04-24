@@ -1,6 +1,7 @@
 using System.Data;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -20,6 +21,12 @@ public sealed class SqlServerPersistence(
     IDbContextFactory<EstateDbContext> dbContextFactory,
     ILogger<SqlServerPersistence> logger) : EfCorePersistenceBase(dbContextFactory, logger)
 {
+    private static readonly JsonSerializerOptions ContactPersonsJsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+
+
     public override async Task SaveAsync(DataSnapshot snapshot, DateTimeOffset refreshTime, CancellationToken ct = default)
     {
         if (!snapshot.IsReady)
@@ -190,6 +197,7 @@ public sealed class SqlServerPersistence(
         table.Columns.Add("OperationsManager", typeof(string));
         table.Columns.Add("OperationCoordinator", typeof(string));
         table.Columns.Add("RentalAdministrator", typeof(string));
+        table.Columns.Add("ContactPersonsJson", typeof(string));
         table.Columns.Add("WorkOrderTypes", typeof(string));
         table.Columns.Add("ImageIds", typeof(string));
         table.Columns.Add("NumDocuments", typeof(int));
@@ -225,10 +233,13 @@ public sealed class SqlServerPersistence(
                 (object?)b.NoticeBoard?.StartDate ?? DBNull.Value,
                 (object?)b.NoticeBoard?.EndDate ?? DBNull.Value,
                 (object?)b.BlueprintAvailable ?? DBNull.Value,
-                (object?)b.ContactPersons?.PropertyManager ?? DBNull.Value,
-                (object?)b.ContactPersons?.OperationsManager ?? DBNull.Value,
-                (object?)b.ContactPersons?.OperationCoordinator ?? DBNull.Value,
-                (object?)b.ContactPersons?.RentalAdministrator ?? DBNull.Value,
+                (object?)b.LegacyPropertyManager ?? DBNull.Value,
+                (object?)b.LegacyOperationsManager ?? DBNull.Value,
+                (object?)b.LegacyOperationCoordinator ?? DBNull.Value,
+                (object?)b.LegacyRentalAdministrator ?? DBNull.Value,
+                b.ContactPersons is null
+                    ? DBNull.Value
+                    : JsonSerializer.Serialize(b.ContactPersons, ContactPersonsJsonOptions),
                 JsonSerializer.Serialize(b.WorkOrderTypes, (JsonSerializerOptions?)null),
                 b.ImageIds is not null
                     ? JsonSerializer.Serialize(b.ImageIds, (JsonSerializerOptions?)null)

@@ -2,6 +2,7 @@ using Umea.se.EstateService.ServiceAccess.Pythagoras.Dto;
 using Umea.se.EstateService.ServiceAccess.Pythagoras.Enums;
 using Umea.se.EstateService.Shared.Data.Entities;
 using Umea.se.EstateService.Shared.Models;
+using Umea.se.EstateService.Shared.Parsing;
 using Umea.se.EstateService.Shared.ValueObjects;
 using static Umea.se.EstateService.Logic.Sync.Pythagoras.Mappers.MapperUtilities;
 
@@ -22,6 +23,8 @@ public static class BuildingEntityMapper
     {
         ArgumentNullException.ThrowIfNull(dto);
 
+        BuildingContactPersonsModel? contactPersons = CreateContactPersons(dto.PropertyValues);
+
         return new BuildingEntity
         {
             Id = dto.Id,
@@ -40,7 +43,11 @@ public static class BuildingEntityMapper
             PropertyDesignation = TryGetPropertyValue(dto.PropertyValues, PropertyCategoryId.PropertyDesignation),
             NoticeBoard = CreateNoticeBoard(dto.PropertyValues),
             BlueprintAvailable = ParseBlueprintAvailable(dto.PropertyValues),
-            ContactPersons = CreateContactPersons(dto.PropertyValues),
+            ContactPersons = contactPersons,
+            LegacyPropertyManager = contactPersons?.PropertyManager.Name ?? string.Empty,
+            LegacyOperationsManager = contactPersons?.OperationsManager?.Name,
+            LegacyOperationCoordinator = contactPersons?.OperationCoordinator?.Name,
+            LegacyRentalAdministrator = contactPersons?.RentalAdministrator?.Name,
             WorkOrderTypes = BuildWorkOrderTypes(dto.PropertyValues),
             BusinessType = dto.BusinessTypeId is int btId && !string.IsNullOrWhiteSpace(dto.BusinessTypeName)
                 ? new BusinessTypeModel { Id = btId, Name = dto.BusinessTypeName }
@@ -141,7 +148,9 @@ public static class BuildingEntityMapper
 
     /// <summary>
     /// Creates a BuildingContactPersonsModel from property values.
-    /// Returns null if no contact person data is present.
+    /// Name properties (282-285) drive presence. Contact properties (306-309) hold "phone / email"
+    /// text from Pythagoras and are parsed leniently via ContactInfoParser.
+    /// Returns null if no name property is populated.
     /// </summary>
     private static BuildingContactPersonsModel? CreateContactPersons(Dictionary<int, PropertyValueDto>? propertyValues)
     {
@@ -150,25 +159,51 @@ public static class BuildingEntityMapper
             return null;
         }
 
-        string? propertyManager = TryGetPropertyValue(propertyValues, PropertyCategoryId.PropertyManager);
-        string? operationsManager = TryGetPropertyValue(propertyValues, PropertyCategoryId.OperationsManager);
-        string? operationCoordinator = TryGetPropertyValue(propertyValues, PropertyCategoryId.OperationCoordinator);
-        string? rentalAdministrator = TryGetPropertyValue(propertyValues, PropertyCategoryId.RentalAdministrator);
+        BuildingContactModel? propertyManager = BuildContact(propertyValues, PropertyCategoryId.PropertyManager, PropertyCategoryId.PropertyManagerContact);
+        BuildingContactModel? operationsManager = BuildContact(propertyValues, PropertyCategoryId.OperationsManager, PropertyCategoryId.OperationsManagerContact);
+        BuildingContactModel? operationCoordinator = BuildContact(propertyValues, PropertyCategoryId.OperationCoordinator, PropertyCategoryId.OperationCoordinatorContact);
+        BuildingContactModel? rentalAdministrator = BuildContact(propertyValues, PropertyCategoryId.RentalAdministrator, PropertyCategoryId.RentalAdministratorContact);
 
-        if (string.IsNullOrEmpty(propertyManager) &&
-            string.IsNullOrEmpty(operationsManager) &&
-            string.IsNullOrEmpty(operationCoordinator) &&
-            string.IsNullOrEmpty(rentalAdministrator))
+        if (propertyManager is null &&
+            operationsManager is null &&
+            operationCoordinator is null &&
+            rentalAdministrator is null)
         {
             return null;
         }
 
+        // PropertyManager is required on the model. If only other roles are populated, synthesize
+        // an empty-name PropertyManager to keep the model constructible without losing data.
+        propertyManager ??= new BuildingContactModel { Name = string.Empty };
+
         return new BuildingContactPersonsModel
         {
-            PropertyManager = propertyManager ?? string.Empty,
+            PropertyManager = propertyManager,
             OperationsManager = operationsManager,
             OperationCoordinator = operationCoordinator,
             RentalAdministrator = rentalAdministrator
+        };
+    }
+
+    private static BuildingContactModel? BuildContact(
+        Dictionary<int, PropertyValueDto> propertyValues,
+        PropertyCategoryId nameProperty,
+        PropertyCategoryId contactProperty)
+    {
+        string? name = TryGetPropertyValue(propertyValues, nameProperty);
+        if (string.IsNullOrEmpty(name))
+        {
+            return null;
+        }
+
+        string? raw = TryGetPropertyValue(propertyValues, contactProperty);
+        (string? phone, string? email) = ContactInfoParser.Parse(raw);
+
+        return new BuildingContactModel
+        {
+            Name = name,
+            Phone = phone,
+            Email = email
         };
     }
 

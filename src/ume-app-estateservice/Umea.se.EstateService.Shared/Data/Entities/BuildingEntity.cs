@@ -19,6 +19,13 @@ public class BuildingEntity : NamedEntity
     public bool? BlueprintAvailable { get; set; }
     public BuildingContactPersonsModel? ContactPersons { get; set; }
 
+    // Legacy flat contact columns — kept for dual-write during the JSON migration rollout.
+    // Drop in a follow-up migration once all readers use ContactPersons.
+    public string LegacyPropertyManager { get; set; } = string.Empty;
+    public string? LegacyOperationsManager { get; set; }
+    public string? LegacyOperationCoordinator { get; set; }
+    public string? LegacyRentalAdministrator { get; set; }
+
     public BusinessTypeModel? BusinessType { get; set; }
     public int NumFloors { get; set; }
     public int NumRooms { get; set; }

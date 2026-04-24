@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Umea.se.EstateService.DataStore;
 
@@ -11,9 +12,11 @@ using Umea.se.EstateService.DataStore;
 namespace Umea.se.EstateService.DataStore.Migrations
 {
     [DbContext(typeof(EstateDbContext))]
-    partial class EstateDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260421100740_AddBuildingContactPersonsJson")]
+    partial class AddBuildingContactPersonsJson
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -513,6 +516,7 @@ namespace Umea.se.EstateService.DataStore.Migrations
                         .HasColumnType("nvarchar(2000)");
 
                     b.Property<string>("Location")
+                        .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 

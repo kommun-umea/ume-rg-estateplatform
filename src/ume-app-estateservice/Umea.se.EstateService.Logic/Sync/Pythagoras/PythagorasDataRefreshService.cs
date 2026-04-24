@@ -41,7 +41,8 @@ public sealed class PythagorasDataRefreshService(
 
     // Properties in the "Driftgrupper" category (8) are not cached by Pythagoras,
     // so uilistdata never returns them. We backfill these via the calculatedvalue endpoint.
-    // Can be removed if Pythagoras starts caching these properties.
+    // The *Contact IDs (306-309) are calculated outputs ("phone / email") derived from the
+    // name selections — they have no inputValue so they only come back via calculatedvalue.
     private static readonly IReadOnlyCollection<int> _uncachedPropertyIds = Array.AsReadOnly(
     [
         (int)PropertyCategoryId.FacilityServiceOrder,
@@ -49,6 +50,10 @@ public sealed class PythagorasDataRefreshService(
         (int)PropertyCategoryId.OperationsManager,
         (int)PropertyCategoryId.OperationCoordinator,
         (int)PropertyCategoryId.RentalAdministrator,
+        (int)PropertyCategoryId.PropertyManagerContact,
+        (int)PropertyCategoryId.OperationsManagerContact,
+        (int)PropertyCategoryId.OperationCoordinatorContact,
+        (int)PropertyCategoryId.RentalAdministratorContact,
         (int)PropertyCategoryId.TownHallServiceOrder
     ]);
 

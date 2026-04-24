@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -195,14 +196,33 @@ public class EstateDbContext(DbContextOptions<EstateDbContext> options) : DbCont
                 nb.Property(n => n.EndDate).HasColumnName("NoticeBoardEndDate");
             });
 
-            // Configure ContactPersons as owned type
-            entity.OwnsOne(e => e.ContactPersons, cp =>
+            // ContactPersons is stored as JSON. The legacy flat columns below are kept for
+            // dual-write compatibility during rollout and will be dropped in a follow-up migration.
+            JsonSerializerOptions contactPersonsJsonOptions = new(JsonSerializerDefaults.Web)
             {
-                cp.Property(c => c.PropertyManager).HasColumnName("PropertyManager").HasMaxLength(500).IsRequired();
-                cp.Property(c => c.OperationsManager).HasColumnName("OperationsManager").HasMaxLength(500);
-                cp.Property(c => c.OperationCoordinator).HasColumnName("OperationCoordinator").HasMaxLength(500);
-                cp.Property(c => c.RentalAdministrator).HasColumnName("RentalAdministrator").HasMaxLength(500);
-            });
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+            };
+
+            ValueConverter<BuildingContactPersonsModel?, string?> contactPersonsConverter = new(
+                v => v == null ? null : JsonSerializer.Serialize(v, contactPersonsJsonOptions),
+                v => string.IsNullOrEmpty(v) ? null : JsonSerializer.Deserialize<BuildingContactPersonsModel>(v, contactPersonsJsonOptions));
+
+            ValueComparer<BuildingContactPersonsModel?> contactPersonsComparer = new(
+                (a, b) => JsonSerializer.Serialize(a, contactPersonsJsonOptions) == JsonSerializer.Serialize(b, contactPersonsJsonOptions),
+                v => v == null ? 0 : JsonSerializer.Serialize(v, contactPersonsJsonOptions).GetHashCode(StringComparison.Ordinal),
+                v => v == null ? null : JsonSerializer.Deserialize<BuildingContactPersonsModel>(JsonSerializer.Serialize(v, contactPersonsJsonOptions), contactPersonsJsonOptions));
+
+            entity.Property(e => e.ContactPersons)
+                .HasConversion(contactPersonsConverter)
+                .Metadata.SetValueComparer(contactPersonsComparer);
+
+            entity.Property(e => e.ContactPersons)
+                .HasColumnName("ContactPersonsJson");
+
+            entity.Property(e => e.LegacyPropertyManager).HasColumnName("PropertyManager").HasMaxLength(500).IsRequired();
+            entity.Property(e => e.LegacyOperationsManager).HasColumnName("OperationsManager").HasMaxLength(500);
+            entity.Property(e => e.LegacyOperationCoordinator).HasColumnName("OperationCoordinator").HasMaxLength(500);
+            entity.Property(e => e.LegacyRentalAdministrator).HasColumnName("RentalAdministrator").HasMaxLength(500);
 
             // Configure BusinessType as owned type
             entity.OwnsOne(e => e.BusinessType, bt =>
