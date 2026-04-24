@@ -58,7 +58,12 @@ public sealed class TestApiFactory : WebAppFactoryBase<Program, HttpClientNames>
                 ["WorkOrder:ProcessingIntervalSeconds"] = "9999",
                 ["WorkOrder:MaxRetries"] = "3",
                 ["WorkOrder:RetryBaseDelaySeconds"] = "1",
-                ["WorkOrder:StatusCheckIntervalMinutes"] = "60"
+                ["WorkOrder:StatusCheckIntervalMinutes"] = "60",
+                // Pythagoras per-type defaults (tests assert these in WorkOrderProcessorTests)
+                ["WorkOrder:DefaultCategoryIdByType:2"] = "82",
+                ["WorkOrder:DefaultOperatingGroupIdByType:1"] = "16",
+                ["WorkOrder:DefaultOperatingGroupIdByType:8"] = "21",
+                ["WorkOrder:DefaultOperatingGroupIdByType:9"] = "22"
             };
 
             configurationBuilder.AddInMemoryCollection(overrides);

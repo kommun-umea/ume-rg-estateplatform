@@ -15,6 +15,18 @@ public sealed class WorkOrderProcessingService(
 {
     private readonly WorkOrderConfiguration _config = appConfig.WorkOrderProcessing;
 
+    public override Task StartAsync(CancellationToken cancellationToken)
+    {
+        IReadOnlyList<string> problems = PythagorasWorkOrderCreateRequirements.Validate(_config);
+        if (problems.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Invalid Pythagoras work order config: {string.Join("; ", problems)}.");
+        }
+
+        return base.StartAsync(cancellationToken);
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         logger.LogInformation("WorkOrderProcessingService started. Polling every {Interval}s.", _config.ProcessingIntervalSeconds);

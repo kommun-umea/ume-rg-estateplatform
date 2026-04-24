@@ -141,19 +141,27 @@ public class WorkOrderProcessor(
             IReadOnlyList<WorkOrderCategorySuggestion> suggestions = await categoryClassifier.ClassifyAsync(
                 workOrder.Description, workOrder.WorkOrderTypeId, ct);
 
-            if (suggestions.Count > 0 && suggestions[0].Confidence >= 0.75)
+            if (suggestions.Count == 0)
             {
-                workOrder.CategoryId = suggestions[0].CategoryId;
+                return;
+            }
+
+            WorkOrderCategorySuggestion top = suggestions[0];
+            double threshold = _config.CategoryClassifierMinimumConfidence;
+
+            if (top.Confidence >= threshold)
+            {
+                workOrder.CategoryId = top.CategoryId;
                 await workOrderRepository.UpdateAsync(workOrder, ct);
                 logger.LogInformation(
                     "Work order {WorkOrderUid} classified as category {CategoryId} ({CategoryName}) with confidence {Confidence:F2}.",
-                    workOrder.Uid, suggestions[0].CategoryId, suggestions[0].CategoryName, suggestions[0].Confidence);
+                    workOrder.Uid, top.CategoryId, top.CategoryName, top.Confidence);
             }
-            else if (suggestions.Count > 0)
+            else
             {
                 logger.LogInformation(
-                    "Work order {WorkOrderUid} best category match {CategoryName} had insufficient confidence {Confidence:F2} (threshold: 0.75). Submitting without category.",
-                    workOrder.Uid, suggestions[0].CategoryName, suggestions[0].Confidence);
+                    "Work order {WorkOrderUid} best category match {CategoryName} had confidence {Confidence:F2} below threshold {Threshold:F2}; will fall back to configured default if required.",
+                    workOrder.Uid, top.CategoryName, top.Confidence, threshold);
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -164,6 +172,39 @@ public class WorkOrderProcessor(
 
     private async Task CreateInPythagorasAsync(WorkOrderEntity workOrder, CancellationToken ct)
     {
+        PythagorasWorkOrderType type = (PythagorasWorkOrderType)workOrder.WorkOrderTypeId;
+
+        // Start with the classifier's persisted decision. If it's null and the type requires a
+        // category, use the configured fallback for the *payload only* — deliberately not
+        // writing it back to workOrder.CategoryId, so stored data stays a faithful record of
+        // what the classifier decided (or didn't).
+        int? classifiedCategoryId = workOrder.CategoryId;
+        int? payloadCategoryId = classifiedCategoryId;
+
+        if (PythagorasWorkOrderCreateRequirements.RequiresCategory(type) && payloadCategoryId is null)
+        {
+            if (!_config.DefaultCategoryIdByType.TryGetValue(workOrder.WorkOrderTypeId, out int defaultCategory))
+            {
+                throw new InvalidOperationException(
+                    $"Pythagoras requires a category for work order type {type} ({workOrder.WorkOrderTypeId}), but the classifier produced no confident suggestion and no DefaultCategoryIdByType[{workOrder.WorkOrderTypeId}] is configured.");
+            }
+            payloadCategoryId = defaultCategory;
+            logger.LogInformation(
+                "Work order {WorkOrderUid} using configured fallback category {CategoryId} for type {Type} (classifier gave no confident suggestion). Not persisted to workOrder.CategoryId.",
+                workOrder.Uid, defaultCategory, type);
+        }
+
+        int? operatingGroupId = null;
+        if (PythagorasWorkOrderCreateRequirements.RequiresOperatingGroup(type))
+        {
+            if (!_config.DefaultOperatingGroupIdByType.TryGetValue(workOrder.WorkOrderTypeId, out int defaultGroup))
+            {
+                throw new InvalidOperationException(
+                    $"Pythagoras requires an operating group for work order type {type} ({workOrder.WorkOrderTypeId}), but no DefaultOperatingGroupIdByType[{workOrder.WorkOrderTypeId}] is configured.");
+            }
+            operatingGroupId = defaultGroup;
+        }
+
         CreatePythagorasWorkOrderRequest createRequest = new()
         {
             Description = workOrder.Description,
@@ -175,11 +216,12 @@ public class WorkOrderProcessor(
             NotifierName = workOrder.NotifierName,
             NotifierTelephone = workOrder.NotifierPhone,
             NotifierUsername = workOrder.NotifierEmail ?? workOrder.CreatedByEmail,
-            CategoryId = workOrder.CategoryId,
+            CategoryId = payloadCategoryId,
+            OperatingGroupId = operatingGroupId,
         };
 
         WorkOrderDto? created = await pythagorasClient.CreateWorkOrderAsync(
-            (PythagorasWorkOrderType)workOrder.WorkOrderTypeId, PythagorasWorkOrderOrigin.PYTHAGORAS_WEB, createRequest, ct) ?? throw new InvalidOperationException("Pythagoras returned null when creating workOrder.");
+            type, PythagorasWorkOrderOrigin.PYTHAGORAS_WEB, createRequest, ct) ?? throw new InvalidOperationException("Pythagoras returned null when creating workOrder.");
         workOrder.PythagorasWorkOrderId = created.Id;
 
         await workOrderRepository.UpdateAsync(workOrder, ct);

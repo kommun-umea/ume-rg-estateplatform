@@ -24,6 +24,26 @@ public class WorkOrderConfiguration
     public int? DocumentActionTypeId { get; set; }
     public int? DocumentActionTypeStatusId { get; set; }
 
+    /// <summary>
+    /// Minimum classifier confidence required to use a suggested category. Below this threshold
+    /// the classifier's pick is ignored — we either fall back to
+    /// <see cref="DefaultCategoryIdByType"/> (when the type requires a category) or omit the
+    /// category entirely.
+    /// </summary>
+    public double CategoryClassifierMinimumConfidence { get; set; } = 0.75;
+
+    /// <summary>
+    /// Default Pythagoras category id per work order type id. Used when the classifier cannot
+    /// supply a confident suggestion, for types where CATEGORIZATION_CATEGORY is MANDATORY_WHEN_CREATED.
+    /// </summary>
+    public Dictionary<int, int> DefaultCategoryIdByType { get; set; } = [];
+
+    /// <summary>
+    /// Default Pythagoras operating group id per work order type id. Used for types where
+    /// OPGROUPASSIGNEES_GROUP is MANDATORY_WHEN_CREATED.
+    /// </summary>
+    public Dictionary<int, int> DefaultOperatingGroupIdByType { get; set; } = [];
+
     public WorkOrderFileValidationConfig FileValidation { get; set; } = new();
 
     public FileStorageType ResolvedStorageType => FileStorage switch

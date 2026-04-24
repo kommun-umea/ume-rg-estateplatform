@@ -271,6 +271,7 @@ public sealed class FakePythagorasClient : IPythagorasClient
     private WorkOrderDto? _createWorkOrderResult;
     private WorkOrderDto? _getWorkOrderResult;
     public List<WorkOrderRequestCapture> WorkOrderRequests { get; } = [];
+    public List<CreatePythagorasWorkOrderRequest> CreateWorkOrderPayloads { get; } = [];
 
     public void SetCreateWorkOrderResult(WorkOrderDto? result) => _createWorkOrderResult = result;
     public void SetGetWorkOrderResult(WorkOrderDto? result) => _getWorkOrderResult = result;
@@ -279,6 +280,7 @@ public sealed class FakePythagorasClient : IPythagorasClient
     {
         ArgumentNullException.ThrowIfNull(request);
         WorkOrderRequests.Add(new WorkOrderRequestCapture("CreateWorkOrder", (int)workOrderType, $"origin={origin}"));
+        CreateWorkOrderPayloads.Add(request);
         return Task.FromResult(_createWorkOrderResult);
     }
 

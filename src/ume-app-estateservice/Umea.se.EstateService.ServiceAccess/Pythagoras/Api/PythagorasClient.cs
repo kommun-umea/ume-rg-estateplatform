@@ -578,7 +578,7 @@ where TValue : class
         if (!response.IsSuccessStatusCode)
         {
             throw new PythagorasApiException(
-                $"CreateWorkOrder failed: {(int)response.StatusCode} {response.ReasonPhrase}. Request: {json}. Response: {responseBody}",
+                $"CreateWorkOrder failed: {(int)response.StatusCode} {response.ReasonPhrase}. Type: {workOrderType} ({typeId}), Origin: {origin}. Request: {json}. Response: {responseBody}",
                 response.StatusCode,
                 responseBody);
         }

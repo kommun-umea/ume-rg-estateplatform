@@ -50,6 +50,7 @@ public sealed class CreatePythagorasWorkOrderRequest
     public int? StatusId { get; init; }
     public int? PriorityId { get; init; }
     public int? CategoryId { get; init; }
+    public int? OperatingGroupId { get; init; }
     public List<int?>? AssigneeIds { get; init; }
     public Dictionary<string, object>? CustomFieldsValueMap { get; init; }
     public List<WorkOrderInlineDocument>? Documents { get; init; }
