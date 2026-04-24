@@ -223,7 +223,7 @@ public class WorkOrderHandlerTests : IDisposable
         CreateWorkOrderRequest request = new()
         {
             BuildingId = 9999,
-            WorkOrderType = (WorkOrderType)999,
+            WorkOrderType = WorkOrderType.ErrorReport,
             Location = "InvalidType",
             Description = "Test"
         };
@@ -231,26 +231,64 @@ public class WorkOrderHandlerTests : IDisposable
         BusinessValidationException exception = await Should.ThrowAsync<BusinessValidationException>(
             () => _handler.SubmitWorkOrderAsync(request, "test@example.com"));
 
-        exception.Errors.Count.ShouldBeGreaterThanOrEqualTo(3);
-        exception.Errors.ShouldContainKey("workOrderType");
+        exception.Errors.Count.ShouldBeGreaterThanOrEqualTo(2);
         exception.Errors.ShouldContainKey("location");
         exception.Errors.ShouldContainKey("buildingId");
     }
 
     [Fact]
-    public async Task SubmitWorkOrder_BuildingService_SetsCorrectTypeId()
+    public async Task SubmitWorkOrder_BuildingService_WithoutLocation_StoresNullLocation()
     {
         CreateWorkOrderRequest request = new()
         {
             BuildingId = 1,
             WorkOrderType = WorkOrderType.BuildingService,
-            Location = "Indoor",
             Description = "Service request"
         };
 
         WorkOrderSubmissionModel result = await _handler.SubmitWorkOrderAsync(request, "test@example.com");
 
         result.Id.ShouldNotBe(Guid.Empty);
+
+        WorkOrderDetailModel detail = await _handler.GetWorkOrderAsync(result.Id, "test@example.com");
+        detail.Location.ShouldBeNull();
+        detail.RoomName.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task SubmitWorkOrder_BuildingService_IgnoresLocationAndRoomId()
+    {
+        CreateWorkOrderRequest request = new()
+        {
+            BuildingId = 1,
+            WorkOrderType = WorkOrderType.BuildingService,
+            Location = "Indoor",
+            RoomId = 10,
+            Description = "Service request"
+        };
+
+        WorkOrderSubmissionModel result = await _handler.SubmitWorkOrderAsync(request, "test@example.com");
+
+        WorkOrderDetailModel detail = await _handler.GetWorkOrderAsync(result.Id, "test@example.com");
+        detail.Location.ShouldBeNull();
+        detail.RoomName.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task SubmitWorkOrder_ErrorReportWithoutLocation_ThrowsRequired()
+    {
+        CreateWorkOrderRequest request = new()
+        {
+            BuildingId = 1,
+            WorkOrderType = WorkOrderType.ErrorReport,
+            Description = "Test"
+        };
+
+        BusinessValidationException exception = await Should.ThrowAsync<BusinessValidationException>(
+            () => _handler.SubmitWorkOrderAsync(request, "test@example.com"));
+
+        exception.Errors.ShouldContainKey("location");
+        exception.Errors["location"].ShouldContain("required");
     }
 
     [Fact]

@@ -18,10 +18,9 @@ public class CreateWorkOrderFormRequest
     [SwaggerSchema("Type of work order.")]
     public WorkOrderType WorkOrderType { get; init; }
 
-    [Required(ErrorMessage = ValidationErrorCode.Required)]
     [JsonPropertyName("location")]
-    [SwaggerSchema("Where the issue is located.", Description = "indoor | outdoor")]
-    public string Location { get; init; } = null!;
+    [SwaggerSchema("Where the issue is located. Required for error reports, ignored for service types.", Description = "indoor | outdoor", Nullable = true)]
+    public string? Location { get; init; }
 
     [JsonPropertyName("roomId")]
     [SwaggerSchema("Room ID. Required for indoor, must be omitted for outdoor.", Nullable = true)]

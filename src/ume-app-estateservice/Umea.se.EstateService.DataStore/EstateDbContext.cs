@@ -371,8 +371,7 @@ public class EstateDbContext(DbContextOptions<EstateDbContext> options) : DbCont
 
             entity.Property(e => e.Location)
                 .HasConversion<string>()
-                .HasMaxLength(20)
-                .IsRequired();
+                .HasMaxLength(20);
 
             entity.Property(e => e.SyncStatus)
                 .HasConversion<string>()

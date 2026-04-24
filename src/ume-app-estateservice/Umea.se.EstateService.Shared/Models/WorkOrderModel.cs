@@ -6,7 +6,7 @@ public class WorkOrderDetailModel
     public WorkOrderType? WorkOrderType { get; init; }
     public string BuildingName { get; init; } = null!;
     public string? RoomName { get; init; }
-    public string Location { get; init; } = null!;
+    public string? Location { get; init; }
     public string Description { get; init; } = null!;
     public string SyncStatus { get; init; } = null!;
     public string? Status { get; init; }
@@ -24,7 +24,7 @@ public class WorkOrderListItemModel
     public WorkOrderType? WorkOrderType { get; init; }
     public string BuildingName { get; init; } = null!;
     public string? RoomName { get; init; }
-    public string Location { get; init; } = null!;
+    public string? Location { get; init; }
     public string Description { get; init; } = null!;
     public string SyncStatus { get; init; } = null!;
     public string? Status { get; init; }

@@ -15,7 +15,7 @@ public class CreateWorkOrderRequest
 {
     public int BuildingId { get; init; }
     public WorkOrderType WorkOrderType { get; init; }
-    public string Location { get; init; } = null!;
+    public string? Location { get; init; }
     public int? RoomId { get; init; }
     public string Description { get; init; } = null!;
     public string? NotifierEmail { get; init; }

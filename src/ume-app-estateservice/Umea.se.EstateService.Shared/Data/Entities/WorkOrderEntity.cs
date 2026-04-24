@@ -10,7 +10,7 @@ public class WorkOrderEntity : BaseEntity
     public int? RoomId { get; set; }
     public string? RoomName { get; set; }
 
-    public WorkOrderLocation Location { get; set; }
+    public WorkOrderLocation? Location { get; set; }
     public string Description { get; set; } = string.Empty;
     public WorkOrderSyncStatus SyncStatus { get; set; }
     public int WorkOrderTypeId { get; set; }

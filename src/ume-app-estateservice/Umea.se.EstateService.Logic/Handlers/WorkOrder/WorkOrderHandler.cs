@@ -35,9 +35,23 @@ public class WorkOrderHandler(
             errors.AddError("workOrderType", ValidationErrorCode.InvalidValue);
         }
 
-        if (!Enum.TryParse<WorkOrderLocation>(request.Location, ignoreCase: true, out WorkOrderLocation location))
+        bool isErrorReport = request.WorkOrderType == WorkOrderType.ErrorReport;
+        WorkOrderLocation? location = null;
+
+        if (isErrorReport)
         {
-            errors.AddError("location", ValidationErrorCode.InvalidValue);
+            if (string.IsNullOrWhiteSpace(request.Location))
+            {
+                errors.AddError("location", ValidationErrorCode.Required);
+            }
+            else if (!Enum.TryParse(request.Location, ignoreCase: true, out WorkOrderLocation parsed))
+            {
+                errors.AddError("location", ValidationErrorCode.InvalidValue);
+            }
+            else
+            {
+                location = parsed;
+            }
         }
 
         if (!dataStore.BuildingsById.TryGetValue(request.BuildingId, out BuildingEntity? building))
@@ -49,8 +63,9 @@ public class WorkOrderHandler(
             errors.AddError("workOrderType", ValidationErrorCode.NotSupported);
         }
 
+        int? roomId = null;
         string? roomName = null;
-        if (request.RoomId.HasValue)
+        if (isErrorReport && request.RoomId.HasValue)
         {
             if (location == WorkOrderLocation.Outdoor)
             {
@@ -66,6 +81,7 @@ public class WorkOrderHandler(
             }
             else
             {
+                roomId = room.Id;
                 roomName = room.Name;
             }
         }
@@ -77,7 +93,7 @@ public class WorkOrderHandler(
             Uid = Guid.NewGuid(),
             BuildingId = request.BuildingId,
             BuildingName = building!.Name,
-            RoomId = request.RoomId,
+            RoomId = roomId,
             RoomName = roomName,
             Location = location,
             WorkOrderTypeId = (int)workOrderType,
