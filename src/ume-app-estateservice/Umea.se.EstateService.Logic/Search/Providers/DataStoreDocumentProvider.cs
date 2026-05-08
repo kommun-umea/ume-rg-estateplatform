@@ -59,7 +59,6 @@ public class DataStoreDocumentProvider(IDataStore dataStore) : IPythagorasDocume
             RankScore = 1,
             UpdatedAt = estate.UpdatedAt,
             Ancestors = [],
-            NumChildren = estate.Buildings.Count,
             ExtendedProperties = CreateEstateExtendedProperties(estate)
         };
     }
